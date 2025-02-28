@@ -1,0 +1,47 @@
+# Ignore build folders
+x64/Debug/
+x64/Release/
+x64/Intermediate/
+
+# Visual Studio cache files
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# CMake build files (if you're using CMake)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Executables and libraries
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.exp
+*.log
+*.userprefs
+*.user
+*.opendb
+*.tlog
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# macOS generated files
+.DS_Store
+
+# Optional: If you’re using other build systems (e.g., build subfolder)
+build/
+out/
+
+# Shader compilation artifacts (if any)
+*.spv
+*.shaderbin
+
+# Temporary files
+*.tmp
+*.temp
