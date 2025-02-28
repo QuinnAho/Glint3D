@@ -1,18 +1,5 @@
-﻿  AxisRenderer.cpp
-  imgui_impl_glfw.cpp
-  imgui_impl_opengl3.cpp
-  imgui.cpp
-  imgui_draw.cpp
-  imgui_tables.cpp
-  imgui_widgets.cpp
+﻿  Application.cpp
   main.cpp
-C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\main.cpp(133,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\main.cpp(134,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  objloader.cpp
-C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\objloader.cpp(60,54): warning C4267: 'return': conversion from 'size_t' to 'int', possible loss of data
-C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\objloader.cpp(61,54): warning C4267: 'return': conversion from 'size_t' to 'int', possible loss of data
-  objloader.h
   Generating Code...
-  glad.c
 x64\Debug\objloader.obj : warning LNK4042: object specified more than once; extras ignored
-  Project1.vcxproj -> C:\Class\ComputerGraphics\Template\OpenGLTemplate\x64\Debug\Project1.exe
+  Project1.vcxproj -> C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\x64\Debug\Project1.exe
