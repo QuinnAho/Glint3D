@@ -45,3 +45,10 @@ out/
 # Temporary files
 *.tmp
 *.temp
+
+# Ignore Visual Studio folders and files
+.vs/
+*.VC.db
+*.ipch
+
+# ... any other build or large files you don't want ...
