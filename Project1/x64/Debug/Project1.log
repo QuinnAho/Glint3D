@@ -1,5 +1,4 @@
 ﻿  Application.cpp
   main.cpp
   Generating Code...
-x64\Debug\objloader.obj : warning LNK4042: object specified more than once; extras ignored
   Project1.vcxproj -> C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\x64\Debug\Project1.exe

@@ -112,7 +112,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -128,7 +128,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,10 +151,12 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="objloader.cpp" />
     <ClCompile Include="objloader.h" />
+    <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="AxisRenderer.h" />
+    <ClInclude Include="texture.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

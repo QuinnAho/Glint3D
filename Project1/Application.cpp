@@ -115,25 +115,50 @@ void Application::setupOpenGL()
 {
     // Simple vertex and fragment shaders
     const char* vertexShaderSource = R"(
-        #version 330 core
-        layout (location = 0) in vec3 aPos;
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-        void main()
-        {
-            gl_Position = projection * view * model * vec4(aPos, 1.0);
-        }
-    )";
+    #version 330 core
+    layout (location = 0) in vec3 aPos;
+
+    uniform mat4 model;
+    uniform mat4 view;
+    uniform mat4 projection;
+
+    out vec2 UV;
+
+    void main()
+    {
+        vec4 worldPosition = model * vec4(aPos, 1.0);
+        gl_Position = projection * view * worldPosition;
+
+        // Compute spherical UV coordinates
+        vec3 normalizedPos = normalize(aPos);
+        float u = 0.5 + atan(normalizedPos.z, normalizedPos.x) / (2.0 * 3.1415926);
+        float v = 0.5 - asin(normalizedPos.y) / 3.1415926;
+        UV = vec2(u, v);
+    }
+)";
 
     const char* fragmentShaderSource = R"(
-        #version 330 core
-        out vec4 FragColor;
-        void main()
-        {
-            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-        }
-    )";
+    #version 330 core
+    out vec4 FragColor;
+    in vec2 UV;
+
+    uniform sampler2D cowTexture;
+    uniform bool useTexture;
+
+    void main()
+    {
+        if (useTexture)
+            FragColor = texture(cowTexture, UV);
+        else
+            FragColor = vec4(1.0); // Solid white when texture is off
+    }
+)";
+
+
+    if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
+    {
+        std::cerr << "Failed to load cow texture.\n";
+    }
 
     // Compile vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -177,6 +202,8 @@ void Application::setupOpenGL()
     // Clean up individual shaders
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+
+    useTextureLocation = glGetUniformLocation(m_shaderProgram, "useTexture");
 
     // Load the OBJ model
     m_objLoader.load("cow.obj"); // <-- your OBJ file path
@@ -302,12 +329,22 @@ void Application::renderScene()
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(m_viewMatrix));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(m_projectionMatrix));
 
-    // Set polygon mode
     switch (m_renderMode)
     {
-    case 0: glPolygonMode(GL_FRONT_AND_BACK, GL_POINT); break; // Points
-    case 1: glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  break; // Wireframe
-    default: glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); break; // Solid
+    case 0:
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        glUniform1i(useTextureLocation, GL_FALSE);
+        break;
+    case 1:
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glUniform1i(useTextureLocation, GL_FALSE);
+        break;
+    default: // Solid Mode
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        m_cowTexture.bind(0);
+        glUniform1i(glGetUniformLocation(m_shaderProgram, "cowTexture"), 0);
+        glUniform1i(useTextureLocation, GL_TRUE);
+        break;
     }
 
     glBindVertexArray(m_VAO);

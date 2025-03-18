@@ -9,6 +9,7 @@
 
 #include "objloader.h"
 #include "AxisRenderer.h"
+#include "texture.h"
 
 // Forward declare ImGui setup or include ImGui headers if desired
 // #include "imgui.h"
@@ -74,6 +75,11 @@ private:
     // Model center for pivot rotations
     glm::vec3 m_modelCenter;
 
+    // Texture 
+    Texture m_cowTexture;
+
+    GLint useTextureLocation;
+
 private:
     // Internal setup methods
     bool initGLFW(const std::string& windowTitle, int width, int height);
@@ -87,6 +93,8 @@ private:
     void renderScene();
     void renderGUI();
     void renderAxisIndicator();
+
+
 
     // GLFW callbacks (must be static or free functions)
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
