@@ -84,6 +84,9 @@ private:
     // Light
     Light m_lights;
 
+    // Shading Mode
+    int m_shadingMode = 2;
+
 private:
     // Internal setup methods
     bool initGLFW(const std::string& windowTitle, int width, int height);

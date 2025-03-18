@@ -128,15 +128,16 @@ void Application::setupOpenGL()
     GLuint shaderProgram = m_cowTexture.getShaderProgram();
     m_useTextureLocation = glGetUniformLocation(shaderProgram, "useTexture");
 
-    // Load the OBJ model
+    // Specify model here
     m_objLoader.load("cow.obj");
 
     glm::vec3 minBound = m_objLoader.getMinBounds();
     glm::vec3 maxBound = m_objLoader.getMaxBounds();
     m_modelCenter = (minBound + maxBound) * 0.5f;
 
-    m_lights.addLight(glm::vec3(2.0f, 5.0f, 3.0f), glm::vec3(1.0f, 0.2f, 0.2f), 1.2f);
-    m_lights.addLight(glm::vec3(4.0f, 5.0f, 3.0f), glm::vec3(1.0f, 0.2f, 0.2f), 1.2f);
+    // Add lights here
+    m_lights.addLight(glm::vec3(2.0f, 5.0f, 3.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
+    m_lights.addLight(glm::vec3(4.0f, 5.0f, 3.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
 
 
     // Translate model so that its center is at origin
@@ -244,6 +245,10 @@ void Application::renderScene()
     GLuint shaderProgram = m_cowTexture.getShaderProgram();
     glUseProgram(shaderProgram);
 
+    // Send shading mode to shader
+    GLuint shadingModeLoc = glGetUniformLocation(shaderProgram, "shadingMode");
+    glUniform1i(shadingModeLoc, m_shadingMode);
+
     // Send Light properties to shader
     m_lights.applyLights(shaderProgram);
 
@@ -295,7 +300,7 @@ void Application::renderGUI()
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(380, 300), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(380, 350), ImGuiCond_Always);
 
     ImGui::Begin("Camera & Render Settings", nullptr, ImGuiWindowFlags_NoCollapse);
     ImGui::Text("Use WASD to move, Q/E for up/down.");
@@ -312,6 +317,15 @@ void Application::renderGUI()
     if (ImGui::Button("Set Points Mode")) { m_renderMode = 0; }
     if (ImGui::Button("Set Wireframe Mode")) { m_renderMode = 1; }
     if (ImGui::Button("Set Solid Mode")) { m_renderMode = 2; }
+
+    ImGui::Separator(); // visual break
+
+    ImGui::Text("Shading Mode:");
+    const char* shadingModes[] = { "Flat Shading", "Gouraud Shading", "Phong Shading" };
+    if (ImGui::Combo("##Shading Mode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes)))
+    {
+        std::cout << "Shading mode set to: " << shadingModes[m_shadingMode] << std::endl;
+    }
 
     ImGui::End();
 

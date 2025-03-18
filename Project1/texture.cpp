@@ -1,4 +1,4 @@
-#include "Texture.h"
+﻿#include "Texture.h"
 #include <iostream>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -12,29 +12,14 @@ layout(location = 1) in vec3 aNormal;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform int shadingMode; // 0 = Flat, 1 = Gouraud, 2 = Phong
 
-out vec3 ModelPos;
-out vec3 WorldNormal;
-
-void main()
-{
-    vec4 worldPosition = model * vec4(aPos, 1.0);
-    gl_Position = projection * view * worldPosition;
-
-    // Pass Model-Space Position Instead of World-Space
-    ModelPos = aPos; 
-
-    // Correct Normal Transformation
-    WorldNormal = normalize(mat3(transpose(inverse(model))) * aNormal);
-}
-)";
-
-// Fragment Shader Source
-const char* fragmentShaderSource = R"(
-#version 330 core
-out vec4 FragColor;
-in vec3 ModelPos;
-in vec3 WorldNormal;
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 LightColor;
+out vec3 LightPos;
+out vec3 ViewPos;
+out vec2 ModelUV;
 
 struct Light {
     vec3 position;
@@ -46,29 +31,95 @@ struct Light {
 uniform int numLights;
 uniform Light lights[MAX_LIGHTS];
 
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal; // Correct normal transformation
+
+    ModelUV = aPos.xy * 0.5 + 0.5;
+
+    LightColor = vec3(0.0);
+    LightPos = vec3(0.0);
+    ViewPos = vec3(0.0);
+
+    // Compute Gouraud shading if selected
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++)
+        {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            LightColor += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+)";
+
+
+
+// Fragment Shader Source
+const char* fragmentShaderSource = R"(
+#version 330 core
+out vec4 FragColor;
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 LightColor;
+in vec2 ModelUV;
+
 uniform sampler2D cowTexture;
 uniform bool useTexture;
+uniform int shadingMode; // 0 = Flat, 1 = Gouraud, 2 = Phong
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
 
 void main()
 {
-    vec3 normal = normalize(WorldNormal);
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
     vec3 totalLight = vec3(0.0);
 
-    for (int i = 0; i < numLights; i++)
-    {
-        vec3 lightDir = normalize(lights[i].position - ModelPos);
-        float diff = max(dot(normal, lightDir), 0.0);
-        vec3 diffuse = diff * lights[i].color * lights[i].intensity;
-        totalLight += diffuse;
+    if (shadingMode == 0) {
+        // Flat Shading
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos))); // Compute face normal
+        for (int i = 0; i < numLights; i++)
+        {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            totalLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        // Gouraud Shading
+        totalLight = LightColor;
+    }
+    else {
+        // Phong Shading (Default)
+        for (int i = 0; i < numLights; i++)
+        {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            totalLight += diff * lights[i].color * lights[i].intensity;
+        }
     }
 
-    // Apply texture if enabled
-    vec3 objectColor = useTexture ? texture(cowTexture, ModelPos.xy * 0.5 + 0.5).rgb : vec3(1.0);
+    vec3 objectColor = useTexture ? texture(cowTexture, ModelUV).rgb : vec3(1.0);
 
-    // Final fragment color
     FragColor = vec4(objectColor * totalLight, 1.0);
 }
 )";
+
 Texture::Texture() : m_textureID(0), m_shaderProgram(0)
 {
 }
