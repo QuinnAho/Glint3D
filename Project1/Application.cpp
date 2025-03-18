@@ -113,103 +113,31 @@ void Application::initImGui()
 
 void Application::setupOpenGL()
 {
-    // Simple vertex and fragment shaders
-    const char* vertexShaderSource = R"(
-    #version 330 core
-    layout (location = 0) in vec3 aPos;
-
-    uniform mat4 model;
-    uniform mat4 view;
-    uniform mat4 projection;
-
-    out vec2 UV;
-
-    void main()
-    {
-        vec4 worldPosition = model * vec4(aPos, 1.0);
-        gl_Position = projection * view * worldPosition;
-
-        // Compute spherical UV coordinates
-        vec3 normalizedPos = normalize(aPos);
-        float u = 0.5 + atan(normalizedPos.z, normalizedPos.x) / (2.0 * 3.1415926);
-        float v = 0.5 - asin(normalizedPos.y) / 3.1415926;
-        UV = vec2(u, v);
-    }
-)";
-
-    const char* fragmentShaderSource = R"(
-    #version 330 core
-    out vec4 FragColor;
-    in vec2 UV;
-
-    uniform sampler2D cowTexture;
-    uniform bool useTexture;
-
-    void main()
-    {
-        if (useTexture)
-            FragColor = texture(cowTexture, UV);
-        else
-            FragColor = vec4(1.0); // Solid white when texture is off
-    }
-)";
-
-
+    // Load the texture and compile shaders (handled inside Texture class)
     if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
     {
         std::cerr << "Failed to load cow texture.\n";
     }
 
-    // Compile vertex shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
-
-    int success;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success)
+    if (!m_cowTexture.initShaders())
     {
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cerr << "Vertex Shader Compilation Error:\n" << infoLog << std::endl;
+        std::cerr << "Failed to compile texture shaders.\n";
     }
 
-    // Compile fragment shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cerr << "Fragment Shader Compilation Error:\n" << infoLog << std::endl;
-    }
-
-    // Link shader program
-    m_shaderProgram = glCreateProgram();
-    glAttachShader(m_shaderProgram, vertexShader);
-    glAttachShader(m_shaderProgram, fragmentShader);
-    glLinkProgram(m_shaderProgram);
-
-    glGetProgramiv(m_shaderProgram, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(m_shaderProgram, 512, nullptr, infoLog);
-        std::cerr << "Program Linking Error:\n" << infoLog << std::endl;
-    }
-
-    // Clean up individual shaders
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    useTextureLocation = glGetUniformLocation(m_shaderProgram, "useTexture");
+    // Retrieve the shader program from Texture class
+    GLuint shaderProgram = m_cowTexture.getShaderProgram();
+    m_useTextureLocation = glGetUniformLocation(shaderProgram, "useTexture");
 
     // Load the OBJ model
-    m_objLoader.load("cow.obj"); // <-- your OBJ file path
+    m_objLoader.load("cow.obj");
+
     glm::vec3 minBound = m_objLoader.getMinBounds();
     glm::vec3 maxBound = m_objLoader.getMaxBounds();
     m_modelCenter = (minBound + maxBound) * 0.5f;
+
+    m_light.setPosition(glm::vec3(2.0f, 5.0f, 3.0f)); // Move it above and to the side
+    m_light.setColor(glm::vec3(1.0f, 1.0f, 1.0f));   // White light
+    m_light.setIntensity(1.5f);  // Bright light
 
     // Translate model so that its center is at origin
     m_modelMatrix = glm::translate(glm::mat4(1.0f), -m_modelCenter);
@@ -221,7 +149,7 @@ void Application::setupOpenGL()
 
     glBindVertexArray(m_VAO);
 
-    // Vertex buffer
+    // Vertex buffer (assuming normal support is added)
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
     glBufferData(
         GL_ARRAY_BUFFER,
@@ -243,7 +171,6 @@ void Application::setupOpenGL()
     );
 
     glBindVertexArray(0);
-
     glEnable(GL_DEPTH_TEST);
 
     // Initialize axis renderer
@@ -311,39 +238,44 @@ void Application::processInput()
 
 void Application::renderScene()
 {
-    // Clear screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use our shader
-    glUseProgram(m_shaderProgram);
+    // Use texture shader
+    GLuint shaderProgram = m_cowTexture.getShaderProgram();
+    glUseProgram(shaderProgram);
 
+    // Send Light properties to shader
+    m_light.applyLight(shaderProgram);
+
+    // Set up transformation matrices
     float aspectRatio = (float)m_windowWidth / (float)m_windowHeight;
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
-    GLuint modelLoc = glGetUniformLocation(m_shaderProgram, "model");
-    GLuint viewLoc = glGetUniformLocation(m_shaderProgram, "view");
-    GLuint projLoc = glGetUniformLocation(m_shaderProgram, "projection");
+    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
+    GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
 
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(m_viewMatrix));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(m_projectionMatrix));
 
+    // Set rendering mode
     switch (m_renderMode)
     {
     case 0:
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glUniform1i(useTextureLocation, GL_FALSE);
+        glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
     case 1:
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glUniform1i(useTextureLocation, GL_FALSE);
+        glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
-    default: // Solid Mode
+    default:
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         m_cowTexture.bind(0);
-        glUniform1i(glGetUniformLocation(m_shaderProgram, "cowTexture"), 0);
-        glUniform1i(useTextureLocation, GL_TRUE);
+        glUniform1i(glGetUniformLocation(shaderProgram, "cowTexture"), 0);
+        glUniform1i(m_useTextureLocation, GL_TRUE);
         break;
     }
 
@@ -351,13 +283,8 @@ void Application::renderScene()
     glDrawElements(GL_TRIANGLES, m_objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
-    // Draw axis indicator
     renderAxisIndicator();
-
-    // Draw ImGui
     renderGUI();
-
-    // Swap buffers
     glfwSwapBuffers(m_window);
 }
 

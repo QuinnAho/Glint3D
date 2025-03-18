@@ -10,6 +10,7 @@
 #include "objloader.h"
 #include "AxisRenderer.h"
 #include "texture.h"
+#include "light.h"
 
 // Forward declare ImGui setup or include ImGui headers if desired
 // #include "imgui.h"
@@ -78,7 +79,10 @@ private:
     // Texture 
     Texture m_cowTexture;
 
-    GLint useTextureLocation;
+    GLint m_useTextureLocation;
+
+    // Light
+    Light m_light;
 
 private:
     // Internal setup methods

@@ -7,6 +7,7 @@ C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\im
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\imgui\imgui_draw.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\imgui_draw.obj
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\imgui\imgui_tables.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\imgui_tables.obj
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\imgui\imgui_widgets.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\imgui_widgets.obj
+C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\light.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\light.obj
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\main.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\main.obj
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\objloader.cpp;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\objloader.obj
 C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\objloader.h;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\x64\Debug\objloader.obj

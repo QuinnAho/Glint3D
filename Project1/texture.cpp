@@ -3,8 +3,69 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-Texture::Texture()
-    : m_textureID(0)
+// Vertex Shader Source
+const char* vertexShaderSource = R"(
+#version 330 core
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 ModelPos;
+out vec3 WorldNormal;
+
+void main()
+{
+    vec4 worldPosition = model * vec4(aPos, 1.0);
+    gl_Position = projection * view * worldPosition;
+
+    // Pass Model-Space Position Instead of World-Space
+    ModelPos = aPos; 
+
+    // Correct Normal Transformation
+    WorldNormal = normalize(mat3(transpose(inverse(model))) * aNormal);
+}
+)";
+
+// Fragment Shader Source
+const char* fragmentShaderSource = R"(
+#version 330 core
+out vec4 FragColor;
+in vec3 ModelPos;   // Use Model-Space Position Instead
+in vec3 WorldNormal;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+uniform Light light;
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+
+void main()
+{
+    // Compute normal and light direction
+    vec3 normal = normalize(WorldNormal);
+    vec3 lightDir = normalize(light.position - ModelPos); // Use ModelPos instead of WorldPos
+
+    // Compute diffuse lighting
+    float diff = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = diff * light.color * light.intensity;
+
+    // Apply texture if enabled
+    vec3 objectColor = useTexture ? texture(cowTexture, ModelPos.xy * 0.5 + 0.5).rgb : vec3(1.0);
+
+    // Combine color with lighting
+    FragColor = vec4(objectColor * diffuse, 1.0);
+}
+
+)";
+
+Texture::Texture() : m_textureID(0), m_shaderProgram(0)
 {
 }
 
@@ -12,6 +73,8 @@ Texture::~Texture()
 {
     if (m_textureID)
         glDeleteTextures(1, &m_textureID);
+    if (m_shaderProgram)
+        glDeleteProgram(m_shaderProgram);
 }
 
 bool Texture::loadFromFile(const std::string& filepath)
@@ -19,7 +82,6 @@ bool Texture::loadFromFile(const std::string& filepath)
     glGenTextures(1, &m_textureID);
     glBindTexture(GL_TEXTURE_2D, m_textureID);
 
-    // Load image data
     int width, height, channels;
     unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &channels, 0);
     if (!data)
@@ -28,18 +90,11 @@ bool Texture::loadFromFile(const std::string& filepath)
         return false;
     }
 
-    GLenum format = GL_RGB;
-    if (channels == 1)
-        format = GL_RED;
-    else if (channels == 3)
-        format = GL_RGB;
-    else if (channels == 4)
-        format = GL_RGBA;
+    GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
 
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    // Set texture parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -57,7 +112,56 @@ void Texture::bind(GLuint unit) const
     glBindTexture(GL_TEXTURE_2D, m_textureID);
 }
 
-GLuint Texture::getTextureID() const
+bool Texture::initShaders()
 {
-    return m_textureID;
+    m_shaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
+    return m_shaderProgram != 0;
+}
+
+GLuint Texture::compileShader(const char* source, GLenum type)
+{
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+
+    GLint success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cerr << "Shader Compilation Error:\n" << infoLog << std::endl;
+        return 0;
+    }
+
+    return shader;
+}
+
+GLuint Texture::createShaderProgram(const char* vertexSource, const char* fragmentSource)
+{
+    GLuint vertexShader = compileShader(vertexSource, GL_VERTEX_SHADER);
+    GLuint fragmentShader = compileShader(fragmentSource, GL_FRAGMENT_SHADER);
+
+    if (!vertexShader || !fragmentShader)
+        return 0;
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+
+    GLint success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        std::cerr << "Program Linking Error:\n" << infoLog << std::endl;
+        return 0;
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    return program;
 }
