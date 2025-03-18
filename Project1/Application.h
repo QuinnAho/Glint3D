@@ -82,7 +82,7 @@ private:
     GLint m_useTextureLocation;
 
     // Light
-    Light m_light;
+    Light m_lights;
 
 private:
     // Internal setup methods

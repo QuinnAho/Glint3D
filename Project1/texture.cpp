@@ -33,7 +33,7 @@ void main()
 const char* fragmentShaderSource = R"(
 #version 330 core
 out vec4 FragColor;
-in vec3 ModelPos;   // Use Model-Space Position Instead
+in vec3 ModelPos;
 in vec3 WorldNormal;
 
 struct Light {
@@ -42,29 +42,33 @@ struct Light {
     float intensity;
 };
 
-uniform Light light;
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
 uniform sampler2D cowTexture;
 uniform bool useTexture;
 
 void main()
 {
-    // Compute normal and light direction
     vec3 normal = normalize(WorldNormal);
-    vec3 lightDir = normalize(light.position - ModelPos); // Use ModelPos instead of WorldPos
+    vec3 totalLight = vec3(0.0);
 
-    // Compute diffuse lighting
-    float diff = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = diff * light.color * light.intensity;
+    for (int i = 0; i < numLights; i++)
+    {
+        vec3 lightDir = normalize(lights[i].position - ModelPos);
+        float diff = max(dot(normal, lightDir), 0.0);
+        vec3 diffuse = diff * lights[i].color * lights[i].intensity;
+        totalLight += diffuse;
+    }
 
     // Apply texture if enabled
     vec3 objectColor = useTexture ? texture(cowTexture, ModelPos.xy * 0.5 + 0.5).rgb : vec3(1.0);
 
-    // Combine color with lighting
-    FragColor = vec4(objectColor * diffuse, 1.0);
+    // Final fragment color
+    FragColor = vec4(objectColor * totalLight, 1.0);
 }
-
 )";
-
 Texture::Texture() : m_textureID(0), m_shaderProgram(0)
 {
 }

@@ -135,9 +135,9 @@ void Application::setupOpenGL()
     glm::vec3 maxBound = m_objLoader.getMaxBounds();
     m_modelCenter = (minBound + maxBound) * 0.5f;
 
-    m_light.setPosition(glm::vec3(2.0f, 5.0f, 3.0f)); // Move it above and to the side
-    m_light.setColor(glm::vec3(1.0f, 1.0f, 1.0f));   // White light
-    m_light.setIntensity(1.5f);  // Bright light
+    m_lights.addLight(glm::vec3(2.0f, 5.0f, 3.0f), glm::vec3(1.0f, 0.2f, 0.2f), 1.2f);
+    m_lights.addLight(glm::vec3(4.0f, 5.0f, 3.0f), glm::vec3(1.0f, 0.2f, 0.2f), 1.2f);
+
 
     // Translate model so that its center is at origin
     m_modelMatrix = glm::translate(glm::mat4(1.0f), -m_modelCenter);
@@ -245,7 +245,7 @@ void Application::renderScene()
     glUseProgram(shaderProgram);
 
     // Send Light properties to shader
-    m_light.applyLight(shaderProgram);
+    m_lights.applyLights(shaderProgram);
 
     // Set up transformation matrices
     float aspectRatio = (float)m_windowWidth / (float)m_windowHeight;

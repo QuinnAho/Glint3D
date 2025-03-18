@@ -3,6 +3,13 @@
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <vector>
+
+struct LightData {
+    glm::vec3 position;
+    glm::vec3 color;
+    float intensity;
+};
 
 class Light
 {
@@ -10,31 +17,17 @@ public:
     Light();
     ~Light();
 
-    // Set Light Position
-    void setPosition(const glm::vec3& position);
+    // Add a new light source
+    void addLight(const glm::vec3& position, const glm::vec3& color, float intensity);
 
-    // Set Light Color
-    void setColor(const glm::vec3& color);
+    // Send all lights to shader
+    void applyLights(GLuint shaderProgram) const;
 
-    // Set Light Intensity
-    void setIntensity(float intensity);
-
-    // Send Light data to shader
-    void applyLight(GLuint shaderProgram) const;
-
-    // Get Light Position
-    glm::vec3 getPosition() const;
-
-    // Get Light Color
-    glm::vec3 getColor() const;
-
-    // Get Light Intensity
-    float getIntensity() const;
+    // Get the number of lights
+    size_t getLightCount() const;
 
 private:
-    glm::vec3 m_position;
-    glm::vec3 m_color;
-    float m_intensity;
+    std::vector<LightData> m_lights;
 };
 
 #endif // LIGHT_H
