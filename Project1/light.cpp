@@ -61,7 +61,7 @@ size_t Light::getLightCount() const
     return m_lights.size();
 }
 
-// NEW: Initialize indicator geometry (a small cube)
+// Initialize indicator geometry (a small cube)
 void Light::initIndicator()
 {
     float vertices[] = {
@@ -119,7 +119,7 @@ void Light::initIndicator()
     glBindVertexArray(0);
 }
 
-// NEW: Initialize the indicator shader within the Light class
+// Initialize the indicator shader within the Light class
 bool Light::initIndicatorShader()
 {
     const char* vertexShaderSource = R"(
@@ -189,7 +189,7 @@ bool Light::initIndicatorShader()
     return true;
 }
 
-// NEW: Render visual indicators for each light using the indicator shader stored in the Light class
+// Render visual indicators for each light using the indicator shader stored in the Light class
 void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection) const
 {
     if (m_indicatorShader == 0)

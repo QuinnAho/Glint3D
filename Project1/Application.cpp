@@ -23,7 +23,7 @@ Application::Application()
     , m_fov(45.0f)
     , m_nearClip(0.1f)
     , m_farClip(100.0f)
-    , m_cameraSpeed(0.1f)
+    , m_cameraSpeed(0.5f)
     , m_sensitivity(0.1f)
     , m_rightMousePressed(false)
     , m_leftMousePressed(false)
@@ -129,9 +129,16 @@ void Application::setupOpenGL()
     GLuint shaderProgram = m_cowTexture.getShaderProgram();
     m_useTextureLocation = glGetUniformLocation(shaderProgram, "useTexture");
 
-    // Specify model here
-    addObject("cow.obj", glm::vec3(0.0f, 0.0f, 0.0f), "cow-tex-fin.jpg");
-    addObject("cube.obj", glm::vec3(10.0f, 0.0f, 0.0f));
+    // Add model here
+    addObject("cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
+    addObject("cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
+
+    //Walls
+    addObject("cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true);
+    addObject("cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true);
+
+    addObject("cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
+    addObject("cube.obj", glm::vec3(14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
 
 
     glm::vec3 minBound = m_objLoader.getMinBounds();
@@ -139,8 +146,8 @@ void Application::setupOpenGL()
     m_modelCenter = (minBound + maxBound) * 0.5f;
 
     // Add lights here
-    m_lights.addLight(glm::vec3(2.0f, 5.0f, 5.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
-    m_lights.addLight(glm::vec3(10.0f, 5.0f, 5.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
+    m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);
+    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 3.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f);
 
 
     // Translate model so that its center is at origin
@@ -399,22 +406,29 @@ void Application::renderAxisIndicator()
     m_axisRenderer.render(axisModel, identity, axisProjection);
 }
 
-void Application::addObject(const std::string& modelPath, const glm::vec3& initialPosition, const std::string& texturePath)
+void Application::addObject(const std::string& modelPath,
+    const glm::vec3& initialPosition,
+    const std::string& texturePath,
+    const glm::vec3& scale,
+    bool isStatic)
 {
     SceneObject obj;
+    obj.isStatic = isStatic; // Set static flag
 
-    // Load the model using ObjLoader (convert string to const char*)
+    // Load the model
     obj.objLoader.load(modelPath.c_str());
 
-    // Retrieve bounds using non-const getters (or const_cast if needed)
+    // Compute the object's bounding box and center
     glm::vec3 minBound = obj.objLoader.getMinBounds();
     glm::vec3 maxBound = obj.objLoader.getMaxBounds();
     glm::vec3 modelCenter = (minBound + maxBound) * 0.5f;
 
-    // Set up the model matrix so that the object's center is placed at initialPosition
-    obj.modelMatrix = glm::translate(glm::mat4(1.0f), initialPosition - modelCenter);
+    // Build the model matrix:
+    obj.modelMatrix = glm::translate(glm::mat4(1.0f), initialPosition)
+        * glm::scale(glm::mat4(1.0f), scale)
+        * glm::translate(glm::mat4(1.0f), -modelCenter);
 
-    // Generate and bind VAO, VBO, and EBO for the object
+    // Generate and bind VAO, VBO, and EBO
     glGenVertexArrays(1, &obj.VAO);
     glGenBuffers(1, &obj.VBO);
     glGenBuffers(1, &obj.EBO);
@@ -439,7 +453,7 @@ void Application::addObject(const std::string& modelPath, const glm::vec3& initi
 
     glBindVertexArray(0);
 
-    // Load the object's texture if a texture file path is provided
+    // Load the texture if provided
     if (!texturePath.empty()) {
         obj.texture = new Texture();
         if (!obj.texture->loadFromFile(texturePath)) {
@@ -448,11 +462,8 @@ void Application::addObject(const std::string& modelPath, const glm::vec3& initi
             obj.texture = nullptr;
         }
     }
-    else {
-        obj.texture = nullptr;
-    }
 
-    // Add the new object to the scene
+    // Add to scene
     m_sceneObjects.push_back(obj);
 }
 

@@ -14,7 +14,7 @@
 #include "light.h"
 #include "raytracer.h"
 #include "userinput.h"
-#include "ray.h"  // Use your dedicated Ray class
+#include "ray.h"  
 
 // Structure to store per-object data
 struct SceneObject {
@@ -23,7 +23,8 @@ struct SceneObject {
     unsigned int EBO;
     glm::mat4 modelMatrix;
     ObjLoader objLoader;
-    Texture* texture; 
+    Texture* texture = nullptr;
+    bool isStatic = false;
 };
 
 class Application
@@ -149,8 +150,12 @@ private:
 
     void createScreenQuad();
 
-    // Adds a new object to the scene
-    void addObject(const std::string& modelPath, const glm::vec3& initialPosition, const std::string& texturePath = "");
+    // Add a new object to the scene; texturePath and scale are optional.
+    void addObject(const std::string& modelPath,
+        const glm::vec3& initialPosition,
+        const std::string& texturePath = "",
+        const glm::vec3& scale = glm::vec3(1.0f),
+        bool isStatic = false);
 
     // GLFW callbacks (static functions)
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);

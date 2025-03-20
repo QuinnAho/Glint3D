@@ -40,24 +40,25 @@ void UserInput::mouseCallback(double xpos, double ypos)
     // Left mouse drag rotates the selected object
     if (m_app->isLeftMousePressed() && m_app->getSelectedObjectIndex() != -1)
     {
-        // Retrieve the selected object (non-const version)
         SceneObject& selectedObj = m_app->getSceneObjects()[m_app->getSelectedObjectIndex()];
+
+        // Skip static objects
+        if (selectedObj.isStatic)
+            return;
 
         // Compute the object's center from its bounding box (in object space)
         glm::vec3 objMin = selectedObj.objLoader.getMinBounds();
         glm::vec3 objMax = selectedObj.objLoader.getMaxBounds();
         glm::vec3 objCenter = (objMin + objMax) * 0.5f;
-        // Transform center to world space
+
         glm::vec3 worldCenter = glm::vec3(selectedObj.modelMatrix * glm::vec4(objCenter, 1.0f));
 
-        // Build transforms for rotating about the object's center
         glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), -worldCenter);
         glm::mat4 back = glm::translate(glm::mat4(1.0f), worldCenter);
 
         float angleX = -glm::radians(yOffset);
         float angleY = glm::radians(xOffset);
 
-        // Update the object's model matrix
         selectedObj.modelMatrix = back
             * glm::rotate(glm::mat4(1.0f), angleX, glm::vec3(1.0f, 0.0f, 0.0f))
             * glm::rotate(glm::mat4(1.0f), angleY, glm::vec3(0.0f, 1.0f, 0.0f))
