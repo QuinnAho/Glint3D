@@ -141,8 +141,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Application.cpp" />
-    <ClCompile Include="AxisRenderer.cpp" />
+    <ClCompile Include="application.cpp" />
+    <ClCompile Include="axisrenderer.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_opengl3.cpp" />
@@ -154,13 +154,19 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="objloader.cpp" />
     <ClCompile Include="objloader.h" />
+    <ClCompile Include="raytracer.cpp" />
     <ClCompile Include="texture.cpp" />
+    <ClCompile Include="userinput.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Application.h" />
-    <ClInclude Include="AxisRenderer.h" />
+    <ClInclude Include="application.h" />
+    <ClInclude Include="axisrenderer.h" />
     <ClInclude Include="light.h" />
+    <ClInclude Include="ray.h" />
+    <ClInclude Include="raytracer.h" />
     <ClInclude Include="texture.h" />
+    <ClInclude Include="triangle.h" />
+    <ClInclude Include="userinput.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

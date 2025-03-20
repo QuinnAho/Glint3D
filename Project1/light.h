@@ -1,33 +1,37 @@
-#ifndef LIGHT_H
-#define LIGHT_H
-
-#include <glad/glad.h>
-#include <glm/glm.hpp>
+#pragma once
 #include <vector>
+#include <string>
+#include <glm/glm.hpp>
+#include <glad/glad.h>
 
-struct LightData {
+struct LightSource {
     glm::vec3 position;
     glm::vec3 color;
     float intensity;
 };
 
-class Light
-{
+class Light {
 public:
     Light();
     ~Light();
 
-    // Add a new light source
+    // Existing functions
     void addLight(const glm::vec3& position, const glm::vec3& color, float intensity);
-
-    // Send all lights to shader
     void applyLights(GLuint shaderProgram) const;
-
-    // Get the number of lights
     size_t getLightCount() const;
 
-private:
-    std::vector<LightData> m_lights;
-};
+    // New functions for indicator visualization
+    void initIndicator();         // Create geometry (a small cube)
+    bool initIndicatorShader();   // Compile and link the indicator shader
+    void renderIndicators(const glm::mat4& view, const glm::mat4& projection) const;
 
-#endif // LIGHT_H
+private:
+    std::vector<LightSource> m_lights;
+
+    // Indicator geometry
+    GLuint m_indicatorVAO = 0;
+    GLuint m_indicatorVBO = 0;
+
+    // Indicator shader program stored in the Light class
+    GLuint m_indicatorShader = 0;
+};

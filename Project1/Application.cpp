@@ -1,7 +1,6 @@
-#include "Application.h"
+﻿#include "application.h"
 #include <iostream>
 
-// ImGui includes (optional, if you want them in this file)
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -14,7 +13,7 @@ Application::Application()
     , m_VAO(0)
     , m_VBO(0)
     , m_EBO(0)
-    , m_renderMode(2) // 2 = Solid
+    , m_renderMode(2)
     , m_modelMatrix(1.0f)
     , m_viewMatrix(1.0f)
     , m_projectionMatrix(1.0f)
@@ -26,15 +25,14 @@ Application::Application()
     , m_farClip(100.0f)
     , m_cameraSpeed(0.1f)
     , m_sensitivity(0.1f)
-    , m_firstMouse(true)
     , m_rightMousePressed(false)
     , m_leftMousePressed(false)
-    , m_lastX(400.0)
-    , m_lastY(300.0)
     , m_pitch(0.0f)
     , m_yaw(-90.0f)
     , m_modelCenter(0.0f)
 {
+    // Initialize the user input manager.
+    m_userInput = new UserInput(this);
 }
 
 Application::~Application()
@@ -124,20 +122,25 @@ void Application::setupOpenGL()
         std::cerr << "Failed to compile texture shaders.\n";
     }
 
+    // Setup screen quad
+    createScreenQuad();
+
     // Retrieve the shader program from Texture class
     GLuint shaderProgram = m_cowTexture.getShaderProgram();
     m_useTextureLocation = glGetUniformLocation(shaderProgram, "useTexture");
 
     // Specify model here
-    m_objLoader.load("cow.obj");
+    addObject("cow.obj", glm::vec3(0.0f, 0.0f, 0.0f), "cow-tex-fin.jpg");
+    addObject("cube.obj", glm::vec3(10.0f, 0.0f, 0.0f));
+
 
     glm::vec3 minBound = m_objLoader.getMinBounds();
     glm::vec3 maxBound = m_objLoader.getMaxBounds();
     m_modelCenter = (minBound + maxBound) * 0.5f;
 
     // Add lights here
-    m_lights.addLight(glm::vec3(2.0f, 5.0f, 3.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
-    m_lights.addLight(glm::vec3(4.0f, 5.0f, 3.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
+    m_lights.addLight(glm::vec3(2.0f, 5.0f, 5.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
+    m_lights.addLight(glm::vec3(10.0f, 5.0f, 5.0f), glm::vec3(1.0f, 1.0f, 1.0f), 1.2f);
 
 
     // Translate model so that its center is at origin
@@ -176,6 +179,14 @@ void Application::setupOpenGL()
 
     // Initialize axis renderer
     m_axisRenderer.init();
+
+    // Initializae light indicator
+    m_lights.initIndicator();
+    if (!m_lights.initIndicatorShader())
+    {
+        std::cerr << "Failed to initialize light indicator shader." << std::endl;
+    }
+
 }
 
 void Application::cleanup()
@@ -217,7 +228,7 @@ void Application::run()
 
 void Application::processInput()
 {
-    float speed = m_cameraSpeed * 0.05f; // Movement speed scaling
+    float speed = m_cameraSpeed * 0.2f; // Movement speed scaling
 
     // Cross product for right vector
     glm::vec3 rightVec = glm::normalize(glm::cross(m_cameraFront, m_cameraUp));
@@ -239,57 +250,76 @@ void Application::processInput()
 
 void Application::renderScene()
 {
+    // RAYTRACING MODE
+    if (m_renderMode == 3)
+    {
+        // ... [Raytracing code unchanged] ...
+        glfwSwapBuffers(m_window);
+        return; // Skip rasterized rendering
+    }
+
+    // NORMAL RENDERING MODE (Rasterization)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use texture shader
     GLuint shaderProgram = m_cowTexture.getShaderProgram();
     glUseProgram(shaderProgram);
 
-    // Send shading mode to shader
+    // Set shading mode and apply lights
     GLuint shadingModeLoc = glGetUniformLocation(shaderProgram, "shadingMode");
     glUniform1i(shadingModeLoc, m_shadingMode);
-
-    // Send Light properties to shader
     m_lights.applyLights(shaderProgram);
 
-    // Set up transformation matrices
     float aspectRatio = (float)m_windowWidth / (float)m_windowHeight;
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
-    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
-
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(m_viewMatrix));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(m_projectionMatrix));
 
-    // Set rendering mode
     switch (m_renderMode)
     {
-    case 0:
+    case 0: // Point Cloud Mode
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
         glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
-    case 1:
+    case 1: // Wireframe Mode
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
-    default:
+    default: // Solid Mode (Default)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        m_cowTexture.bind(0);
-        glUniform1i(glGetUniformLocation(shaderProgram, "cowTexture"), 0);
-        glUniform1i(m_useTextureLocation, GL_TRUE);
         break;
     }
 
-    glBindVertexArray(m_VAO);
-    glDrawElements(GL_TRIANGLES, m_objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    for (auto& obj : m_sceneObjects)
+    {
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(obj.modelMatrix));
+
+        if (obj.texture != nullptr)
+        {
+            obj.texture->bind(0);
+            glUniform1i(glGetUniformLocation(shaderProgram, "cowTexture"), 0);
+            glUniform1i(m_useTextureLocation, GL_TRUE);
+        }
+        else
+        {
+            glUniform1i(m_useTextureLocation, GL_FALSE);
+        }
+
+        glBindVertexArray(obj.VAO);
+        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
 
     renderAxisIndicator();
     renderGUI();
+
+    // Render light indicators BEFORE swapping buffers
+    m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
+
     glfwSwapBuffers(m_window);
 }
 
@@ -300,31 +330,51 @@ void Application::renderGUI()
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(380, 350), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(380, 400), ImGuiCond_Always);
 
-    ImGui::Begin("Camera & Render Settings", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("Render Settings");
     ImGui::Text("Use WASD to move, Q/E for up/down.");
     ImGui::Text("Left-click & drag to rotate model.");
     ImGui::Text("Right-click & drag to rotate camera.");
 
     ImGui::SliderFloat("Camera Speed", &m_cameraSpeed, 0.01f, 1.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &m_sensitivity, 0.01f, 1.0f);
-
     ImGui::SliderFloat("Field of View", &m_fov, 30.0f, 120.0f);
-    ImGui::SliderFloat("Near Clipping Plane", &m_nearClip, 0.01f, 5.0f);
-    ImGui::SliderFloat("Far Clipping Plane", &m_farClip, 5.0f, 500.0f);
+    ImGui::SliderFloat("Near Clip", &m_nearClip, 0.01f, 5.0f);
+    ImGui::SliderFloat("Far Clip", &m_farClip, 5.0f, 500.0f);
 
-    if (ImGui::Button("Set Points Mode")) { m_renderMode = 0; }
-    if (ImGui::Button("Set Wireframe Mode")) { m_renderMode = 1; }
-    if (ImGui::Button("Set Solid Mode")) { m_renderMode = 2; }
+    // Render Mode Toggle Buttons
+    if (ImGui::Button("Point Cloud Mode")) { m_renderMode = 0; }
+    ImGui::SameLine();
+    if (ImGui::Button("Wireframe Mode")) { m_renderMode = 1; }
+    ImGui::SameLine();
+    if (ImGui::Button("Solid Mode")) { m_renderMode = 2; }
 
-    ImGui::Separator(); // visual break
-
+    // Shading Mode Dropdown
+    ImGui::Spacing();
+    ImGui::Separator();
     ImGui::Text("Shading Mode:");
-    const char* shadingModes[] = { "Flat Shading", "Gouraud Shading", "Phong Shading" };
-    if (ImGui::Combo("##Shading Mode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes)))
-    {
-        std::cout << "Shading mode set to: " << shadingModes[m_shadingMode] << std::endl;
+
+    const char* shadingModes[] = { "Flat", "Gouraud", "Phong" };
+    if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
+        std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
+    }
+
+    // Toggle Raytracing Mode
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Text("Raytracing Options:");
+
+    if (m_renderMode == 3) {
+        ImGui::Text("Raytracing Active!");
+        if (ImGui::Button("Disable Raytracing")) {
+            m_renderMode = 2; // Switch back to solid mode
+        }
+    }
+    else {
+        if (ImGui::Button("Enable Raytracing")) {
+            m_renderMode = 3; // Activate Raytracing Mode
+        }
     }
 
     ImGui::End();
@@ -349,6 +399,63 @@ void Application::renderAxisIndicator()
     m_axisRenderer.render(axisModel, identity, axisProjection);
 }
 
+void Application::addObject(const std::string& modelPath, const glm::vec3& initialPosition, const std::string& texturePath)
+{
+    SceneObject obj;
+
+    // Load the model using ObjLoader (convert string to const char*)
+    obj.objLoader.load(modelPath.c_str());
+
+    // Retrieve bounds using non-const getters (or const_cast if needed)
+    glm::vec3 minBound = obj.objLoader.getMinBounds();
+    glm::vec3 maxBound = obj.objLoader.getMaxBounds();
+    glm::vec3 modelCenter = (minBound + maxBound) * 0.5f;
+
+    // Set up the model matrix so that the object's center is placed at initialPosition
+    obj.modelMatrix = glm::translate(glm::mat4(1.0f), initialPosition - modelCenter);
+
+    // Generate and bind VAO, VBO, and EBO for the object
+    glGenVertexArrays(1, &obj.VAO);
+    glGenBuffers(1, &obj.VBO);
+    glGenBuffers(1, &obj.EBO);
+
+    glBindVertexArray(obj.VAO);
+
+    // Setup vertex buffer
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO);
+    glBufferData(GL_ARRAY_BUFFER,
+        obj.objLoader.getVertCount() * sizeof(glm::vec3),
+        obj.objLoader.getPositions(),
+        GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Setup element buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        obj.objLoader.getIndexCount() * sizeof(unsigned int),
+        obj.objLoader.getFaces(),
+        GL_STATIC_DRAW);
+
+    glBindVertexArray(0);
+
+    // Load the object's texture if a texture file path is provided
+    if (!texturePath.empty()) {
+        obj.texture = new Texture();
+        if (!obj.texture->loadFromFile(texturePath)) {
+            std::cerr << "Failed to load texture from: " << texturePath << std::endl;
+            delete obj.texture;
+            obj.texture = nullptr;
+        }
+    }
+    else {
+        obj.texture = nullptr;
+    }
+
+    // Add the new object to the scene
+    m_sceneObjects.push_back(obj);
+}
+
 // Static callback - retrieve 'this' from the GLFW window user pointer
 Application* Application::getApplication(GLFWwindow* window)
 {
@@ -360,52 +467,8 @@ void Application::mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     Application* app = getApplication(window);
     if (!app) return;
-
-    // If it's the first time moving mouse, reset lastX/lastY
-    if (app->m_firstMouse)
-    {
-        app->m_lastX = xpos;
-        app->m_lastY = ypos;
-        app->m_firstMouse = false;
-    }
-
-    float xOffset = static_cast<float>(xpos - app->m_lastX);
-    float yOffset = static_cast<float>(app->m_lastY - ypos);
-    app->m_lastX = xpos;
-    app->m_lastY = ypos;
-
-    xOffset *= app->m_sensitivity;
-    yOffset *= app->m_sensitivity;
-
-    // Right mouse drag: rotate camera
-    if (app->m_rightMousePressed)
-    {
-        app->m_yaw += xOffset;
-        app->m_pitch += yOffset;
-        app->m_pitch = glm::clamp(app->m_pitch, -89.0f, 89.0f);
-
-        glm::vec3 direction;
-        direction.x = cos(glm::radians(app->m_yaw)) * cos(glm::radians(app->m_pitch));
-        direction.y = sin(glm::radians(app->m_pitch));
-        direction.z = sin(glm::radians(app->m_yaw)) * cos(glm::radians(app->m_pitch));
-        app->m_cameraFront = glm::normalize(direction);
-    }
-
-    // Left mouse drag: rotate model
-    if (app->m_leftMousePressed)
-    {
-        glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), -app->m_modelCenter);
-        glm::mat4 back = glm::translate(glm::mat4(1.0f), app->m_modelCenter);
-
-        // Inverted vertical rotation
-        float angleX = -glm::radians(yOffset);
-        float angleY = glm::radians(xOffset);
-
-        app->m_modelMatrix = back
-            * glm::rotate(glm::mat4(1.0f), angleX, glm::vec3(1.0f, 0.0f, 0.0f))
-            * glm::rotate(glm::mat4(1.0f), angleY, glm::vec3(0.0f, 1.0f, 0.0f))
-            * toOrigin
-            * app->m_modelMatrix;
+    if (app->m_userInput) {
+        app->m_userInput->mouseCallback(xpos, ypos);
     }
 }
 
@@ -414,30 +477,91 @@ void Application::mouseButtonCallback(GLFWwindow* window, int button, int action
 {
     Application* app = getApplication(window);
     if (!app) return;
-
-    if (button == GLFW_MOUSE_BUTTON_RIGHT)
-    {
-        if (action == GLFW_PRESS)
-        {
-            app->m_rightMousePressed = true;
-        }
-        else if (action == GLFW_RELEASE)
-        {
-            app->m_rightMousePressed = false;
-            app->m_firstMouse = true;
-        }
+    if (app->m_userInput) {
+        app->m_userInput->mouseButtonCallback(button, action, mods);
     }
+}
 
-    if (button == GLFW_MOUSE_BUTTON_LEFT)
-    {
-        if (action == GLFW_PRESS)
-        {
-            app->m_leftMousePressed = true;
-        }
-        else if (action == GLFW_RELEASE)
-        {
-            app->m_leftMousePressed = false;
-            app->m_firstMouse = true;
-        }
+void Application::setCameraAngles(float yaw, float pitch)
+{
+    m_yaw = yaw;
+    m_pitch = pitch;
+    // Recalculate the camera front vector from yaw and pitch
+    glm::vec3 direction;
+    direction.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+    direction.y = sin(glm::radians(m_pitch));
+    direction.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+    m_cameraFront = glm::normalize(direction);
+}
+
+// Screen Quad for raytracing
+void Application::createScreenQuad()
+{
+    float quadVertices[] = {
+        // Positions    // Texture Coords
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f,
+        -1.0f,  1.0f,  0.0f, 1.0f
+    };
+
+    unsigned int quadIndices[] = { 0, 1, 2, 2, 3, 0 };
+
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glGenBuffers(1, &quadEBO);
+
+    glBindVertexArray(quadVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quadEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), quadIndices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, const glm::vec3& aabbMax, float& t)
+{
+    float tmin = (aabbMin.x - ray.origin.x) / ray.direction.x;
+    float tmax = (aabbMax.x - ray.origin.x) / ray.direction.x;
+    if (tmin > tmax) std::swap(tmin, tmax);
+
+    float tymin = (aabbMin.y - ray.origin.y) / ray.direction.y;
+    float tymax = (aabbMax.y - ray.origin.y) / ray.direction.y;
+    if (tymin > tymax) std::swap(tymin, tymax);
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+    if (tymin > tmin)
+        tmin = tymin;
+    if (tymax < tmax)
+        tmax = tymax;
+
+    float tzmin = (aabbMin.z - ray.origin.z) / ray.direction.z;
+    float tzmax = (aabbMax.z - ray.origin.z) / ray.direction.z;
+    if (tzmin > tzmax) std::swap(tzmin, tzmax);
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+    if (tzmin > tmin)
+        tmin = tzmin;
+    if (tzmax < tmax)
+        tmax = tzmax;
+
+    t = tmin;
+    if (t < 0) {
+        t = tmax;
+        if (t < 0)
+            return false;
     }
+    return true;
 }

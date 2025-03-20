@@ -1,4 +1,4 @@
-#include "AxisRenderer.h"
+#include "axisrenderer.h"
 
 AxisRenderer::AxisRenderer() : VAO(0), VBO(0), shaderProgram(0) {}
 
