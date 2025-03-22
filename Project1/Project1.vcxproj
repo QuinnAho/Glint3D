@@ -143,6 +143,7 @@
   <ItemGroup>
     <ClCompile Include="application.cpp" />
     <ClCompile Include="axisrenderer.cpp" />
+    <ClCompile Include="colors.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_opengl3.cpp" />
@@ -152,21 +153,32 @@
     <ClCompile Include="Libraries\include\imgui\imgui_widgets.cpp" />
     <ClCompile Include="light.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="material.cpp" />
+    <ClCompile Include="material.h" />
     <ClCompile Include="objloader.cpp" />
     <ClCompile Include="objloader.h" />
     <ClCompile Include="raytracer.cpp" />
+    <ClCompile Include="shader.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="userinput.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.h" />
     <ClInclude Include="axisrenderer.h" />
+    <ClInclude Include="colors.h" />
     <ClInclude Include="light.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="raytracer.h" />
+    <ClInclude Include="shader.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="triangle.h" />
     <ClInclude Include="userinput.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\grid.frag" />
+    <None Include="shaders\grid.vert" />
+    <None Include="shaders\standard.frag" />
+    <None Include="shaders\standard.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,7 +9,6 @@ Application::Application()
     : m_window(nullptr)
     , m_windowWidth(800)
     , m_windowHeight(600)
-    , m_shaderProgram(0)
     , m_VAO(0)
     , m_VBO(0)
     , m_EBO(0)
@@ -117,27 +116,24 @@ void Application::setupOpenGL()
         std::cerr << "Failed to load cow texture.\n";
     }
 
-    if (!m_cowTexture.initShaders())
-    {
-        std::cerr << "Failed to compile texture shaders.\n";
-    }
-
     // Setup screen quad
     createScreenQuad();
 
-    // Retrieve the shader program from Texture class
-    GLuint shaderProgram = m_cowTexture.getShaderProgram();
-    m_useTextureLocation = glGetUniformLocation(shaderProgram, "useTexture");
+    // Load and compile your standard shader once
+    m_standardShader = new Shader();
+    if (!m_standardShader->load("shaders/standard.vert", "shaders/standard.frag")) {
+        std::cerr << "Failed to load standard shader.\n";
+    }
 
     // Add model here
     addObject("cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
     addObject("cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
 
     //Walls
-    addObject("cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true);
-    addObject("cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true);
+    addObject("cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true, Colors::White);
+    addObject("cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true, Colors::White);
 
-    addObject("cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
+    addObject("cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true, Colors::White);
     addObject("cube.obj", glm::vec3(14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
 
 
@@ -146,8 +142,8 @@ void Application::setupOpenGL()
     m_modelCenter = (minBound + maxBound) * 0.5f;
 
     // Add lights here
-    m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);
-    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 3.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f);
+    m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), Colors::Red, 1.2f);
+    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 3.0f), Colors::Blue, 1.2f);
 
 
     // Translate model so that its center is at origin
@@ -218,6 +214,14 @@ void Application::cleanup()
         m_window = nullptr;
     }
     glfwTerminate();
+
+    // Delete shader
+    if (m_standardShader)
+    {
+        delete m_standardShader;
+        m_standardShader = nullptr;
+    }
+
 }
 
 void Application::run()
@@ -257,69 +261,63 @@ void Application::processInput()
 
 void Application::renderScene()
 {
-    // RAYTRACING MODE
-    if (m_renderMode == 3)
-    {
-        // ... [Raytracing code unchanged] ...
-        glfwSwapBuffers(m_window);
-        return; // Skip rasterized rendering
-    }
-
     // NORMAL RENDERING MODE (Rasterization)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    GLuint shaderProgram = m_cowTexture.getShaderProgram();
-    glUseProgram(shaderProgram);
-
     // Set shading mode and apply lights
-    GLuint shadingModeLoc = glGetUniformLocation(shaderProgram, "shadingMode");
-    glUniform1i(shadingModeLoc, m_shadingMode);
-    m_lights.applyLights(shaderProgram);
-
     float aspectRatio = (float)m_windowWidth / (float)m_windowHeight;
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
-
-    GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(m_viewMatrix));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(m_projectionMatrix));
 
     switch (m_renderMode)
     {
     case 0: // Point Cloud Mode
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glUniform1i(m_useTextureLocation, GL_FALSE);
+       // glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
     case 1: // Wireframe Mode
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glUniform1i(m_useTextureLocation, GL_FALSE);
+        //glUniform1i(m_useTextureLocation, GL_FALSE);
         break;
     default: // Solid Mode (Default)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         break;
     }
 
-    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     for (auto& obj : m_sceneObjects)
     {
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(obj.modelMatrix));
+        if (!obj.shader) continue;
 
-        if (obj.texture != nullptr)
+        obj.shader->use();
+
+        // Pass transformation matrices
+        obj.shader->setMat4("model", obj.modelMatrix);
+        obj.shader->setMat4("view", m_viewMatrix);
+        obj.shader->setMat4("projection", m_projectionMatrix);
+
+        // Pass shading mode and lighting
+        obj.shader->setInt("shadingMode", m_shadingMode);
+        obj.shader->setVec3("objectColor", obj.color);
+        m_lights.applyLights(obj.shader->getID());
+
+        // Texture binding and uniform
+        if (obj.texture)
         {
             obj.texture->bind(0);
-            glUniform1i(glGetUniformLocation(shaderProgram, "cowTexture"), 0);
-            glUniform1i(m_useTextureLocation, GL_TRUE);
+            obj.shader->setBool("useTexture", true);
+            obj.shader->setInt("cowTexture", 0); // Ensure the sampler2D uniform is set to texture unit 0
         }
         else
         {
-            glUniform1i(m_useTextureLocation, GL_FALSE);
+            obj.shader->setBool("useTexture", false);
         }
 
+        // Draw the object
         glBindVertexArray(obj.VAO);
         glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
+
 
     renderAxisIndicator();
     renderGUI();
@@ -410,10 +408,13 @@ void Application::addObject(const std::string& modelPath,
     const glm::vec3& initialPosition,
     const std::string& texturePath,
     const glm::vec3& scale,
-    bool isStatic)
+    bool isStatic,
+    const glm::vec3& color)
 {
     SceneObject obj;
-    obj.isStatic = isStatic; // Set static flag
+    obj.isStatic = isStatic;
+    obj.color = color;
+    obj.shader = m_standardShader;
 
     // Load the model
     obj.objLoader.load(modelPath.c_str());
@@ -423,7 +424,7 @@ void Application::addObject(const std::string& modelPath,
     glm::vec3 maxBound = obj.objLoader.getMaxBounds();
     glm::vec3 modelCenter = (minBound + maxBound) * 0.5f;
 
-    // Build the model matrix:
+    // Build the model matrix
     obj.modelMatrix = glm::translate(glm::mat4(1.0f), initialPosition)
         * glm::scale(glm::mat4(1.0f), scale)
         * glm::translate(glm::mat4(1.0f), -modelCenter);

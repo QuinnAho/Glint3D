@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{689594e8-4506-443d-a4de-73a5185b825a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -63,6 +66,18 @@
     <ClCompile Include="userinput.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="colors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="material.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="material.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="axisrenderer.h">
@@ -89,5 +104,25 @@
     <ClInclude Include="userinput.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="colors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\grid.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\grid.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\standard.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\standard.vert">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

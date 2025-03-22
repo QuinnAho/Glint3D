@@ -15,16 +15,18 @@
 #include "raytracer.h"
 #include "userinput.h"
 #include "ray.h"  
+#include "material.h"
+#include "shader.h"
 
 // Structure to store per-object data
 struct SceneObject {
-    unsigned int VAO;
-    unsigned int VBO;
-    unsigned int EBO;
+    unsigned int VAO, VBO, EBO;
     glm::mat4 modelMatrix;
     ObjLoader objLoader;
     Texture* texture = nullptr;
+    Shader* shader = nullptr;
     bool isStatic = false;
+    glm::vec3 color = glm::vec3(1.0f);
 };
 
 class Application
@@ -78,7 +80,7 @@ private:
     int m_windowHeight;
 
     // Shaders & Buffers
-    GLuint m_shaderProgram;
+    Shader* m_standardShader = nullptr;
     GLuint m_VAO, m_VBO, m_EBO;
 
     // Rendering mode: 0 = Points, 1 = Wireframe, 2 = Solid, 3 = Raytracing
@@ -122,7 +124,6 @@ private:
 
     // Texture for the cow model
     Texture m_cowTexture;
-    GLint m_useTextureLocation;
 
     // Lighting
     Light m_lights;
@@ -155,7 +156,8 @@ private:
         const glm::vec3& initialPosition,
         const std::string& texturePath = "",
         const glm::vec3& scale = glm::vec3(1.0f),
-        bool isStatic = false);
+        bool isStatic = false,
+        const glm::vec3& color = glm::vec3(1.0f)); 
 
     // GLFW callbacks (static functions)
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);

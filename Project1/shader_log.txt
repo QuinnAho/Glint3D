@@ -1,0 +1,1205 @@
+? Failed to open shader: shaders/vertex.glsl
+? Failed to open shader: shaders/fragment.glsl
+? Failed to open shader: ../shaders/vertex.glsl
+? Failed to open shader: ../shaders/fragment.glsl
+? Failed to open shader: ../../shaders/vertex.glsl
+? Failed to open shader: ../../shaders/fragment.glsl
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/vertex.glsl
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/fragment.glsl
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/standard.vert
+----- Shader Code Start -----
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int shadingMode;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 GouraudLight;
+out vec2 UV;
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    UV = aPos.xy * 0.5 + 0.5; // Fake UVs if not using real ones
+
+    GouraudLight = vec3(0.0);
+
+    if (shadingMode == 1) {
+        vec3 normal = normalize(Normal);
+        vec3 viewDir = normalize(-FragPos);
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            GouraudLight += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    gl_Position = projection * view * worldPos;
+}
+
+----- Shader Code End -----
+
+? Opened shader file: shaders/standard.frag
+----- Shader Code Start -----
+﻿#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 GouraudLight;
+in vec2 UV;
+
+uniform sampler2D cowTexture;
+uniform bool useTexture;
+uniform int shadingMode;
+
+uniform vec3 objectColor = vec3(1.0); // fallback if no texture
+
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
+
+void main()
+{
+    vec3 normal = normalize(Normal);
+    vec3 viewDir = normalize(-FragPos);
+    vec3 lightResult = vec3(0.0);
+
+    if (shadingMode == 0) {
+        vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+    else if (shadingMode == 1) {
+        lightResult = GouraudLight;
+    }
+    else {
+        for (int i = 0; i < numLights; i++) {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float diff = max(dot(normal, lightDir), 0.0);
+            lightResult += diff * lights[i].color * lights[i].intensity;
+        }
+    }
+
+    vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
+    FragColor = vec4(baseColor * lightResult, 1.0);
+}
+
+----- Shader Code End -----
+
