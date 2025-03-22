@@ -145,6 +145,7 @@
     <ClCompile Include="axisrenderer.cpp" />
     <ClCompile Include="colors.cpp" />
     <ClCompile Include="glad.c" />
+    <ClCompile Include="grid.cpp" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="Libraries\include\imgui\imgui.cpp" />
@@ -166,6 +167,7 @@
     <ClInclude Include="application.h" />
     <ClInclude Include="axisrenderer.h" />
     <ClInclude Include="colors.h" />
+    <ClInclude Include="grid.h" />
     <ClInclude Include="light.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="raytracer.h" />

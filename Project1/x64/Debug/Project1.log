@@ -1,3 +1,2 @@
 ﻿  application.cpp
-C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\application.cpp(119,18): warning C4566: character represented by universal-character-name '\U0001F525' cannot be represented in the current code page (1252)
   Project1.vcxproj -> C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\x64\Debug\Project1.exe

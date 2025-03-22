@@ -125,6 +125,16 @@ void Application::setupOpenGL()
         std::cerr << "Failed to load standard shader.\n";
     }
 
+    // Load and compile the grid shader
+    m_gridShader = new Shader();
+    if (!m_gridShader->load("shaders/grid.vert", "shaders/grid.frag")) {
+        std::cerr << "Failed to load grid shader.\n";
+    }
+
+    if (!m_grid.init(m_gridShader, 200, 5.0f)) {
+        std::cerr << "Failed to initialize grid\n";
+    }
+
     // Add model here
     addObject("cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
     addObject("cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
@@ -222,6 +232,13 @@ void Application::cleanup()
         m_standardShader = nullptr;
     }
 
+    m_grid.cleanup();
+
+    if (m_gridShader)
+    {
+        delete m_gridShader;
+        m_gridShader = nullptr;
+    }
 }
 
 void Application::run()
@@ -283,6 +300,9 @@ void Application::renderScene()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         break;
     }
+
+    // Render infinite grid
+    m_grid.render(m_viewMatrix, m_projectionMatrix);
 
     for (auto& obj : m_sceneObjects)
     {
@@ -363,23 +383,6 @@ void Application::renderGUI()
     const char* shadingModes[] = { "Flat", "Gouraud", "Phong" };
     if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
         std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
-    }
-
-    // Toggle Raytracing Mode
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Text("Raytracing Options:");
-
-    if (m_renderMode == 3) {
-        ImGui::Text("Raytracing Active!");
-        if (ImGui::Button("Disable Raytracing")) {
-            m_renderMode = 2; // Switch back to solid mode
-        }
-    }
-    else {
-        if (ImGui::Button("Enable Raytracing")) {
-            m_renderMode = 3; // Activate Raytracing Mode
-        }
     }
 
     ImGui::End();

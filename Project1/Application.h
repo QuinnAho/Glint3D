@@ -17,6 +17,7 @@
 #include "ray.h"  
 #include "material.h"
 #include "shader.h"
+#include "grid.h"
 
 // Structure to store per-object data
 struct SceneObject {
@@ -135,6 +136,10 @@ private:
     GLuint quadVAO, quadVBO, quadEBO;
     GLuint m_screenShaderProgram;
     GLuint m_raytracedTexture = 0;
+
+    // Grid shader
+    Grid m_grid;
+    Shader* m_gridShader = nullptr; 
 
     // Internal setup methods
     bool initGLFW(const std::string& windowTitle, int width, int height);
