@@ -1,9 +1,2 @@
 ﻿  application.cpp
-  main.cpp
-  userinput.cpp
-C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\userinput.cpp(105,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\userinput.cpp(106,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  Generating Code...
-x64\Debug\material.obj : warning LNK4042: object specified more than once; extras ignored
-x64\Debug\objloader.obj : warning LNK4042: object specified more than once; extras ignored
   Project1.vcxproj -> C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\x64\Debug\Project1.exe

@@ -4,73 +4,74 @@ out vec4 FragColor;
 
 in vec3 FragPos;
 in vec3 Normal;
-in vec3 GouraudLight;
+in vec3 GouraudLight;  // We only use this if shadingMode == 1
 in vec2 UV;
 
-// Texturing & shading mode controls
+// For texturing & shading controls
 uniform sampler2D cowTexture;
 uniform bool useTexture;
 uniform int shadingMode;
 uniform vec3 objectColor; // fallback if no texture
 
-// NEW: Global ambient light
-uniform vec4 globalAmbient; 
+// ------------------------------------------------------------------------
+// Global ambient
+uniform vec4 globalAmbient; // .a is often unused, so we just use .rgb
 
 // Light struct
 struct Light {
     vec3 position;
     vec3 color;
-    float intensity; // If intensity=0, treat as 'disabled'.
+    float intensity; // If 0, treat as disabled
 };
 
 #define MAX_LIGHTS 10
 uniform int numLights;
 uniform Light lights[MAX_LIGHTS];
 
+// ------------------------------------------------------------------------
+// Material struct
+struct Material {
+    vec3 diffuse;
+    vec3 specular;
+    vec3 ambient;
+    float shininess;
+    float roughness;
+    float metallic;
+};
+uniform Material material;
+
+// Camera position (for specular reflection in Gouraud)
+uniform vec3 viewPos;
+
+// ------------------------------------------------------------------------
+// Main
 void main()
 {
-    // Base color from texture or solid color
+    // Base color from either texture or fallback color
     vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
 
-    // Start with ambient term
-    vec3 totalLight = globalAmbient.rgb; // ignoring globalAmbient.a here, typically it’s not used for shading
+    // Start with an ambient term (global + material's own ambient color)
+    vec3 totalLight = globalAmbient.rgb * material.ambient;
 
-    // Normalized normal & view direction (if needed)
-    vec3 N = normalize(Normal);
-
-    // Decide on lighting based on shading mode
     if (shadingMode == 0) {
-        // ---- FLAT (face) Shading ----
-        // Recompute a face normal using derivatives of FragPos
+        // ----- FLAT Shading -----
+        // Recompute a face normal using derivatives
         vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
 
-        vec3 flatLighting = vec3(0.0);
+        // Simple diffuse for each light
         for (int i = 0; i < numLights; i++) {
-            vec3 lightDir = normalize(lights[i].position - FragPos);
-            float diff = max(dot(faceNormal, lightDir), 0.0);
-            flatLighting += diff * lights[i].color * lights[i].intensity;
+            vec3 L = normalize(lights[i].position - FragPos);
+            float diff = max(dot(faceNormal, L), 0.0);
+            totalLight += material.diffuse * diff * lights[i].color * lights[i].intensity;
         }
-        totalLight += flatLighting;
     }
     else if (shadingMode == 1) {
-        // ---- GOURAUD Shading ----
-        // GouraudLight was computed in the vertex shader (diffuse, etc.).
-        // Just add it to global ambient here
-        totalLight += GouraudLight; 
-    }
-    else {
-        // ---- PHONG Shading ----
-        // Per-pixel normal-based lighting:
-        vec3 phongLighting = vec3(0.0);
-        for (int i = 0; i < numLights; i++) {
-            vec3 lightDir = normalize(lights[i].position - FragPos);
-            float diff = max(dot(N, lightDir), 0.0);
-            phongLighting += diff * lights[i].color * lights[i].intensity;
-        }
-        totalLight += phongLighting;
+        // ----- GOURAUD Shading -----
+        // The vertex shader already computed diffuse + specular
+        totalLight += GouraudLight;
     }
 
-    // Final color
+    // Multiply lighting by base color (texture or objectColor)
     vec3 finalColor = baseColor * totalLight;
     FragColor = vec4(finalColor, 1.0);
 }

@@ -28,6 +28,10 @@ struct SceneObject {
     Shader* shader = nullptr;
     bool isStatic = false;
     glm::vec3 color = glm::vec3(1.0f);
+    Material material;
+    GLuint VBO_positions; 
+    GLuint VBO_normals;
+    std::string name;
 };
 
 class Application
@@ -162,7 +166,8 @@ private:
         const std::string& texturePath = "",
         const glm::vec3& scale = glm::vec3(1.0f),
         bool isStatic = false,
-        const glm::vec3& color = glm::vec3(1.0f)); 
+        const glm::vec3& color = glm::vec3(1.0f),
+        std::string name = "");
 
     // GLFW callbacks (static functions)
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);

@@ -13,6 +13,7 @@ Application::Application()
     , m_VBO(0)
     , m_EBO(0)
     , m_renderMode(2)
+    , m_shadingMode(1)
     , m_modelMatrix(1.0f)
     , m_viewMatrix(1.0f)
     , m_projectionMatrix(1.0f)
@@ -281,70 +282,67 @@ void Application::renderScene()
     // NORMAL RENDERING MODE (Rasterization)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Set shading mode and apply lights
-    float aspectRatio = (float)m_windowWidth / (float)m_windowHeight;
+    // Compute view and projection matrices
+    float aspectRatio = static_cast<float>(m_windowWidth) / m_windowHeight;
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
+    // Set polygon mode based on render mode
     switch (m_renderMode)
     {
-    case 0: // Point Cloud Mode
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-       // glUniform1i(m_useTextureLocation, GL_FALSE);
-        break;
-    case 1: // Wireframe Mode
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        //glUniform1i(m_useTextureLocation, GL_FALSE);
-        break;
-    default: // Solid Mode (Default)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        break;
+    case 0: glPolygonMode(GL_FRONT_AND_BACK, GL_POINT); break;
+    case 1: glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  break;
+    default: glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); break;
     }
 
-    // Render infinite grid
+    // Render the infinite grid first
     m_grid.render(m_viewMatrix, m_projectionMatrix);
 
+    // Render all scene objects
     for (auto& obj : m_sceneObjects)
     {
         if (!obj.shader) continue;
 
         obj.shader->use();
 
-        // Pass transformation matrices
+        // Transformation matrices
         obj.shader->setMat4("model", obj.modelMatrix);
         obj.shader->setMat4("view", m_viewMatrix);
         obj.shader->setMat4("projection", m_projectionMatrix);
 
-        // Pass shading mode and lighting
+        // Shading, camera, and lighting
         obj.shader->setInt("shadingMode", m_shadingMode);
+        obj.shader->setVec3("viewPos", m_cameraPos); // <-- Ensure viewPos is passed
         obj.shader->setVec3("objectColor", obj.color);
         m_lights.applyLights(obj.shader->getID());
 
-        // Texture binding and uniform
+        // Material properties
+        obj.material.apply(obj.shader->getID(), "material");
+
+        // Texture handling
         if (obj.texture)
         {
             obj.texture->bind(0);
             obj.shader->setBool("useTexture", true);
-            obj.shader->setInt("cowTexture", 0); // Ensure the sampler2D uniform is set to texture unit 0
+            obj.shader->setInt("cowTexture", 0);
         }
         else
         {
             obj.shader->setBool("useTexture", false);
         }
 
-        // Draw the object
+        // Draw
         glBindVertexArray(obj.VAO);
         glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
 
-
+    // Render overlays and UI
     renderAxisIndicator();
     renderGUI();
-
-    // Render light indicators BEFORE swapping buffers
     m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
 
+    // Display frame
     glfwSwapBuffers(m_window);
 }
 
@@ -379,7 +377,7 @@ void Application::renderGUI()
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Text("Shading Mode:");
-    const char* shadingModes[] = { "Flat", "Gouraud", "Phong" };
+    const char* shadingModes[] = { "Flat", "Gouraud" };
     if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
         std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
     }
@@ -402,6 +400,43 @@ void Application::renderGUI()
                 ImGui::Checkbox(("Enabled##" + label).c_str(), &light.enabled);
                 ImGui::ColorEdit3(("Color##" + label).c_str(), glm::value_ptr(light.color));
                 ImGui::SliderFloat(("Intensity##" + label).c_str(), &light.intensity, 0.0f, 5.0f);
+                ImGui::TreePop();
+            }
+        }
+    }
+
+    // Materials
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (size_t i = 0; i < m_sceneObjects.size(); ++i)
+        {
+            SceneObject& obj = m_sceneObjects[i];
+            std::string label = "Object " + std::to_string(i);
+
+            if (ImGui::TreeNode(label.c_str()))
+            {
+                // If you only need RGB for specular, use ImGui::ColorEdit3:
+                // ImGui::ColorEdit3(("Specular##" + label).c_str(), glm::value_ptr(obj.material.specular));
+
+                // If you want RGBA, you'll need to store specular as vec4 in Material:
+                // For demonstration, here's a quick hack that appends 1.0 for alpha:
+                glm::vec4 specColor(obj.material.specular, 1.0f);
+                if (ImGui::ColorEdit4(("Specular##" + label).c_str(), glm::value_ptr(specColor)))
+                {
+                    // Update only the RGB in your material
+                    obj.material.specular = glm::vec3(specColor);
+                    // If you had a real alpha field, store that too
+                }
+
+                // Expose other properties as well if you like:
+                ImGui::ColorEdit3(("Diffuse##" + label).c_str(), glm::value_ptr(obj.material.diffuse));
+                ImGui::ColorEdit3(("Ambient##" + label).c_str(), glm::value_ptr(obj.material.ambient));
+                ImGui::SliderFloat(("Shininess##" + label).c_str(), &obj.material.shininess, 1.0f, 128.0f);
+                ImGui::SliderFloat(("Roughness##" + label).c_str(), &obj.material.roughness, 0.0f, 1.0f);
+                ImGui::SliderFloat(("Metallic##" + label).c_str(), &obj.material.metallic, 0.0f, 1.0f);
+
                 ImGui::TreePop();
             }
         }
@@ -441,45 +476,63 @@ void Application::addObject(const std::string& modelPath,
     obj.color = color;
     obj.shader = m_standardShader;
 
-    // Load the model
+    // 1) Load the OBJ data (positions, faces, compute normals, etc.)
     obj.objLoader.load(modelPath.c_str());
 
-    // Compute the object's bounding box and center
+    // 2) Compute bounding box center for pivot transforms
     glm::vec3 minBound = obj.objLoader.getMinBounds();
     glm::vec3 maxBound = obj.objLoader.getMaxBounds();
     glm::vec3 modelCenter = (minBound + maxBound) * 0.5f;
 
-    // Build the model matrix
+    // 3) Build the per-object model matrix (translate, scale, recenter)
     obj.modelMatrix = glm::translate(glm::mat4(1.0f), initialPosition)
         * glm::scale(glm::mat4(1.0f), scale)
         * glm::translate(glm::mat4(1.0f), -modelCenter);
 
-    // Generate and bind VAO, VBO, and EBO
+    // 4) Generate VAO & the needed VBO/EBOs
     glGenVertexArrays(1, &obj.VAO);
-    glGenBuffers(1, &obj.VBO);
-    glGenBuffers(1, &obj.EBO);
-
     glBindVertexArray(obj.VAO);
 
-    // Setup vertex buffer
-    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO);
-    glBufferData(GL_ARRAY_BUFFER,
+    // 4a) Positions (VBO_positions)
+    glGenBuffers(1, &obj.VBO_positions);
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_positions);
+    glBufferData(
+        GL_ARRAY_BUFFER,
         obj.objLoader.getVertCount() * sizeof(glm::vec3),
         obj.objLoader.getPositions(),
-        GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+        GL_STATIC_DRAW
+    );
+    // aPos in location = 0
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Setup element buffer
+    // 4b) Normals (VBO_normals) - only if you have getNormals() in objLoader
+    glGenBuffers(1, &obj.VBO_normals);
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_normals);
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        obj.objLoader.getVertCount() * sizeof(glm::vec3),
+        obj.objLoader.getNormals(),
+        GL_STATIC_DRAW
+    );
+    // aNormal in location = 1
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glEnableVertexAttribArray(1);
+
+    // 4c) Element Buffer (EBO)
+    glGenBuffers(1, &obj.EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
         obj.objLoader.getIndexCount() * sizeof(unsigned int),
         obj.objLoader.getFaces(),
-        GL_STATIC_DRAW);
+        GL_STATIC_DRAW
+    );
 
+    // 5) Unbind the VAO (optional, but often good practice)
     glBindVertexArray(0);
 
-    // Load the texture if provided
+    // 6) (Optional) Load a texture if provided
     if (!texturePath.empty()) {
         obj.texture = new Texture();
         if (!obj.texture->loadFromFile(texturePath)) {
@@ -489,9 +542,10 @@ void Application::addObject(const std::string& modelPath,
         }
     }
 
-    // Add to scene
+    // 7) Finally, add to our scene
     m_sceneObjects.push_back(obj);
 }
+
 
 // Static callback - retrieve 'this' from the GLFW window user pointer
 Application* Application::getApplication(GLFWwindow* window)
