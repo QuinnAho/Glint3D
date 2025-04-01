@@ -137,15 +137,15 @@ void Application::setupOpenGL()
     }
 
     // Add model here
-    addObject("cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
-    addObject("cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
+    addObject("Cow Right", "cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
+    addObject("Cow Left", "cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
 
     //Walls
-    addObject("cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true, Colors::White);
-    addObject("cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true, Colors::White);
+    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true, Colors::White);
+    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true, Colors::White);
 
-    addObject("cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true, Colors::White);
-    addObject("cube.obj", glm::vec3(14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
+    addObject("Wall3", "cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true, Colors::White);
+    addObject("Wall4", "cube.obj", glm::vec3(14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
 
 
     glm::vec3 minBound = m_objLoader.getMinBounds();
@@ -413,29 +413,31 @@ void Application::renderGUI()
         for (size_t i = 0; i < m_sceneObjects.size(); ++i)
         {
             SceneObject& obj = m_sceneObjects[i];
-            std::string label = "Object " + std::to_string(i);
 
-            if (ImGui::TreeNode(label.c_str()))
+            // If obj.name is empty, fall back to "Object i"
+            std::string displayName = obj.name.empty()
+                ? ("Object " + std::to_string(i))
+                : obj.name;
+
+            // Append an invisible unique ID (##Object_i) so ImGui tree nodes don't collide
+            std::string treeNodeLabel = displayName + "##Object_" + std::to_string(i);
+
+            if (ImGui::TreeNode(treeNodeLabel.c_str()))
             {
-                // If you only need RGB for specular, use ImGui::ColorEdit3:
-                // ImGui::ColorEdit3(("Specular##" + label).c_str(), glm::value_ptr(obj.material.specular));
-
-                // If you want RGBA, you'll need to store specular as vec4 in Material:
-                // For demonstration, here's a quick hack that appends 1.0 for alpha:
                 glm::vec4 specColor(obj.material.specular, 1.0f);
-                if (ImGui::ColorEdit4(("Specular##" + label).c_str(), glm::value_ptr(specColor)))
+                if (ImGui::ColorEdit4(("Specular##" + std::to_string(i)).c_str(), glm::value_ptr(specColor)))
                 {
-                    // Update only the RGB in your material
                     obj.material.specular = glm::vec3(specColor);
-                    // If you had a real alpha field, store that too
                 }
 
-                // Expose other properties as well if you like:
-                ImGui::ColorEdit3(("Diffuse##" + label).c_str(), glm::value_ptr(obj.material.diffuse));
-                ImGui::ColorEdit3(("Ambient##" + label).c_str(), glm::value_ptr(obj.material.ambient));
-                ImGui::SliderFloat(("Shininess##" + label).c_str(), &obj.material.shininess, 1.0f, 128.0f);
-                ImGui::SliderFloat(("Roughness##" + label).c_str(), &obj.material.roughness, 0.0f, 1.0f);
-                ImGui::SliderFloat(("Metallic##" + label).c_str(), &obj.material.metallic, 0.0f, 1.0f);
+                ImGui::ColorEdit3(("Diffuse##" + std::to_string(i)).c_str(), glm::value_ptr(obj.material.diffuse));
+                ImGui::ColorEdit3(("Ambient##" + std::to_string(i)).c_str(), glm::value_ptr(obj.material.ambient));
+                ImGui::SliderFloat(("Shininess##" + std::to_string(i)).c_str(),
+                    &obj.material.shininess, 1.0f, 128.0f);
+                ImGui::SliderFloat(("Roughness##" + std::to_string(i)).c_str(),
+                    &obj.material.roughness, 0.0f, 1.0f);
+                ImGui::SliderFloat(("Metallic##" + std::to_string(i)).c_str(),
+                    &obj.material.metallic, 0.0f, 1.0f);
 
                 ImGui::TreePop();
             }
@@ -464,17 +466,20 @@ void Application::renderAxisIndicator()
     m_axisRenderer.render(axisModel, identity, axisProjection);
 }
 
-void Application::addObject(const std::string& modelPath,
+void Application::addObject(std::string name,
+    const std::string& modelPath,
     const glm::vec3& initialPosition,
     const std::string& texturePath,
     const glm::vec3& scale,
     bool isStatic,
-    const glm::vec3& color)
+    const glm::vec3& color
+)
 {
     SceneObject obj;
     obj.isStatic = isStatic;
     obj.color = color;
     obj.shader = m_standardShader;
+    obj.name = name;
 
     // 1) Load the OBJ data (positions, faces, compute normals, etc.)
     obj.objLoader.load(modelPath.c_str());

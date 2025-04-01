@@ -21,6 +21,7 @@
 
 // Structure to store per-object data
 struct SceneObject {
+    std::string name;
     unsigned int VAO, VBO, EBO;
     glm::mat4 modelMatrix;
     ObjLoader objLoader;
@@ -31,7 +32,6 @@ struct SceneObject {
     Material material;
     GLuint VBO_positions; 
     GLuint VBO_normals;
-    std::string name;
 };
 
 class Application
@@ -161,13 +161,13 @@ private:
     void createScreenQuad();
 
     // Add a new object to the scene; texturePath and scale are optional.
-    void addObject(const std::string& modelPath,
-        const glm::vec3& initialPosition,
+    void addObject(std::string name = "",
+        const std::string& modelPath = "",
+        const glm::vec3& initialPosition = glm::vec3(1.0f),
         const std::string& texturePath = "",
         const glm::vec3& scale = glm::vec3(1.0f),
         bool isStatic = false,
-        const glm::vec3& color = glm::vec3(1.0f),
-        std::string name = "");
+        const glm::vec3& color = glm::vec3(1.0f));
 
     // GLFW callbacks (static functions)
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
