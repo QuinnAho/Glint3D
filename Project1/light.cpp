@@ -23,12 +23,24 @@ Light::~Light()
 
 void Light::addLight(const glm::vec3& position, const glm::vec3& color, float intensity)
 {
-    m_lights.push_back({ position, color, intensity });
+    LightSource newLight;
+    newLight.position = position;
+    newLight.color = color;
+    newLight.intensity = intensity;
+    newLight.enabled = true; // default on
+    m_lights.push_back(newLight);
 }
 
 void Light::applyLights(GLuint shaderProgram) const
 {
     glUseProgram(shaderProgram);
+
+    // Send the global ambient
+    GLint ambientLoc = glGetUniformLocation(shaderProgram, "globalAmbient");
+    if (ambientLoc != -1)
+    {
+        glUniform4fv(ambientLoc, 1, &m_globalAmbient[0]);
+    }
 
     GLint lightCountLoc = glGetUniformLocation(shaderProgram, "numLights");
     if (lightCountLoc != -1)
@@ -43,18 +55,14 @@ void Light::applyLights(GLuint shaderProgram) const
         GLint lightColorLoc = glGetUniformLocation(shaderProgram, (baseName + ".color").c_str());
         GLint lightIntensityLoc = glGetUniformLocation(shaderProgram, (baseName + ".intensity").c_str());
 
-        static bool printedUniformError = false;
-        if (!printedUniformError && (lightPosLoc == -1 || lightColorLoc == -1 || lightIntensityLoc == -1))
-        {
-            std::cerr << "Error: Failed to get uniform location for lights[" << i << "]\n";
-            printedUniformError = true;
-        }
+        float intensity = (m_lights[i].enabled) ? m_lights[i].intensity : 0.0f;
 
-        if (lightPosLoc != -1) glUniform3fv(lightPosLoc, 1, glm::value_ptr(m_lights[i].position));
-        if (lightColorLoc != -1) glUniform3fv(lightColorLoc, 1, glm::value_ptr(m_lights[i].color));
-        if (lightIntensityLoc != -1) glUniform1f(lightIntensityLoc, m_lights[i].intensity);
+        if (lightPosLoc != -1)       glUniform3fv(lightPosLoc, 1, glm::value_ptr(m_lights[i].position));
+        if (lightColorLoc != -1)     glUniform3fv(lightColorLoc, 1, glm::value_ptr(m_lights[i].color));
+        if (lightIntensityLoc != -1) glUniform1f(lightIntensityLoc, intensity);
     }
 }
+
 
 size_t Light::getLightCount() const
 {

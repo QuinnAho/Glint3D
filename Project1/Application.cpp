@@ -355,7 +355,7 @@ void Application::renderGUI()
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(380, 400), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400, 600), ImGuiCond_Always);
 
     ImGui::Begin("Render Settings");
     ImGui::Text("Use WASD to move, Q/E for up/down.");
@@ -368,21 +368,43 @@ void Application::renderGUI()
     ImGui::SliderFloat("Near Clip", &m_nearClip, 0.01f, 5.0f);
     ImGui::SliderFloat("Far Clip", &m_farClip, 5.0f, 500.0f);
 
-    // Render Mode Toggle Buttons
+    // Render Mode Buttons
     if (ImGui::Button("Point Cloud Mode")) { m_renderMode = 0; }
     ImGui::SameLine();
     if (ImGui::Button("Wireframe Mode")) { m_renderMode = 1; }
     ImGui::SameLine();
     if (ImGui::Button("Solid Mode")) { m_renderMode = 2; }
 
-    // Shading Mode Dropdown
+    // Shading Mode
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Text("Shading Mode:");
-
     const char* shadingModes[] = { "Flat", "Gouraud", "Phong" };
     if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
         std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
+    }
+
+    // Lighting
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        // Global ambient light
+        ImGui::ColorEdit4("Global Ambient", glm::value_ptr(m_lights.m_globalAmbient));
+
+        // Loop through lights
+        for (size_t i = 0; i < m_lights.m_lights.size(); ++i)
+        {
+            auto& light = m_lights.m_lights[i];
+            std::string label = "Light " + std::to_string(i);
+            if (ImGui::TreeNode(label.c_str()))
+            {
+                ImGui::Checkbox(("Enabled##" + label).c_str(), &light.enabled);
+                ImGui::ColorEdit3(("Color##" + label).c_str(), glm::value_ptr(light.color));
+                ImGui::SliderFloat(("Intensity##" + label).c_str(), &light.intensity, 0.0f, 5.0f);
+                ImGui::TreePop();
+            }
+        }
     }
 
     ImGui::End();

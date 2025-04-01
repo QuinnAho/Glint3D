@@ -8,6 +8,7 @@ struct LightSource {
     glm::vec3 position;
     glm::vec3 color;
     float intensity;
+    bool enabled;
 };
 
 class Light {
@@ -25,8 +26,11 @@ public:
     bool initIndicatorShader();   // Compile and link the indicator shader
     void renderIndicators(const glm::mat4& view, const glm::mat4& projection) const;
 
-private:
+    glm::vec4 m_globalAmbient = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
     std::vector<LightSource> m_lights;
+
+
+private:
 
     // Indicator geometry
     GLuint m_indicatorVAO = 0;
