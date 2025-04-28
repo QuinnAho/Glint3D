@@ -112,13 +112,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\class\OpenGLOBJViewer\Project1\Libraries\include;D:\class\OpenGLOBJViewer\Project1\Libraries\include\imgui\backends;D:\class\OpenGLOBJViewer\Project1\Libraries\include\imgui;D:\class\OpenGLOBJViewer\Project1\Libraries\lib;D:\class\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\class\OpenGLOBJViewer\Project1\Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,7 +130,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui\backends;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\include\imgui;C:\Class\ComputerGraphics\Template\OpenGLTemplate\Project1\Libraries\lib;C:\Class\ComputerGraphics\Template\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\class\OpenGLOBJViewer\Project1\Libraries\include;D:\class\OpenGLOBJViewer\Project1\Libraries\include\imgui\backends;D:\class\OpenGLOBJViewer\Project1\Libraries\include\imgui;D:\class\OpenGLOBJViewer\Project1\Libraries\lib;D:\class\OpenGLOBJViewer\Project1\Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -138,11 +139,13 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\class\OpenGLOBJViewer\Project1\Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="application.cpp" />
     <ClCompile Include="axisrenderer.cpp" />
+    <ClCompile Include="BVHNode.cpp" />
     <ClCompile Include="colors.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="grid.cpp" />
@@ -159,6 +162,7 @@
     <ClCompile Include="objloader.cpp" />
     <ClCompile Include="objloader.h" />
     <ClCompile Include="raytracer.cpp" />
+    <ClCompile Include="RayUtils.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="userinput.cpp" />
@@ -166,11 +170,13 @@
   <ItemGroup>
     <ClInclude Include="application.h" />
     <ClInclude Include="axisrenderer.h" />
+    <ClInclude Include="BVHNode.h" />
     <ClInclude Include="colors.h" />
     <ClInclude Include="grid.h" />
     <ClInclude Include="light.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="raytracer.h" />
+    <ClInclude Include="RayUtils.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="triangle.h" />
@@ -179,6 +185,8 @@
   <ItemGroup>
     <None Include="shaders\grid.frag" />
     <None Include="shaders\grid.vert" />
+    <None Include="shaders\rayscreen.frag" />
+    <None Include="shaders\rayscreen.vert" />
     <None Include="shaders\standard.frag" />
     <None Include="shaders\standard.vert" />
   </ItemGroup>

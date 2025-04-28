@@ -1,27 +1,31 @@
-#ifndef RAYTRACER_H
-#define RAYTRACER_H
-
+﻿#pragma once
 #include <vector>
 #include "Triangle.h"
+#include "Ray.h"
 #include "ObjLoader.h"
+#include "material.h"
+#include "BVHNode.h"
+#include "Light.h"   // <---- You need to add Light.h here too!
+#include <glm/glm.hpp>
 
-class Raytracer {
+class Raytracer
+{
 public:
-    std::vector<Triangle> triangles; // Store the cow's triangles
-    glm::vec3 lightPos;
-    glm::vec3 lightColor;
-
-    // Constructor
     Raytracer();
 
-    // Load cow model and store as triangle mesh
-    void loadModel(ObjLoader& objLoader, float reflectivity = 0.0f);
+    void loadModel(const ObjLoader& loader, const glm::mat4& transform, float reflectivity, const Material& mat);
 
-    // Check if a point is in shadow
-    bool isInShadow(const glm::vec3& point, const glm::vec3& lightDir) const;
+    glm::vec3 traceRay(const Ray& r, const Light& lights, int depth = 3) const;  // <--- FIXED
+    void renderImage(std::vector<glm::vec3>& out,
+        int W, int H,
+        glm::vec3 camPos,
+        glm::vec3 camFront,
+        glm::vec3 camUp,
+        float fovDeg,
+        const Light& lights);  // <--- FIXED
 
-    // Main ray tracing function with reflections
-    glm::vec3 traceRay(const Ray& ray, int depth = 3) const;
+private:
+    std::vector<Triangle> triangles;
+    glm::vec3 lightPos, lightColor;
+    BVHNode* bvhRoot;
 };
-
-#endif

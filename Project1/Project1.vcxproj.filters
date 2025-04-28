@@ -81,6 +81,12 @@
     <ClCompile Include="grid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BVHNode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RayUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="axisrenderer.h">
@@ -116,6 +122,12 @@
     <ClInclude Include="grid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BVHNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RayUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\grid.frag">
@@ -128,6 +140,12 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\standard.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\rayscreen.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\rayscreen.vert">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

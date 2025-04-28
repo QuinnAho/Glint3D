@@ -1,178 +1,152 @@
-﻿#pragma once
-
+﻿/* ────────────────────────────────────────────────────────────
+   Application.h   –   full header (thread-enabled version)
+   ──────────────────────────────────────────────────────────── */
+#pragma once
 #include <string>
 #include <vector>
+#include <memory>
+#include <future>                      //  ← NEW
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
-#include "objloader.h"
+#include "Ray.h"
+#include "Material.h"
+#include "ObjLoader.h"
 #include "AxisRenderer.h"
-#include "texture.h"
-#include "light.h"
-#include "raytracer.h"
-#include "userinput.h"
-#include "ray.h"  
-#include "material.h"
-#include "shader.h"
-#include "grid.h"
+#include "Texture.h"
+#include "Light.h"
+#include "Raytracer.h"
+#include "UserInput.h"
+#include "Shader.h"
+#include "Grid.h"
 
-// Structure to store per-object data
-struct SceneObject {
+   /* -------- one scene object --------------------------------- */
+struct SceneObject
+{
     std::string name;
-    unsigned int VAO, VBO, EBO;
-    glm::mat4 modelMatrix;
+    GLuint   VAO = 0, VBO_positions = 0, VBO_normals = 0, EBO = 0;
+    glm::mat4 modelMatrix{ 1.0f };
+
     ObjLoader objLoader;
     Texture* texture = nullptr;
     Shader* shader = nullptr;
-    bool isStatic = false;
-    glm::vec3 color = glm::vec3(1.0f);
-    Material material;
-    GLuint VBO_positions; 
-    GLuint VBO_normals;
+
+    bool      isStatic = false;
+    glm::vec3 color{ 1.0f };
+    Material  material;
 };
 
+/* -------- the application ---------------------------------- */
 class Application
 {
-public:
-    // Accessor methods for input data
-    float getMouseSensitivity() const { return m_sensitivity; }
-    int getWindowWidth() const { return m_windowWidth; }
-    int getWindowHeight() const { return m_windowHeight; }
-    glm::mat4 getProjectionMatrix() const { return m_projectionMatrix; }
-    glm::mat4 getViewMatrix() const { return m_viewMatrix; }
-    glm::vec3 getCameraPosition() const { return m_cameraPos; }
-    float getYaw() const { return m_yaw; }
-    float getPitch() const { return m_pitch; }
-
-    bool isLeftMousePressed() const { return m_leftMousePressed; }
-    bool isRightMousePressed() const { return m_rightMousePressed; }
-    int getSelectedObjectIndex() const { return m_selectedObjectIndex; }
-    // Provide both const and non-const access to the scene objects:
-    const std::vector<SceneObject>& getSceneObjects() const { return m_sceneObjects; }
-    std::vector<SceneObject>& getSceneObjects() { return m_sceneObjects; }
-
-    // Setters to update state from input callbacks
-    void setLeftMousePressed(bool pressed) { m_leftMousePressed = pressed; }
-    void setRightMousePressed(bool pressed) { m_rightMousePressed = pressed; }
-    void setSelectedObjectIndex(int index) { m_selectedObjectIndex = index; }
-    void setCameraAngles(float yaw, float pitch);
-
-    // Provide a method to test ray-AABB intersection
-    bool rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, const glm::vec3& aabbMax, float& t);
-
-    // Expose the UserInput pointer so that GLFW callbacks can call it
-    UserInput* getUserInput() { return m_userInput; }
-
 public:
     Application();
     ~Application();
 
-    // Initialize GLFW, create window, load OpenGL, set callbacks, etc.
-    bool init(const std::string& windowTitle, int width, int height);
+    bool  init(const std::string& title, int w, int h);
+    void  run();
 
-    // Main run loop: process input, render, etc.
-    void run();
+    /* getters used by UserInput */
+    float       getMouseSensitivity() const { return m_sensitivity; }
+    int         getWindowWidth()      const { return m_windowWidth; }
+    int         getWindowHeight()     const { return m_windowHeight; }
+    glm::mat4   getProjectionMatrix() const { return m_projectionMatrix; }
+    glm::mat4   getViewMatrix()       const { return m_viewMatrix; }
+    glm::vec3   getCameraPosition()   const { return m_cameraPos; }
+    float       getYaw()              const { return m_yaw; }
+    float       getPitch()            const { return m_pitch; }
+
+    bool  isLeftMousePressed()  const { return m_leftMousePressed; }
+    bool  isRightMousePressed() const { return m_rightMousePressed; }
+    int   getSelectedObjectIndex() const { return m_selectedObjectIndex; }
+
+    const std::vector<SceneObject>& getSceneObjects() const { return m_sceneObjects; }
+    std::vector<SceneObject>& getSceneObjects() { return m_sceneObjects; }
+
+    /* setters called by UserInput */
+    void setLeftMousePressed(bool v) { m_leftMousePressed = v; }
+    void setRightMousePressed(bool v) { m_rightMousePressed = v; }
+    void setSelectedObjectIndex(int i) { m_selectedObjectIndex = i; }
+    void setCameraAngles(float yaw, float pitch);
+
+    /* helpers */
+    bool rayIntersectsAABB(const Ray& ray,
+        const glm::vec3& mn,
+        const glm::vec3& mx,
+        float& t);
+
+    UserInput* getUserInput() { return m_userInput; }
 
 private:
-    // GLFW window pointer
-    GLFWwindow* m_window;
-
-    // Window dimensions
-    int m_windowWidth;
-    int m_windowHeight;
-
-    // Shaders & Buffers
-    Shader* m_standardShader = nullptr;
-    GLuint m_VAO, m_VBO, m_EBO;
-
-    // Rendering mode: 0 = Points, 1 = Wireframe, 2 = Solid, 3 = Raytracing
-    int m_renderMode;
-
-    // AxisRenderer instance
-    AxisRenderer m_axisRenderer;
-
-    // OBJ loading (for fallback or initial object)
-    ObjLoader m_objLoader;
-
-    // Transformation matrices
-    glm::mat4 m_modelMatrix;
-    glm::mat4 m_viewMatrix;
-    glm::mat4 m_projectionMatrix;
-
-    // Camera parameters
-    glm::vec3 m_cameraPos;
-    glm::vec3 m_cameraFront;
-    glm::vec3 m_cameraUp;
-    float m_fov;
-    float m_nearClip;
-    float m_farClip;
-    float m_cameraSpeed;
-    float m_sensitivity;
-
-    // Camera angles
-    float m_yaw, m_pitch;
-    // Mouse input states (m_firstMouse, m_lastX, and m_lastY now reside in UserInput)
-    bool m_leftMousePressed, m_rightMousePressed;
-    int m_selectedObjectIndex;
-
-    // Container for scene objects
-    std::vector<SceneObject> m_sceneObjects;
-
-    // Pointer to the input manager
-    UserInput* m_userInput;
-
-    // Model center for pivot rotations
-    glm::vec3 m_modelCenter;
-
-    // Texture for the cow model
-    Texture m_cowTexture;
-
-    // Lighting
-    Light m_lights;
-
-    // Shading Mode (e.g., 0 = Flat, 1 = Gouraud, 2 = Phong)
-    int m_shadingMode = 2;
-
-    // Screen quad data for raytracing
-    GLuint quadVAO, quadVBO, quadEBO;
-    GLuint m_screenShaderProgram;
-    GLuint m_raytracedTexture = 0;
-
-    // Grid shader
-    Grid m_grid;
-    Shader* m_gridShader = nullptr; 
-
-    // Internal setup methods
-    bool initGLFW(const std::string& windowTitle, int width, int height);
+    /* --- init / teardown ----------------------------------- */
+    bool initGLFW(const std::string&, int, int);
     bool initGLAD();
     void initImGui();
     void setupOpenGL();
     void cleanup();
 
-    // Main loop steps
+    /* --- per-frame helpers ---------------------------------- */
     void processInput();
-    void renderScene();
+    void renderScene();                    //  ← IMPLEMENTED BELOW
     void renderGUI();
     void renderAxisIndicator();
-
     void createScreenQuad();
 
-    // Add a new object to the scene; texturePath and scale are optional.
     void addObject(std::string name = "",
-        const std::string& modelPath = "",
-        const glm::vec3& initialPosition = glm::vec3(1.0f),
-        const std::string& texturePath = "",
-        const glm::vec3& scale = glm::vec3(1.0f),
-        bool isStatic = false,
-        const glm::vec3& color = glm::vec3(1.0f));
+        const std::string& model = "",
+        const glm::vec3& pos = glm::vec3(1),
+        const std::string& texture = "",
+        const glm::vec3& scale = glm::vec3(1),
+        bool  isStat = false,
+        const glm::vec3& color = glm::vec3(1));
 
-    // GLFW callbacks (static functions)
-    static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
-    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    /* --- GLFW callbacks (static wrappers) ------------------- */
+    static void mouseCallback(GLFWwindow*, double, double);
+    static void mouseButtonCallback(GLFWwindow*, int, int, int);
+    static Application* getApplication(GLFWwindow*);
 
-    // Helper to retrieve a pointer to this class from a GLFW window
-    static Application* getApplication(GLFWwindow* window);
+private:
+    /* --- window / core -------------------------------------- */
+    GLFWwindow* m_window = nullptr;
+    int   m_windowWidth = 800, m_windowHeight = 600;
+
+    /* --- scene ---------------------------------------------- */
+    std::vector<SceneObject> m_sceneObjects;
+    int   m_selectedObjectIndex = -1;
+
+    /* --- camera --------------------------------------------- */
+    glm::vec3 m_cameraPos{ 0,0,10 }, m_cameraFront{ 0,0,-1 }, m_cameraUp{ 0,1,0 };
+    float m_fov = 45.f, m_nearClip = 0.1f, m_farClip = 100.f;
+    float m_cameraSpeed = 0.5f, m_sensitivity = 0.1f;
+    float m_yaw = -90.f, m_pitch = 0.f;
+
+    /* --- matrices ------------------------------------------- */
+    glm::mat4 m_modelMatrix{ 1 }, m_viewMatrix{ 1 }, m_projectionMatrix{ 1 };
+
+    /* --- GL (raster path) ----------------------------------- */
+    ObjLoader m_objLoader;
+    Shader* m_standardShader = nullptr, * m_gridShader = nullptr, * m_rayScreenShader = nullptr;
+    GLuint  m_VAO = 0, m_VBO = 0, m_EBO = 0;
+    Grid    m_grid;
+    AxisRenderer m_axisRenderer;
+    Light   m_lights;
+    int     m_shadingMode = 2;
+
+    /* --- ray tracer ----------------------------------------- */
+    std::unique_ptr<Raytracer> m_raytracer;
+    GLuint rayTexID = 0, quadVAO = 0, quadVBO = 0, quadEBO = 0;
+
+    /* --- threaded tracing state ----------------------------- */
+    std::future<void>         m_traceJob;   // background task
+    std::vector<glm::vec3>    m_framebuffer;
+    bool                      m_traceDone = false;
+
+    /* --- misc ----------------------------------------------- */
+    bool  m_leftMousePressed = false, m_rightMousePressed = false;
+    UserInput* m_userInput = nullptr;
+    int   m_renderMode = 2;   // 0=Pts 1=Wire 2=Solid 3=Ray
+    glm::vec3 m_modelCenter{ 0 };
+    Texture   m_cowTexture;
 };

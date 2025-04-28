@@ -147,6 +147,8 @@ LICENSE
   See end of file for license information.
 
 */
+#pragma warning(disable : 4996)
+#define _CRT_SECURE_NO_WARNINGS   // <-- tell MSVC to allow sprintf
 
 #ifndef INCLUDE_STB_IMAGE_WRITE_H
 #define INCLUDE_STB_IMAGE_WRITE_H

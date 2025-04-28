@@ -1,45 +1,76 @@
 ﻿#ifndef TRIANGLE_H
 #define TRIANGLE_H
 
-#include "ray.h"
+#include <glm/glm.hpp>
+#include "ray.h"                // your Ray struct (origin, direction)
+#include "Material.h"           // NEW: Material per triangle
 
-class Triangle {
+/*─────────────────────────────────────────────────────────────*/
+/*  Triangle – GPU-agnostic, CPU-side ray-tracing helper       */
+/*─────────────────────────────────────────────────────────────*/
+class Triangle
+{
 public:
-    glm::vec3 v0, v1, v2; // Triangle vertices
-    glm::vec3 normal;
-    float reflectivity; // Reflectivity (0 = matte, 1 = mirror)
-
-    Triangle(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, float reflect = 0.0f)
-        : v0(p0), v1(p1), v2(p2), reflectivity(reflect) {
-        normal = glm::normalize(glm::cross(v1 - v0, v2 - v0)); // Compute normal
+    /* v0–v1–v2 can be in ANY order – normals are generated */
+    Triangle(const glm::vec3& a,
+        const glm::vec3& b,
+        const glm::vec3& c,
+        float refl = 0.0f,
+        const Material& mat = Material())    // <-- Added material param
+        : v0(a), v1(b), v2(c), reflectivity(refl), material(mat)
+    {
+        /* geometric normal (unit length) */
+        normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
     }
 
-    // Möller-Trumbore Algorithm for Ray-Triangle Intersection
-    bool intersect(const Ray& ray, float& t, glm::vec3& hitNormal) const {
-        const float EPSILON = 0.000001f;
-        glm::vec3 edge1 = v1 - v0;
-        glm::vec3 edge2 = v2 - v0;
-        glm::vec3 h = glm::cross(ray.direction, edge2);
-        float a = glm::dot(edge1, h);
+    /*---------------------------------------------------------*/
+    /*  Möller–Trumbore -- TWO-SIDED intersection test         */
+    /*  - returns true  →  t/n get filled                      */
+    /*  - returns false →  no hit                              */
+    /*---------------------------------------------------------*/
+    bool intersect(const Ray& r,
+        float& tOut,
+        glm::vec3& nOut) const
+    {
+        constexpr float EPS = 1e-6f;
 
-        if (a > -EPSILON && a < EPSILON) return false; // Parallel, no intersection
+        glm::vec3 e1 = v1 - v0;
+        glm::vec3 e2 = v2 - v0;
 
-        float f = 1.0f / a;
-        glm::vec3 s = ray.origin - v0;
-        float u = f * glm::dot(s, h);
+        /* calculate determinant */
+        glm::vec3 p = glm::cross(r.direction, e2);
+        float det = glm::dot(e1, p);
+
+        if (std::abs(det) < EPS) return false;  // ray ‖ triangle
+
+        float invDet = 1.0f / det;
+
+        /* calculate barycentric u */
+        glm::vec3 s = r.origin - v0;
+        float u = glm::dot(s, p) * invDet;
         if (u < 0.0f || u > 1.0f) return false;
 
-        glm::vec3 q = glm::cross(s, edge1);
-        float v = f * glm::dot(ray.direction, q);
+        /* calculate barycentric v */
+        glm::vec3 q = glm::cross(s, e1);
+        float v = glm::dot(r.direction, q) * invDet;
         if (v < 0.0f || u + v > 1.0f) return false;
 
-        t = f * glm::dot(edge2, q);
-        if (t > EPSILON) {
-            hitNormal = normal;
-            return true;
-        }
-        return false;
+        /* distance to intersection */
+        float t = glm::dot(e2, q) * invDet;
+        if (t <= EPS) return false;  // behind ray start
+
+        /* hit! */
+        tOut = t;
+        nOut = normal;  // already normalized
+        return true;
     }
+
+public:
+    // Data
+    glm::vec3 v0, v1, v2;
+    glm::vec3 normal;         // Face normal (unit vector)
+    float reflectivity = 0.0f; // 0 = matte, 1 = mirror
+    Material material;         // NEW: material data
 };
 
-#endif
+#endif /* TRIANGLE_H */

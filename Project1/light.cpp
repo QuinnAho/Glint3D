@@ -223,3 +223,10 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection)
     }
     glBindVertexArray(0);
 }
+
+const LightSource* Light::getFirstLight() const
+{
+    if (m_lights.empty())
+        return nullptr;
+    return &m_lights[0];
+}

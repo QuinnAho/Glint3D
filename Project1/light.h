@@ -29,6 +29,7 @@ public:
     glm::vec4 m_globalAmbient = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
     std::vector<LightSource> m_lights;
 
+    const LightSource* getFirstLight() const;
 
 private:
 

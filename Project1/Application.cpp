@@ -5,6 +5,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION  
+#include "stb_image_write.h"
+
 Application::Application()
     : m_window(nullptr)
     , m_windowWidth(800)
@@ -111,97 +114,109 @@ void Application::initImGui()
 
 void Application::setupOpenGL()
 {
-    // Load the texture and compile shaders (handled inside Texture class)
+    /* -------------------------------------------------- 0) textures & helpers */
     if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
-    {
         std::cerr << "Failed to load cow texture.\n";
+
+    /* -------------------------------------------------- 1) screen-quad & rayTex */
+    createScreenQuad();                           // allocates rayTexID (RGB32F)
+
+    /*  Clear the ray-texture once so the first frame isn’t pure black  */
+    {
+        std::vector<float> grey(m_windowWidth * m_windowHeight * 3, 0.1f);
+        glBindTexture(GL_TEXTURE_2D, rayTexID);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+            m_windowWidth, m_windowHeight,
+            GL_RGB, GL_FLOAT, grey.data());
     }
 
-    // Setup screen quad
-    createScreenQuad();
+    for (auto& obj : m_sceneObjects)
+    {
+        bool isWall = obj.name.rfind("Wall", 0) == 0;
+        if (isWall)
+        {
+            // Walls: very low reflectivity
+            obj.material.specular = glm::vec3(0.2f);
+            obj.material.ambient = obj.color * 0.4f;
+            obj.material.shininess = 8.0f;
+            obj.material.roughness = 0.8f;
+            obj.material.metallic = 0.0f;
+        }
+        else
+        {
+            // Cow: low specular, but NOT mirror walls
+            obj.material.specular = glm::vec3(0.3f);  // less shine
+            obj.material.ambient = obj.color * 0.5f;
+            obj.material.shininess = 16.0f;           // softer highlight
+            obj.material.roughness = 0.6f;
+            obj.material.metallic = 0.0f;
+        }
 
-    // Load and compile your standard shader once
+        float reflectivity = isWall ? 0.4f : 0.05f; // <-- BIG FIX
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, obj.material);
+    }
+
+
+    /* -------------------------------------------------- 2) standard & grid shaders */
     m_standardShader = new Shader();
-    if (!m_standardShader->load("shaders/standard.vert", "shaders/standard.frag")) {
+    if (!m_standardShader->load("shaders/standard.vert", "shaders/standard.frag"))
         std::cerr << "Failed to load standard shader.\n";
-    }
 
-    // Load and compile the grid shader
     m_gridShader = new Shader();
-    if (!m_gridShader->load("shaders/grid.vert", "shaders/grid.frag")) {
+    if (!m_gridShader->load("shaders/grid.vert", "shaders/grid.frag"))
         std::cerr << "Failed to load grid shader.\n";
+
+    if (!m_grid.init(m_gridShader, 200, 5.0f))
+        std::cerr << "Failed to initialise grid.\n";
+
+    /* -------------------------------------------------- 3) FULL-SCREEN QUAD SHADER */
+    m_rayScreenShader = new Shader();
+    if (!m_rayScreenShader->load("shaders/rayscreen.vert",
+        "shaders/rayscreen.frag"))
+    {
+        std::cerr << "[RayScreen] shader failed to load\n";
+        std::terminate();
+    }
+    /*  tell the sampler “rayTex” to use texture-unit 0  */
+    m_rayScreenShader->use();
+    m_rayScreenShader->setInt("rayTex", 0);
+
+    /* -------------------------------------------------- 4) load all scene objects */
+    addObject("Cow", "cow.obj", glm::vec3(0.0f, 2.0f, 0.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f, 0.8f, 0.8f)); // centered light pink cow
+
+    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -7.0f), "", glm::vec3(16.0f, 6.0f, 0.5f), true, glm::vec3(1.0f, 0.5f, 0.5f)); // Red
+    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, 0.0f), "", glm::vec3(16.0f, 0.5f, 16.0f), true, glm::vec3(0.5f, 1.0f, 0.5f)); // Green
+    addObject("Wall3", "cube.obj", glm::vec3(-8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(0.5f, 0.5f, 1.0f)); // Blue
+    addObject("Wall4", "cube.obj", glm::vec3(8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(1.0f, 1.0f, 0.5f)); // Yellow
+
+
+
+
+
+
+
+                                       
+    //m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), Colors::Red, 1.2f);
+    m_lights.addLight(glm::vec3(0.0f, 10.0f, 0.0f), Colors::White, 2.0f);
+
+
+    m_raytracer = std::make_unique<Raytracer>();
+    for (auto& obj : m_sceneObjects)
+    {
+        float refl = (obj.name.rfind("Wall", 0) == 0) ? 0.4f : 0.1f; // Walls semi-reflective
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, refl, obj.material);
     }
 
-    if (!m_grid.init(m_gridShader, 200, 5.0f)) {
-        std::cerr << "Failed to initialize grid\n";
-    }
-
-    // Add model here
-    addObject("Cow Right", "cow.obj", glm::vec3(6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
-    addObject("Cow Left", "cow.obj", glm::vec3(-6.0f, 2.0f, 0.0f), "cow-tex-fin.jpg");
-
-    //Walls
-    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -5.0f), "", glm::vec3(14.0f, 6.0f, 0.5f), true, Colors::White);
-    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, -0.0f), "", glm::vec3(14.0f, 0.5f, 6.0f), true, Colors::White);
-
-    addObject("Wall3", "cube.obj", glm::vec3(-14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true, Colors::White);
-    addObject("Wall4", "cube.obj", glm::vec3(14, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 6.0f), true);
 
 
-    glm::vec3 minBound = m_objLoader.getMinBounds();
-    glm::vec3 maxBound = m_objLoader.getMaxBounds();
-    m_modelCenter = (minBound + maxBound) * 0.5f;
-
-    // Add lights here
-    m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), Colors::Red, 1.2f);
-    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 3.0f), Colors::Blue, 1.2f);
-
-
-    // Translate model so that its center is at origin
-    m_modelMatrix = glm::translate(glm::mat4(1.0f), -m_modelCenter);
-
-    // Generate VAO/VBO/EBO
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
-    glGenBuffers(1, &m_EBO);
-
-    glBindVertexArray(m_VAO);
-
-    // Vertex buffer (assuming normal support is added)
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        m_objLoader.getVertCount() * sizeof(glm::vec3),
-        m_objLoader.getPositions(),
-        GL_STATIC_DRAW
-    );
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Element buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        m_objLoader.getIndexCount() * sizeof(unsigned int),
-        m_objLoader.getFaces(),
-        GL_STATIC_DRAW
-    );
-
-    glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
-
-    // Initialize axis renderer
     m_axisRenderer.init();
 
-    // Initializae light indicator
     m_lights.initIndicator();
     if (!m_lights.initIndicatorShader())
-    {
-        std::cerr << "Failed to initialize light indicator shader." << std::endl;
-    }
-
+        std::cerr << "Failed to initialise light-indicator shader.\n";
 }
+
 
 void Application::cleanup()
 {
@@ -277,49 +292,107 @@ void Application::processInput()
         m_cameraPos += speed * m_cameraUp;
 }
 
+
 void Application::renderScene()
 {
-    // NORMAL RENDERING MODE (Rasterization)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Default framebuffer
+    glViewport(0, 0, m_windowWidth, m_windowHeight);
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // BLACK
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Compute view and projection matrices
-    float aspectRatio = static_cast<float>(m_windowWidth) / m_windowHeight;
-    m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearClip, m_farClip);
+    // Update camera matrices
+    float aspect = float(m_windowWidth) / m_windowHeight;
+    m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspect, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
-    // Set polygon mode based on render mode
+    /* ========================================================
+       RAY-TRACE MODE
+       ======================================================== */
+    if (m_renderMode == 3 && m_raytracer)
+    {
+        // --- Start the raytrace ONCE ---
+        if (!m_traceJob.valid() && !m_traceDone)  // <=== ADD THIS !!
+        {
+            std::cout << "[TraceJob] Starting new raytrace...\n";
+
+            m_framebuffer.resize(size_t(m_windowWidth) * m_windowHeight);
+
+            m_traceJob = std::async(std::launch::async,
+                [&, W = m_windowWidth, H = m_windowHeight]()
+                {
+                    std::cout << "[TraceJob] Worker: tracing image...\n";
+                    m_raytracer->renderImage(m_framebuffer, W, H, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
+
+                    std::cout << "[TraceJob] Worker: finished tracing!\n";
+                    m_traceDone = true; 
+                });
+        }
+
+        // --- If tracing finished, upload result ---
+        if (m_traceJob.valid() && m_traceJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        {
+            m_traceJob.get(); // collect result (no exceptions)
+            m_traceJob = std::future<void>(); // reset
+
+            glBindTexture(GL_TEXTURE_2D, rayTexID);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                m_windowWidth, m_windowHeight,
+                GL_RGB, GL_FLOAT, m_framebuffer.data());
+        }
+
+        // --- Always draw the last available raytrace result ---
+        m_rayScreenShader->use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rayTexID);
+
+        glBindVertexArray(quadVAO);
+        glDisable(GL_DEPTH_TEST);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+
+        renderAxisIndicator();
+        renderGUI();
+        glfwSwapBuffers(m_window);
+        return;
+    }
+    else
+    {
+        // Leaving raytrace mode — reset trace job if needed
+        if (m_traceJob.valid())
+            m_traceJob.wait();
+        m_traceJob = std::future<void>();
+        m_traceDone = false;  // <=== ADD THIS TOO when leaving raytrace mode
+    }
+
+
     switch (m_renderMode)
     {
     case 0: glPolygonMode(GL_FRONT_AND_BACK, GL_POINT); break;
     case 1: glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  break;
-    default: glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); break;
+    default:glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  break;
     }
 
-    // Render the infinite grid first
     m_grid.render(m_viewMatrix, m_projectionMatrix);
 
-    // Render all scene objects
     for (auto& obj : m_sceneObjects)
     {
+        
         if (!obj.shader) continue;
-
         obj.shader->use();
 
-        // Transformation matrices
         obj.shader->setMat4("model", obj.modelMatrix);
         obj.shader->setMat4("view", m_viewMatrix);
         obj.shader->setMat4("projection", m_projectionMatrix);
 
-        // Shading, camera, and lighting
         obj.shader->setInt("shadingMode", m_shadingMode);
-        obj.shader->setVec3("viewPos", m_cameraPos); // <-- Ensure viewPos is passed
+        obj.shader->setVec3("viewPos", m_cameraPos);
         obj.shader->setVec3("objectColor", obj.color);
         m_lights.applyLights(obj.shader->getID());
-
-        // Material properties
         obj.material.apply(obj.shader->getID(), "material");
 
-        // Texture handling
         if (obj.texture)
         {
             obj.texture->bind(0);
@@ -327,24 +400,20 @@ void Application::renderScene()
             obj.shader->setInt("cowTexture", 0);
         }
         else
-        {
             obj.shader->setBool("useTexture", false);
-        }
 
-        // Draw
         glBindVertexArray(obj.VAO);
         glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
 
-    // Render overlays and UI
     renderAxisIndicator();
     renderGUI();
     m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
-
-    // Display frame
     glfwSwapBuffers(m_window);
 }
+
+
 
 void Application::renderGUI()
 {
@@ -372,6 +441,17 @@ void Application::renderGUI()
     if (ImGui::Button("Wireframe Mode")) { m_renderMode = 1; }
     ImGui::SameLine();
     if (ImGui::Button("Solid Mode")) { m_renderMode = 2; }
+    ImGui::SameLine();
+    if (ImGui::Button("Raytrace"))   m_renderMode = 3;   // NEW
+
+    if (m_renderMode == 3)
+    {
+        if (m_traceJob.valid())
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Raytracing... please wait");
+        else if (m_traceDone)
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Raytracer Done!");
+    }
+
 
     // Shading Mode
     ImGui::Spacing();
@@ -480,6 +560,26 @@ void Application::addObject(std::string name,
     obj.color = color;
     obj.shader = m_standardShader;
     obj.name = name;
+
+    obj.material.diffuse = color;
+    obj.material.specular = glm::vec3(1.0f);   // white specular
+    obj.material.ambient = color * 0.5f;        // slightly darker ambient
+    obj.material.shininess = 32.0f;             // typical shiny surface
+    obj.material.roughness = 0.2f;              // little bit glossy
+    obj.material.metallic = 0.0f;               // not metallic
+
+
+    // Walls: less reflective, less specular
+    Material wallMaterial;
+    wallMaterial.diffuse = color;
+    wallMaterial.specular = glm::vec3(0.2f);  // LOWER specular strength
+    wallMaterial.ambient = color * 0.4f;       // Keep ambient a bit dark
+    wallMaterial.shininess = 8.0f;             // LOW shininess = large soft highlights
+    wallMaterial.roughness = 0.8f;             // HIGH roughness = matte
+    wallMaterial.metallic = 0.0f;              // Non-metallic
+
+    float wallReflectivity = 0.05f;             // VERY LOW reflectivity
+
 
     // 1) Load the OBJ data (positions, faces, compute normals, etc.)
     obj.objLoader.load(modelPath.c_str());
@@ -623,6 +723,19 @@ void Application::createScreenQuad()
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+
+    glGenTextures(1, &rayTexID);
+    glBindTexture(GL_TEXTURE_2D, rayTexID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F,
+        m_windowWidth, m_windowHeight,
+        0, GL_RGB, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // ADD
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);  // ADD
+
+
 }
 
 bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, const glm::vec3& aabbMax, float& t)
