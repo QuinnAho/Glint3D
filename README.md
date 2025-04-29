@@ -3,6 +3,10 @@
 This project is a simple but flexible 3D viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**.  
 It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, or point cloud), and raytracing them offline with basic lighting.
 
+
+
+![image](https://github.com/user-attachments/assets/1ab937e4-cb85-4944-b458-3a8d4a2fdd3e)
+
 ---
 
 ## Features
