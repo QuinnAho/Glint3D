@@ -115,6 +115,3 @@ The output is rendered to a full-screen quad as a texture.
 | **ImGui** | User Interface |
 | **stb_image** | Texture loading |
 | **stb_image_write** | (Optional) For saving screenshots |
-cmake ..
-make
-./Project1
