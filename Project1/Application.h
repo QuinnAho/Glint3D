@@ -133,4 +133,11 @@ private:
     int   m_renderMode = 2;   
     glm::vec3 m_modelCenter{ 0 };
     Texture   m_cowTexture;
+
+    GLuint m_shadowFBO;
+    GLuint m_shadowDepthTexture;
+    Shader* m_shadowShader;
+
+    glm::mat4 m_lightSpaceMatrix;
+
 };

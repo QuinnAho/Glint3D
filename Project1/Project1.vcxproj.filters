@@ -145,5 +145,11 @@
     <None Include="shaders\rayscreen.vert">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\shadow_depth.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\shadow_depth.vert">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

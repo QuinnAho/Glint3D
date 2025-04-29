@@ -186,6 +186,8 @@
     <None Include="shaders\grid.vert" />
     <None Include="shaders\rayscreen.frag" />
     <None Include="shaders\rayscreen.vert" />
+    <None Include="shaders\shadow_depth.frag" />
+    <None Include="shaders\shadow_depth.vert" />
     <None Include="shaders\standard.frag" />
     <None Include="shaders\standard.vert" />
   </ItemGroup>
