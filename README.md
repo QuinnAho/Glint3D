@@ -32,17 +32,17 @@ It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, o
 
 ## Features
 
-- ✅ Load and render OBJ models
-- ✅ Apply textures (e.g., cow texture)
-- ✅ Wireframe, point cloud, or solid rendering modes
-- ✅ Basic Phong shading in real-time
-- ✅ Basic CPU raytracer:
+- Load and render OBJ models
+- Apply textures (e.g., cow texture)
+- Wireframe, point cloud, or solid rendering modes
+- Basic Phong shading in real-time
+- Basic CPU raytracer:
   - Ray-AABB (Bounding Volume Hierarchy) acceleration
   - Ray-triangle intersection
   - Simple point lights
   - Textured raytraced objects
-- ✅ Interactive camera movement
-- ✅ GUI controls (via ImGui)
+- Interactive camera movement
+- GUI controls (via ImGui)
 
 ---
 
@@ -115,24 +115,6 @@ The output is rendered to a full-screen quad as a texture.
 | **ImGui** | User Interface |
 | **stb_image** | Texture loading |
 | **stb_image_write** | (Optional) For saving screenshots |
-
----
-
-## Building
-
-### Prerequisites
-
-- C++17 compiler
-- CMake or Visual Studio
-- OpenGL 3.3+
-
-### How to Build
-
-```bash
-git clone <this-repo>
-cd Project1/
-mkdir build
-cd build
 cmake ..
 make
 ./Project1
