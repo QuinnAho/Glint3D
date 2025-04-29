@@ -66,9 +66,6 @@
     <ClCompile Include="userinput.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="colors.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="material.h">
       <Filter>Header Files</Filter>
     </ClCompile>

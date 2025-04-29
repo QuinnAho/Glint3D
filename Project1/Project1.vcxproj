@@ -146,7 +146,6 @@
     <ClCompile Include="application.cpp" />
     <ClCompile Include="axisrenderer.cpp" />
     <ClCompile Include="BVHNode.cpp" />
-    <ClCompile Include="colors.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="grid.cpp" />
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_glfw.cpp" />

@@ -1,7 +1,6 @@
 D:\class\OpenGLOBJViewer\Project1\application.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\application.obj
 D:\class\OpenGLOBJViewer\Project1\axisrenderer.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\axisrenderer.obj
 D:\class\OpenGLOBJViewer\Project1\BVHNode.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\BVHNode.obj
-D:\class\OpenGLOBJViewer\Project1\colors.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\colors.obj
 D:\class\OpenGLOBJViewer\Project1\glad.c;D:\class\OpenGLOBJViewer\Project1\x64\Debug\glad.obj
 D:\class\OpenGLOBJViewer\Project1\grid.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\grid.obj
 D:\class\OpenGLOBJViewer\Project1\Libraries\include\imgui\backends\imgui_impl_glfw.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\imgui_impl_glfw.obj

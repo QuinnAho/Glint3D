@@ -8,13 +8,11 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>   // glm::min / glm::max
 
-/* ------------------------------------------------------------ */
 ObjLoader::ObjLoader()
     : minBound(std::numeric_limits<float>::max()),
     maxBound(std::numeric_limits<float>::lowest())
 {}
 
-/* ------------------------------------------------------------ */
 void ObjLoader::load(const char* filename)
 {
     std::ifstream file(filename);
@@ -73,7 +71,6 @@ void ObjLoader::computeNormals()
     for (glm::vec3& n : Normals) n = glm::normalize(n);
 }
 
-/* ------------ accessors (all const) ------------------------- */
 glm::vec3            ObjLoader::getMinBounds()  const { return minBound; }
 glm::vec3            ObjLoader::getMaxBounds()  const { return maxBound; }
 

@@ -1,9 +1,5 @@
 ﻿#pragma once
-/* ────────────────────────────────────────────
-   Very small OBJ loader  (positions + faces)
-   – normals are generated automatically
-   – all read-only accessors are now  const
-   ──────────────────────────────────────────── */
+
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -14,10 +10,8 @@ class ObjLoader
 public:
     ObjLoader();
 
-    /* ------------ IO --------------- */
     void load(const char* filename);
 
-    /* ------------ accessors -------- */
     int                  getVertCount()  const;
     int                  getIndexCount() const;
 

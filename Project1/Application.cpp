@@ -114,11 +114,9 @@ void Application::initImGui()
 
 void Application::setupOpenGL()
 {
-    /* -------------------------------------------------- 0) textures & helpers */
     if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
         std::cerr << "Failed to load cow texture.\n";
 
-    /* -------------------------------------------------- 1) screen-quad & rayTex */
     createScreenQuad();                           // allocates rayTexID (RGB32F)
 
     /*  Clear the ray-texture once so the first frame isn’t pure black  */
@@ -152,12 +150,11 @@ void Application::setupOpenGL()
             obj.material.metallic = 0.0f;
         }
 
-        float reflectivity = isWall ? 0.4f : 0.05f; // <-- BIG FIX
+        float reflectivity = isWall ? 0.4f : 0.05f;
         m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, obj.material);
     }
 
 
-    /* -------------------------------------------------- 2) standard & grid shaders */
     m_standardShader = new Shader();
     if (!m_standardShader->load("shaders/standard.vert", "shaders/standard.frag"))
         std::cerr << "Failed to load standard shader.\n";
@@ -169,7 +166,6 @@ void Application::setupOpenGL()
     if (!m_grid.init(m_gridShader, 200, 5.0f))
         std::cerr << "Failed to initialise grid.\n";
 
-    /* -------------------------------------------------- 3) FULL-SCREEN QUAD SHADER */
     m_rayScreenShader = new Shader();
     if (!m_rayScreenShader->load("shaders/rayscreen.vert",
         "shaders/rayscreen.frag"))
@@ -181,20 +177,13 @@ void Application::setupOpenGL()
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
 
-    /* -------------------------------------------------- 4) load all scene objects */
+    // Add all scene objects
     addObject("Cow", "cow.obj", glm::vec3(0.0f, 2.0f, 0.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f, 0.8f, 0.8f)); // centered light pink cow
 
     addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -7.0f), "", glm::vec3(16.0f, 6.0f, 0.5f), true, glm::vec3(1.0f, 0.5f, 0.5f)); // Red
     addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, 0.0f), "", glm::vec3(16.0f, 0.5f, 16.0f), true, glm::vec3(0.5f, 1.0f, 0.5f)); // Green
     addObject("Wall3", "cube.obj", glm::vec3(-8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(0.5f, 0.5f, 1.0f)); // Blue
     addObject("Wall4", "cube.obj", glm::vec3(8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(1.0f, 1.0f, 0.5f)); // Yellow
-
-
-
-
-
-
-
                                        
     //m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), Colors::Red, 1.2f);
     m_lights.addLight(glm::vec3(0.0f, 10.0f, 0.0f), Colors::White, 2.0f);
@@ -307,9 +296,6 @@ void Application::renderScene()
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspect, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
-    /* ========================================================
-       RAY-TRACE MODE
-       ======================================================== */
     if (m_renderMode == 3 && m_raytracer)
     {
         // --- Start the raytrace ONCE ---

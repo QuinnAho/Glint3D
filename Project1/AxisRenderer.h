@@ -38,4 +38,4 @@ public:
     void cleanup();
 };
 
-#endif // AXIS_RENDERER_H
+#endif

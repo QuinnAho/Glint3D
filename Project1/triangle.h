@@ -2,12 +2,10 @@
 #define TRIANGLE_H
 
 #include <glm/glm.hpp>
-#include "ray.h"                // your Ray struct (origin, direction)
-#include "Material.h"           // NEW: Material per triangle
+#include "ray.h"                
+#include "Material.h"          
 
-/*─────────────────────────────────────────────────────────────*/
-/*  Triangle – GPU-agnostic, CPU-side ray-tracing helper       */
-/*─────────────────────────────────────────────────────────────*/
+
 class Triangle
 {
 public:
@@ -23,11 +21,7 @@ public:
         normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
     }
 
-    /*---------------------------------------------------------*/
-    /*  Möller–Trumbore -- TWO-SIDED intersection test         */
-    /*  - returns true  →  t/n get filled                      */
-    /*  - returns false →  no hit                              */
-    /*---------------------------------------------------------*/
+    // Möller–Trumbore -- TWO-SIDED intersection test
     bool intersect(const Ray& r,
         float& tOut,
         glm::vec3& nOut) const
