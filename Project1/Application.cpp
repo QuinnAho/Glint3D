@@ -177,16 +177,58 @@ void Application::setupOpenGL()
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
 
-    // Add all scene objects
-    addObject("Cow", "cow.obj", glm::vec3(0.0f, 2.0f, 0.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f, 0.8f, 0.8f)); // centered light pink cow
+    // Add two cows (one on the left, one on the right)
+    addObject("Cow Left", "cow.obj",
+        glm::vec3(-6.0f, 2.0f, 5.0f),
+        "cow-tex-fin.jpg",
+        glm::vec3(1.0f),
+        false,
+        glm::vec3(1.0f, 1.0f, 1.0)); // White
 
-    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -7.0f), "", glm::vec3(16.0f, 6.0f, 0.5f), true, glm::vec3(1.0f, 0.5f, 0.5f)); // Red
-    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, 0.0f), "", glm::vec3(16.0f, 0.5f, 16.0f), true, glm::vec3(0.5f, 1.0f, 0.5f)); // Green
-    addObject("Wall3", "cube.obj", glm::vec3(-8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(0.5f, 0.5f, 1.0f)); // Blue
-    addObject("Wall4", "cube.obj", glm::vec3(8.0f, 2.0f, 0.0f), "", glm::vec3(0.5f, 6.0f, 16.0f), true, glm::vec3(1.0f, 1.0f, 0.5f)); // Yellow
-                                       
-    //m_lights.addLight(glm::vec3(6.0f, 7.0f, 3.0f), Colors::Red, 1.2f);
-    m_lights.addLight(glm::vec3(0.0f, 10.0f, 0.0f), Colors::White, 2.0f);
+    addObject("Cow Right", "cow.obj",
+        glm::vec3(6.0f, 2.0f, 5.0f), 
+        "cow-tex-fin.jpg",
+        glm::vec3(1.0f),
+        false,
+        glm::vec3(1.0f, 1.0f, 1.0)); //White
+
+
+    addObject("Wall1", "cube.obj",
+        glm::vec3(0.0f, 2.0f, -3.0f),
+        "",
+        glm::vec3(16.0f, 6.0f, 0.5f),
+        true,
+        glm::vec3(1.0f, 0.5f, 0.5f)); // Red
+
+    addObject("Wall2", "cube.obj",
+        glm::vec3(0.0f, -4.0f, 5.0f),
+        "",
+        glm::vec3(16.0f, 0.5f, 8.0f), 
+        true,
+        glm::vec3(0.5f, 1.0f, 0.5f)); // Green
+
+    addObject("Wall3", "cube.obj",
+        glm::vec3(-16.0f, 2.0f, 5.0f),
+        "",
+        glm::vec3(0.5f, 6.0f, 8.0f), 
+        true,
+        glm::vec3(0.5f, 0.5f, 1.0f)); // Blue
+
+    addObject("Wall4", "cube.obj",
+        glm::vec3(16.0f, 2.0f, 5.0f),
+        "",
+        glm::vec3(0.5f, 6.0f, 8.0f),
+        true,
+        glm::vec3(1.0f, 1.0f, 0.5f)); // Yellow
+
+
+
+    // Add two lights
+    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 8.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f); // Light reddish (moved forward)
+    m_lights.addLight(glm::vec3(6.0f, 7.0f, 8.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);  // Light bluish (moved forward)
+
+
+                                      
 
 
     m_raytracer = std::make_unique<Raytracer>();
@@ -408,7 +450,7 @@ void Application::renderGUI()
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(400, 600), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400, 400), ImGuiCond_Always);
 
     ImGui::Begin("Render Settings");
     ImGui::Text("Use WASD to move, Q/E for up/down.");
