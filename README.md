@@ -7,6 +7,16 @@ It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, o
 
 ![image](https://github.com/user-attachments/assets/1ab937e4-cb85-4944-b458-3a8d4a2fdd3e)
 
+![image](https://github.com/user-attachments/assets/e6bac5ab-9dde-42f5-a7c4-b591f3b8970d)
+
+![image](https://github.com/user-attachments/assets/007f764a-b7c3-4a76-926d-adddc16be4f1)
+
+![image](https://github.com/user-attachments/assets/72e6216c-8b49-4d11-8ef6-18a665b1514c)
+
+![image](https://github.com/user-attachments/assets/0765d651-f80c-47e1-8f95-9e95d194c152)
+
+
+
 ---
 
 ## Features
