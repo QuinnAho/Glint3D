@@ -117,44 +117,16 @@ void Application::setupOpenGL()
     if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
         std::cerr << "Failed to load cow texture.\n";
 
-    createScreenQuad();                           // allocates rayTexID (RGB32F)
+    createScreenQuad();  // allocates rayTexID (RGB32F)
 
-    /*  Clear the ray-texture once so the first frame isn’t pure black  */
+    // Clear the ray-texture once so the first frame isn’t pure black
     {
         std::vector<float> grey(m_windowWidth * m_windowHeight * 3, 0.1f);
         glBindTexture(GL_TEXTURE_2D, rayTexID);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-            m_windowWidth, m_windowHeight,
-            GL_RGB, GL_FLOAT, grey.data());
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_windowWidth, m_windowHeight, GL_RGB, GL_FLOAT, grey.data());
     }
 
-    for (auto& obj : m_sceneObjects)
-    {
-        bool isWall = obj.name.rfind("Wall", 0) == 0;
-        if (isWall)
-        {
-            // Walls: very low reflectivity
-            obj.material.specular = glm::vec3(0.2f);
-            obj.material.ambient = obj.color * 0.4f;
-            obj.material.shininess = 8.0f;
-            obj.material.roughness = 0.8f;
-            obj.material.metallic = 0.0f;
-        }
-        else
-        {
-            // Cow: low specular, but NOT mirror walls
-            obj.material.specular = glm::vec3(0.3f);  // less shine
-            obj.material.ambient = obj.color * 0.5f;
-            obj.material.shininess = 16.0f;           // softer highlight
-            obj.material.roughness = 0.6f;
-            obj.material.metallic = 0.0f;
-        }
-
-        float reflectivity = isWall ? 0.4f : 0.05f;
-        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, obj.material);
-    }
-
-
+    // Load shaders
     m_standardShader = new Shader();
     if (!m_standardShader->load("shaders/standard.vert", "shaders/standard.frag"))
         std::cerr << "Failed to load standard shader.\n";
@@ -167,78 +139,54 @@ void Application::setupOpenGL()
         std::cerr << "Failed to initialise grid.\n";
 
     m_rayScreenShader = new Shader();
-    if (!m_rayScreenShader->load("shaders/rayscreen.vert",
-        "shaders/rayscreen.frag"))
+    if (!m_rayScreenShader->load("shaders/rayscreen.vert", "shaders/rayscreen.frag"))
     {
         std::cerr << "[RayScreen] shader failed to load\n";
         std::terminate();
     }
-    /*  tell the sampler “rayTex” to use texture-unit 0  */
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
 
-    // Add two cows (one on the left, one on the right)
-    addObject("Cow Left", "cow.obj",
-        glm::vec3(-6.0f, 2.0f, 5.0f),
-        "cow-tex-fin.jpg",
-        glm::vec3(1.0f),
-        false,
-        glm::vec3(1.0f, 1.0f, 1.0)); // White
+    // ---- Add scene objects ----
+    addObject("Cow Left", "cow.obj", glm::vec3(-6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
+    addObject("Cow Right", "cow.obj", glm::vec3(6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
 
-    addObject("Cow Right", "cow.obj",
-        glm::vec3(6.0f, 2.0f, 5.0f), 
-        "cow-tex-fin.jpg",
-        glm::vec3(1.0f),
-        false,
-        glm::vec3(1.0f, 1.0f, 1.0)); //White
+    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -3.0f), "", glm::vec3(16.0f, 6.0f, 0.5f), true, glm::vec3(1.0f, 0.5f, 0.5f));
+    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, 5.0f), "", glm::vec3(16.0f, 0.5f, 8.0f), true, glm::vec3(0.5f, 1.0f, 0.5f));
+    addObject("Wall3", "cube.obj", glm::vec3(-16.0f, 2.0f, 5.0f), "", glm::vec3(0.5f, 6.0f, 8.0f), true, glm::vec3(0.5f, 0.5f, 1.0f));
+    addObject("Wall4", "cube.obj", glm::vec3(16.0f, 2.0f, 5.0f), "", glm::vec3(0.5f, 6.0f, 8.0f), true, glm::vec3(1.0f, 1.0f, 0.5f));
 
+    // ---- Add lights ----
+    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 8.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f);
+    m_lights.addLight(glm::vec3(6.0f, 7.0f, 8.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);
 
-    addObject("Wall1", "cube.obj",
-        glm::vec3(0.0f, 2.0f, -3.0f),
-        "",
-        glm::vec3(16.0f, 6.0f, 0.5f),
-        true,
-        glm::vec3(1.0f, 0.5f, 0.5f)); // Red
-
-    addObject("Wall2", "cube.obj",
-        glm::vec3(0.0f, -4.0f, 5.0f),
-        "",
-        glm::vec3(16.0f, 0.5f, 8.0f), 
-        true,
-        glm::vec3(0.5f, 1.0f, 0.5f)); // Green
-
-    addObject("Wall3", "cube.obj",
-        glm::vec3(-16.0f, 2.0f, 5.0f),
-        "",
-        glm::vec3(0.5f, 6.0f, 8.0f), 
-        true,
-        glm::vec3(0.5f, 0.5f, 1.0f)); // Blue
-
-    addObject("Wall4", "cube.obj",
-        glm::vec3(16.0f, 2.0f, 5.0f),
-        "",
-        glm::vec3(0.5f, 6.0f, 8.0f),
-        true,
-        glm::vec3(1.0f, 1.0f, 0.5f)); // Yellow
-
-
-
-    // Add two lights
-    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 8.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f); // Light reddish (moved forward)
-    m_lights.addLight(glm::vec3(6.0f, 7.0f, 8.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);  // Light bluish (moved forward)
-
-
-                                      
-
-
+    // ---- Setup raytracer now that sceneObjects exist ----
     m_raytracer = std::make_unique<Raytracer>();
     for (auto& obj : m_sceneObjects)
     {
-        float refl = (obj.name.rfind("Wall", 0) == 0) ? 0.4f : 0.1f; // Walls semi-reflective
-        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, refl, obj.material);
+        bool isWall = obj.name.rfind("Wall", 0) == 0;
+        float reflectivity = isWall ? 0.4f : 0.05f;
+
+        // Setup materials for raytracer use
+        if (isWall)
+        {
+            obj.material.specular = glm::vec3(0.2f);
+            obj.material.ambient = obj.color * 0.4f;
+            obj.material.shininess = 8.0f;
+            obj.material.roughness = 0.8f;
+            obj.material.metallic = 0.0f;
+        }
+        else
+        {
+            obj.material.specular = glm::vec3(0.3f);
+            obj.material.ambient = obj.color * 0.5f;
+            obj.material.shininess = 16.0f;
+            obj.material.roughness = 0.6f;
+            obj.material.metallic = 0.0f;
+        }
+
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, obj.material);
     }
-
-
 
     glEnable(GL_DEPTH_TEST);
     m_axisRenderer.init();
@@ -246,6 +194,29 @@ void Application::setupOpenGL()
     m_lights.initIndicator();
     if (!m_lights.initIndicatorShader())
         std::cerr << "Failed to initialise light-indicator shader.\n";
+
+    // ---- Setup shadow framebuffer ----
+    glGenFramebuffers(1, &m_shadowFBO);
+    glGenTextures(1, &m_shadowDepthTexture);
+    glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowDepthTexture, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Load shadow shader
+    m_shadowShader = new Shader();
+    if (!m_shadowShader->load("shaders/shadow_depth.vert", "shaders/shadow_depth.frag"))
+        std::cerr << "Failed to load shadow shader.\n";
 }
 
 
@@ -326,11 +297,31 @@ void Application::processInput()
 
 void Application::renderScene()
 {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Default framebuffer
+    // ---- 1. Render shadow map first ----
+    glViewport(0, 0, 1024, 1024);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-6.0f, 7.0f, 8.0f));
+    glm::mat4 lightView = glm::lookAt(lightDir * 20.0f, glm::vec3(0.0f), glm::vec3(0, 1, 0));
+    glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 1.0f, 50.0f);
+    m_lightSpaceMatrix = lightProjection * lightView;
+
+    m_shadowShader->use();
+    m_shadowShader->setMat4("lightSpaceMatrix", m_lightSpaceMatrix);
+
+    for (auto& obj : m_sceneObjects)
+    {
+        m_shadowShader->setMat4("model", obj.modelMatrix);
+        glBindVertexArray(obj.VAO);
+        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // ---- 2. Render normal scene ----
     glViewport(0, 0, m_windowWidth, m_windowHeight);
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // BLACK
-
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Update camera matrices
@@ -354,7 +345,7 @@ void Application::renderScene()
                     m_raytracer->renderImage(m_framebuffer, W, H, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
 
                     std::cout << "[TraceJob] Worker: finished tracing!\n";
-                    m_traceDone = true; 
+                    m_traceDone = true;
                 });
         }
 
@@ -388,13 +379,11 @@ void Application::renderScene()
     }
     else
     {
-        // Leaving raytrace mode — reset trace job if needed
         if (m_traceJob.valid())
             m_traceJob.wait();
         m_traceJob = std::future<void>();
-        m_traceDone = false;  // <=== ADD THIS TOO when leaving raytrace mode
+        m_traceDone = false;
     }
-
 
     switch (m_renderMode)
     {
@@ -407,13 +396,18 @@ void Application::renderScene()
 
     for (auto& obj : m_sceneObjects)
     {
-        
         if (!obj.shader) continue;
         obj.shader->use();
 
+        // Pass all the scene info
         obj.shader->setMat4("model", obj.modelMatrix);
         obj.shader->setMat4("view", m_viewMatrix);
         obj.shader->setMat4("projection", m_projectionMatrix);
+        obj.shader->setMat4("lightSpaceMatrix", m_lightSpaceMatrix);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
+        obj.shader->setInt("shadowMap", 1);
 
         obj.shader->setInt("shadingMode", m_shadingMode);
         obj.shader->setVec3("viewPos", m_cameraPos);

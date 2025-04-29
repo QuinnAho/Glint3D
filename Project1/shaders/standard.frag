@@ -7,6 +7,9 @@ in vec3 Normal;
 in vec3 GouraudLight;  // We only use this if shadingMode == 1
 in vec2 UV;
 
+uniform sampler2D shadowMap;
+uniform mat4 lightSpaceMatrix;
+
 // For texturing & shading controls
 uniform sampler2D cowTexture;
 uniform bool useTexture;
@@ -44,34 +47,59 @@ uniform Material material;
 uniform vec3 viewPos;
 
 // ------------------------------------------------------------------------
+// Calculate Shadow
+float calculateShadow(vec4 fragPosLightSpace)
+{
+    // Perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5; // transform to [0,1] range
+
+    // Check if outside light projection
+    if (projCoords.z > 1.0)
+        return 1.0;
+
+    // Read depth from shadow map
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
+
+    // Bias to prevent shadow acne
+    float bias = 0.005;
+
+    // 1.0 = lit, 0.5 = shadowed
+    float shadow = (currentDepth - bias) > closestDepth ? 0.5 : 1.0;
+    return shadow;
+}
+
+// ------------------------------------------------------------------------
 // Main
 void main()
 {
     // Base color from either texture or fallback color
     vec3 baseColor = useTexture ? texture(cowTexture, UV).rgb : objectColor;
 
-    // Start with an ambient term (global + material's own ambient color)
+    // Shadow factor
+    float shadow = calculateShadow(lightSpaceMatrix * vec4(FragPos, 1.0));
+
+    // Start with ambient term
     vec3 totalLight = globalAmbient.rgb * material.ambient;
 
     if (shadingMode == 0) {
         // ----- FLAT Shading -----
-        // Recompute a face normal using derivatives
         vec3 faceNormal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
 
-        // Simple diffuse for each light
         for (int i = 0; i < numLights; i++) {
+            if (lights[i].intensity <= 0.0) continue;
             vec3 L = normalize(lights[i].position - FragPos);
             float diff = max(dot(faceNormal, L), 0.0);
-            totalLight += material.diffuse * diff * lights[i].color * lights[i].intensity;
+            totalLight += shadow * material.diffuse * diff * lights[i].color * lights[i].intensity;
         }
     }
     else if (shadingMode == 1) {
         // ----- GOURAUD Shading -----
-        // The vertex shader already computed diffuse + specular
-        totalLight += GouraudLight;
+        totalLight += shadow * GouraudLight;
     }
 
-    // Multiply lighting by base color (texture or objectColor)
+    // Final color
     vec3 finalColor = baseColor * totalLight;
     FragColor = vec4(finalColor, 1.0);
 }
