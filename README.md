@@ -3,21 +3,46 @@
 This project is a simple but flexible 3D viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**.  
 It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, or point cloud), and raytracing them offline with basic lighting.
 
+
+**Phong** 
+
+![image](https://github.com/user-attachments/assets/1ab937e4-cb85-4944-b458-3a8d4a2fdd3e)
+
+
+**Flat**
+
+![image](https://github.com/user-attachments/assets/e6bac5ab-9dde-42f5-a7c4-b591f3b8970d)
+
+
+**Raytraced (Not Real Time)**
+
+![image](https://github.com/user-attachments/assets/007f764a-b7c3-4a76-926d-adddc16be4f1)
+
+
+**Wireframe**
+
+![image](https://github.com/user-attachments/assets/72e6216c-8b49-4d11-8ef6-18a665b1514c)
+
+
+**Point Cloud**
+
+![image](https://github.com/user-attachments/assets/0765d651-f80c-47e1-8f95-9e95d194c152)
+
 ---
 
 ## Features
 
-- ✅ Load and render OBJ models
-- ✅ Apply textures (e.g., cow texture)
-- ✅ Wireframe, point cloud, or solid rendering modes
-- ✅ Basic Phong shading in real-time
-- ✅ Basic CPU raytracer:
+- Load and render OBJ models
+- Apply textures (e.g., cow texture)
+- Wireframe, point cloud, or solid rendering modes
+- Basic Phong shading in real-time
+- Basic CPU raytracer:
   - Ray-AABB (Bounding Volume Hierarchy) acceleration
   - Ray-triangle intersection
   - Simple point lights
   - Textured raytraced objects
-- ✅ Interactive camera movement
-- ✅ GUI controls (via ImGui)
+- Interactive camera movement
+- GUI controls (via ImGui)
 
 ---
 
@@ -90,24 +115,3 @@ The output is rendered to a full-screen quad as a texture.
 | **ImGui** | User Interface |
 | **stb_image** | Texture loading |
 | **stb_image_write** | (Optional) For saving screenshots |
-
----
-
-## Building
-
-### Prerequisites
-
-- C++17 compiler
-- CMake or Visual Studio
-- OpenGL 3.3+
-
-### How to Build
-
-```bash
-git clone <this-repo>
-cd Project1/
-mkdir build
-cd build
-cmake ..
-make
-./Project1
