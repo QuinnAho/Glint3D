@@ -15,6 +15,7 @@
 #include "Texture.h"
 #include "Light.h"
 #include "Raytracer.h"
+#include "GpuRaytracer.h"
 #include "UserInput.h"
 #include "Shader.h"
 #include "Grid.h"
@@ -122,6 +123,7 @@ private:
     int     m_shadingMode = 2;
 
     std::unique_ptr<Raytracer> m_raytracer;
+    std::unique_ptr<GpuRaytracer> m_gpuRaytracer;
     GLuint rayTexID = 0, quadVAO = 0, quadVBO = 0, quadEBO = 0;
 
     std::future<void>         m_traceJob;   // background task

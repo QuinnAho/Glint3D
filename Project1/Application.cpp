@@ -147,6 +147,11 @@ void Application::setupOpenGL()
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
 
+    // Initialize GPU raytracer (compute shader based)
+    m_gpuRaytracer = std::make_unique<GpuRaytracer>();
+    if (!m_gpuRaytracer->init())
+        std::cerr << "Failed to initialise GPU raytracer.\n";
+
     // ---- Add scene objects ----
     addObject("Cow Left", "cow.obj", glm::vec3(-6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
     addObject("Cow Right", "cow.obj", glm::vec3(6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
@@ -329,39 +334,12 @@ void Application::renderScene()
     m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspect, m_nearClip, m_farClip);
     m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
 
-    if (m_renderMode == 3 && m_raytracer)
+    if (m_renderMode == 3 && m_gpuRaytracer)
     {
-        // --- Start the raytrace ONCE ---
-        if (!m_traceJob.valid() && !m_traceDone)  // <=== ADD THIS !!
-        {
-            std::cout << "[TraceJob] Starting new raytrace...\n";
+        // GPU ray tracing every frame
+        m_gpuRaytracer->render(rayTexID, m_windowWidth, m_windowHeight,
+                               m_cameraPos, m_cameraFront, m_cameraUp, m_fov);
 
-            m_framebuffer.resize(size_t(m_windowWidth) * m_windowHeight);
-
-            m_traceJob = std::async(std::launch::async,
-                [&, W = m_windowWidth, H = m_windowHeight]()
-                {
-                    std::cout << "[TraceJob] Worker: tracing image...\n";
-                    m_raytracer->renderImage(m_framebuffer, W, H, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
-
-                    std::cout << "[TraceJob] Worker: finished tracing!\n";
-                    m_traceDone = true;
-                });
-        }
-
-        // --- If tracing finished, upload result ---
-        if (m_traceJob.valid() && m_traceJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        {
-            m_traceJob.get(); // collect result (no exceptions)
-            m_traceJob = std::future<void>(); // reset
-
-            glBindTexture(GL_TEXTURE_2D, rayTexID);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-                m_windowWidth, m_windowHeight,
-                GL_RGB, GL_FLOAT, m_framebuffer.data());
-        }
-
-        // --- Always draw the last available raytrace result ---
         m_rayScreenShader->use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, rayTexID);
