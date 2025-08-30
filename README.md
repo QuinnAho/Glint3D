@@ -127,6 +127,13 @@ Output is rendered to a fullscreen quad as a texture.
 ## Chat + Commands
 
 Open the app and use the right-side **Talk panel**.  
+**Example**
+<img width="800" height="631" alt="image" src="https://github.com/user-attachments/assets/dc534961-42a9-4ec3-9295-b6d0dfa6692a" />
+
+<img width="803" height="601" alt="image" src="https://github.com/user-attachments/assets/384430a8-36b2-45d8-ad9a-997282afff40" />
+
+<img width="792" height="633" alt="image" src="https://github.com/user-attachments/assets/cd61d91c-10ef-4edb-8fda-18e92bb973be" />
+
 
 ### Example JSON Commands
 ```json
