@@ -18,16 +18,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="glad.c">
+    <ClCompile Include="src\glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="objloader.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="objloader.cpp">
+    <ClCompile Include="src\objloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Libraries\include\imgui\imgui.cpp">
@@ -48,81 +45,93 @@
     <ClCompile Include="Libraries\include\imgui\backends\imgui_impl_opengl3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="axisrenderer.cpp">
+    <ClCompile Include="src\axisrenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="application.cpp">
+    <ClCompile Include="src\application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="light.cpp">
+    <ClCompile Include="src\light.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="raytracer.cpp">
+    <ClCompile Include="src\raytracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="texture.cpp">
+    <ClCompile Include="src\texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="userinput.cpp">
+    <ClCompile Include="src\userinput.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="material.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="material.cpp">
+    <ClCompile Include="src\material.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="shader.cpp">
+    <ClCompile Include="src\shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="grid.cpp">
+    <ClCompile Include="src\grid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BVHNode.cpp">
+    <ClCompile Include="src\BVHNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RayUtils.cpp">
+    <ClCompile Include="src\RayUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\triangle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\InputHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="axisrenderer.h">
+    <ClInclude Include="include\axisrenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="application.h">
+    <ClInclude Include="include\application.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="light.h">
+    <ClInclude Include="include\light.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ray.h">
+    <ClInclude Include="include\ray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="raytracer.h">
+    <ClInclude Include="include\raytracer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="texture.h">
+    <ClInclude Include="include\texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="triangle.h">
+    <ClInclude Include="include\triangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="userinput.h">
+    <ClInclude Include="include\userinput.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="colors.h">
+    <ClInclude Include="include\colors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader.h">
+    <ClInclude Include="include\shader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="grid.h">
+    <ClInclude Include="include\grid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BVHNode.h">
+    <ClInclude Include="include\BVHNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RayUtils.h">
+    <ClInclude Include="include\RayUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\objloader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\material.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\InputHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,0 +1,26 @@
+# Visual Studio
+.vs/
+*.VC.db
+*.opendb
+*.sdf
+*.suo
+*.user
+*.userosscache
+*.vcxproj.user
+*.ipch
+
+# Build outputs
+/x64/
+*.obj
+*.pdb
+*.ilk
+*.tlog
+*.log
+*.cache
+*.exe
+
+# ImGui runtime state
+imgui.ini
+
+# Misc
+shader_log.txt
