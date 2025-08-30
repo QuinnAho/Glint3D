@@ -18,6 +18,8 @@
 #include "UserInput.h"
 #include "Shader.h"
 #include "Grid.h"
+#include "commands.h"
+#include "ai_bridge.h"
 
 struct SceneObject
 {
@@ -84,6 +86,7 @@ private:
     void processInput();
     void renderScene();                  
     void renderGUI();
+    void renderChatPanel();
     void renderAxisIndicator();
     void createScreenQuad();
 
@@ -139,5 +142,21 @@ private:
     Shader* m_shadowShader;
 
     glm::mat4 m_lightSpaceMatrix;
+
+    // Chat UI state + command plumbing
+    char m_chatInput[2048] = {0};
+    std::vector<std::string> m_chatScrollback; // parsed outputs and errors
+    bool m_previewOnly = true; // if true, only preview JSON and log; if false, execute
+    bool m_useAI = false;      // if true, treat input as natural language and call AI
+    AIConfig m_aiConfig{};     // endpoint + model
+    NLToJSONBridge m_ai{ m_aiConfig };
+
+    // Per-batch confirmation modal state
+    bool m_confirmOpen = false;
+    CommandBatch m_pendingBatch;
+    std::string m_pendingPretty;
+
+    // Interpreter entry (v0: add-only; can be stubbed to preview)
+    void executeCommands(const CommandBatch& batch, bool previewOnly);
 
 };

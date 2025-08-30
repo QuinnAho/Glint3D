@@ -1,5 +1,8 @@
 ﻿#include "application.h"
 #include <iostream>
+#include <sstream>
+#include <algorithm>
+#include <cstdio>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -373,6 +376,7 @@ void Application::renderScene()
         glBindVertexArray(0);
 
         renderAxisIndicator();
+        m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
         renderGUI();
         glfwSwapBuffers(m_window);
         return;
@@ -548,8 +552,170 @@ void Application::renderGUI()
 
     ImGui::End();
 
+    // Right-side Talk panel (chat-style command input)
+    renderChatPanel();
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void Application::renderChatPanel()
+{
+    const float panelWidth = 420.0f;
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - panelWidth - 10.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, ImGui::GetIO().DisplaySize.y - 20.0f), ImGuiCond_Always);
+    ImGui::Begin("Talk", nullptr, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::Checkbox("Preview only", &m_previewOnly);
+    ImGui::SameLine();
+    ImGui::Checkbox("Use AI", &m_useAI);
+    if (m_useAI)
+    {
+        char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
+        char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
+        if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
+            m_aiConfig.endpoint = endpointBuf;
+            m_ai.setConfig(m_aiConfig);
+        }
+        if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
+            m_aiConfig.model = modelBuf;
+            m_ai.setConfig(m_aiConfig);
+        }
+    }
+    ImGui::Separator();
+
+    ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
+    ImGui::Text("Enter JSON-like command(s):");
+    ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 140.0f), flags);
+    if (ImGui::Button("Submit"))
+    {
+        std::string input(m_chatInput);
+        if (!input.empty()) {
+            std::string jsonToRun;
+            if (m_useAI) {
+                std::string err;
+                if (!m_ai.translate(input, jsonToRun, err)) {
+                    m_chatScrollback.push_back(std::string("AI error: ") + err);
+                    m_chatInput[0] = '\0';
+                    // keep window open; do not early-return out of UI
+                }
+                m_chatScrollback.push_back(std::string("AI JSON:\n") + jsonToRun);
+            } else {
+                jsonToRun = input;
+            }
+
+            CommandBatch batch; std::string perr;
+            if (ParseCommandBatch(jsonToRun, batch, perr)) {
+                m_pendingPretty = ToJson(batch);
+                m_chatScrollback.push_back(std::string("Parsed OK:\n") + m_pendingPretty);
+                m_pendingBatch = batch;
+                m_confirmOpen = true;
+                ImGui::OpenPopup("Apply Commands?");
+            } else {
+                m_chatScrollback.push_back(std::string("Parse error: ") + perr);
+            }
+        }
+        m_chatInput[0] = '\0';
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Output:");
+    if (ImGui::BeginChild("##scrollback", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        for (const auto& line : m_chatScrollback) {
+            ImGui::TextUnformatted(line.c_str());
+            ImGui::Separator();
+        }
+    }
+    ImGui::EndChild();
+
+    // Confirmation modal for current batch
+    if (ImGui::BeginPopupModal("Apply Commands?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped("About to apply the following commands:");
+        ImGui::Separator();
+        ImGui::BeginChild("##pending_pretty", ImVec2(400, 220), true, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::TextUnformatted(m_pendingPretty.c_str());
+        ImGui::EndChild();
+        ImGui::Separator();
+        if (ImGui::Button("Apply")) {
+            executeCommands(m_pendingBatch, false);
+            m_confirmOpen = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            m_confirmOpen = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::End();
+}
+
+void Application::executeCommands(const CommandBatch& batch, bool previewOnly)
+{
+    for (const auto& cmd : batch.commands) {
+        switch (cmd.op) {
+        case CommandOp::LoadModel: {
+            std::ostringstream os; os << "Will load_model: path='" << cmd.loadModel.path << "'";
+            if (cmd.loadModel.name) os << ", name='" << *cmd.loadModel.name << "'";
+            if (cmd.loadModel.transform.position) os << ", pos=(" << cmd.loadModel.transform.position->x << "," << cmd.loadModel.transform.position->y << "," << cmd.loadModel.transform.position->z << ")";
+            if (cmd.loadModel.transform.scale)    os << ", scale=(" << cmd.loadModel.transform.scale->x    << "," << cmd.loadModel.transform.scale->y    << "," << cmd.loadModel.transform.scale->z    << ")";
+            m_chatScrollback.push_back(os.str());
+            if (!previewOnly) {
+                glm::vec3 pos = cmd.loadModel.transform.position.value_or(glm::vec3(0.0f));
+                glm::vec3 scl = cmd.loadModel.transform.scale.value_or(glm::vec3(1.0f));
+                addObject(cmd.loadModel.name.value_or(""), cmd.loadModel.path, pos, "", scl, false, glm::vec3(1.0f));
+                if (m_raytracer && !m_sceneObjects.empty()) {
+                    const SceneObject& newObj = m_sceneObjects.back();
+                    m_raytracer->loadModel(newObj.objLoader, newObj.modelMatrix, 0.05f, newObj.material);
+                }
+            }
+            break; }
+        case CommandOp::Duplicate: {
+            std::ostringstream os; os << "Will duplicate: source='" << cmd.duplicate.source << "'";
+            if (cmd.duplicate.name) os << ", name='" << *cmd.duplicate.name << "'";
+            if (cmd.duplicate.transform.position) os << ", deltaPos=(" << cmd.duplicate.transform.position->x << "," << cmd.duplicate.transform.position->y << "," << cmd.duplicate.transform.position->z << ")";
+            m_chatScrollback.push_back(os.str());
+            if (!previewOnly) {
+                auto it = std::find_if(m_sceneObjects.begin(), m_sceneObjects.end(), [&](const SceneObject& o){ return o.name == cmd.duplicate.source; });
+                if (it != m_sceneObjects.end()) {
+                    SceneObject copy = *it;
+                    if (cmd.duplicate.name) copy.name = *cmd.duplicate.name; else copy.name += "_copy";
+                    if (cmd.duplicate.transform.position) {
+                        copy.modelMatrix = glm::translate(copy.modelMatrix, *cmd.duplicate.transform.position);
+                    }
+                    if (cmd.duplicate.transform.scale) {
+                        copy.modelMatrix = copy.modelMatrix * glm::scale(glm::mat4(1.0f), *cmd.duplicate.transform.scale);
+                    }
+                    m_sceneObjects.push_back(copy);
+                    if (m_raytracer && !m_sceneObjects.empty()) {
+                        const SceneObject& newObj = m_sceneObjects.back();
+                        m_raytracer->loadModel(newObj.objLoader, newObj.modelMatrix, 0.05f, newObj.material);
+                    }
+                } else {
+                    m_chatScrollback.push_back("Duplicate error: source not found");
+                }
+            }
+            break; }
+        case CommandOp::AddLight: {
+            std::ostringstream os; os << "Will add_light: type='" << cmd.addLight.type << "'";
+            if (cmd.addLight.position)  os << ", pos=(" << cmd.addLight.position->x  << "," << cmd.addLight.position->y  << "," << cmd.addLight.position->z  << ")";
+            if (cmd.addLight.direction) os << ", dir=(" << cmd.addLight.direction->x << "," << cmd.addLight.direction->y << "," << cmd.addLight.direction->z << ")";
+            if (cmd.addLight.intensity) os << ", I=" << *cmd.addLight.intensity;
+            m_chatScrollback.push_back(os.str());
+            if (!previewOnly) {
+                glm::vec3 c = cmd.addLight.color.value_or(glm::vec3(1.0f));
+                float I = cmd.addLight.intensity.value_or(1.0f);
+                glm::vec3 p = cmd.addLight.position.value_or(glm::vec3(0.0f));
+                m_lights.addLight(p, c, I);
+                m_lights.initIndicator();
+            }
+            break; }
+        }
+    }
 }
 
 void Application::renderAxisIndicator()

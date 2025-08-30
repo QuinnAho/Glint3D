@@ -1,34 +1,8 @@
-﻿  application.cpp
-  axisrenderer.cpp
-  BVHNode.cpp
-  grid.cpp
-  imgui_impl_glfw.cpp
-  imgui_impl_opengl3.cpp
-  imgui.cpp
-  imgui_draw.cpp
-  imgui_tables.cpp
-  imgui_widgets.cpp
-  light.cpp
+﻿  BVHNode.cpp
+  application.cpp
   main.cpp
-  material.cpp
-  objloader.cpp
-  raytracer.cpp
-  RayUtils.cpp
-  shader.cpp
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(60,22): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(62,24): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(70,18): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(72,20): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
-  texture.cpp
   userinput.cpp
 D:\class\OpenGLOBJViewer\Project1\src\userinput.cpp(105,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
 D:\class\OpenGLOBJViewer\Project1\src\userinput.cpp(106,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  triangle.cpp
   Generating Code...
-  Compiling...
-  InputHandler.cpp
-D:\class\OpenGLOBJViewer\Project1\src\InputHandler.cpp(46,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-D:\class\OpenGLOBJViewer\Project1\src\InputHandler.cpp(47,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  Generating Code...
-  glad.c
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
