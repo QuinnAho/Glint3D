@@ -1,31 +1,26 @@
-# OpenGL OBJ Viewer + Basic Raytracer
+# AI-Enhanced OBJ Viewer + Raytracer
 
-This project is a simple but flexible 3D viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**.  
-It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, or point cloud), and raytracing them offline with basic lighting.
+This project is a flexible 3D OBJ model viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**, enhanced with **AI-powered natural language controls**.  
+It supports real-time rasterized modes (wireframe, shaded, point cloud) and an offline CPU raytracer with BVH acceleration.  
+Users can also interact with the app using **JSON commands** or **AI-driven natural language prompts**.
 
+---
 
-**Phong** 
+## Rendering Modes
 
+**Phong**  
 ![image](https://github.com/user-attachments/assets/1ab937e4-cb85-4944-b458-3a8d4a2fdd3e)
 
-
-**Flat**
-
+**Flat**  
 ![image](https://github.com/user-attachments/assets/e6bac5ab-9dde-42f5-a7c4-b591f3b8970d)
 
-
-**Raytraced (Not Real Time)**
-
+**Raytraced (CPU, Not Real Time)**  
 ![image](https://github.com/user-attachments/assets/007f764a-b7c3-4a76-926d-adddc16be4f1)
 
-
-**Wireframe**
-
+**Wireframe**  
 ![image](https://github.com/user-attachments/assets/72e6216c-8b49-4d11-8ef6-18a665b1514c)
 
-
-**Point Cloud**
-
+**Point Cloud**  
 ![image](https://github.com/user-attachments/assets/0765d651-f80c-47e1-8f95-9e95d194c152)
 
 ---
@@ -35,34 +30,58 @@ It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, o
 - Load and render OBJ models
 - Apply textures (e.g., cow texture)
 - Wireframe, point cloud, or solid rendering modes
-- Basic Phong shading in real-time
-- Basic CPU raytracer:
-  - Ray-AABB (Bounding Volume Hierarchy) acceleration
-  - Ray-triangle intersection
-  - Simple point lights
-  - Textured raytraced objects
+- Real-time Phong shading
+- CPU raytracer:
+  - BVH acceleration (Ray–AABB + Ray–Triangle)
+  - Point light support
+  - Textured raytraced surfaces
 - Interactive camera movement
-- GUI controls (via ImGui)
+- GUI controls (ImGui)
+- **Chat-based JSON commands** to load/duplicate models and add lights
+- **AI natural language bridge** using a local LLM (Ollama)
 
 ---
 
-## Project Structure
+## Project Setup and Structure
 
-| Folder/File | Purpose |
-|:------------|:--------|
-| `application.h/cpp` | Main Application loop (OpenGL + Windowing + GUI) |
-| `raytracer.h/cpp` | CPU Raytracer (using BVH acceleration) |
-| `BVHNode.h/cpp` | Bounding Volume Hierarchy for faster raytracing |
-| `Triangle.h/cpp` | Triangle representation for intersection tests |
-| `ObjLoader.h/cpp` | Simple OBJ model loader |
-| `Shader.h/cpp` | GLSL Shader helper |
-| `Light.h/cpp` | Manage multiple lights |
-| `Texture.h/cpp` | Texture loading and sampling (for OpenGL + CPU) |
-| `Grid.h/cpp` | Optional scene grid |
-| `UserInput.h/cpp` | Camera control with mouse and keyboard |
-| `shaders/` | OpenGL vertex/fragment shaders |
-| `textures/` | Model textures (e.g., cow-tex-fin.jpg) |
-| `models/` | OBJ models (e.g., cow.obj, cube.obj) |
+### Overview
+A Visual Studio C++ OpenGL project for viewing OBJ models with a simple raytracing preview and AI-driven scene manipulation.  
+Uses GLFW, GLAD, ImGui, GLM, and stb headers vendored under `Libraries/`.
+
+### Folder Layout
+- **src/** — C/C++ sources for rendering, input, loaders  
+- **include/** — Public headers  
+- **Libraries/** — Third-party headers and prebuilt libs (GLFW, ImGui, stb, GLM)  
+- **shaders/** — GLSL shaders  
+- **assets/** — Models + textures (e.g., cow.obj, cow-tex-fin.jpg)  
+
+### Requirements
+- Visual Studio 2022 (Desktop development with C++)  
+- Windows 10+ SDK  
+
+### Opening
+- Open `Project1.vcxproj` in Visual Studio  
+
+### Configuration
+- Platform: **x64** (Debug or Release)  
+- Language standard: **C++17**  
+- Includes (pre-configured):  
+  - `$(ProjectDir)include`  
+  - `$(ProjectDir)Libraries\include`  
+  - `$(ProjectDir)Libraries\include\imgui`  
+  - `$(ProjectDir)Libraries\include\stb`  
+- Libraries: `$(ProjectDir)Libraries\lib`  
+- Linker: `glfw3.lib; opengl32.lib; gdi32.lib; user32.lib; shell32.lib; legacy_stdio_definitions.lib`  
+
+### Build
+- Select **x64-Debug** or **x64-Release** → Build  
+- Output under `x64/`  
+- Working directory must be project root so shaders/assets resolve  
+
+### Runtime Notes
+- Shaders load from `shaders/`  
+- Assets load from `assets/`  
+- ImGui config persists in `imgui.ini`  
 
 ---
 
@@ -74,44 +93,39 @@ It allows loading `.obj` models, viewing them in real-time (wireframe, shaded, o
 | `Q` / `E` | Move camera up / down |
 | Left-Click + Drag | Rotate model |
 | Right-Click + Drag | Rotate camera view |
-| GUI Sliders | Change camera speed, FOV, clipping planes |
-| Buttons | Switch between wireframe, solid, point cloud, and raytrace modes |
+| GUI Sliders | Adjust speed, FOV, clipping planes |
+| Buttons | Switch between wireframe, solid, point cloud, raytrace |
 
 ---
 
 ## Example Scene
 
-- Two Cows on either side of the scene.
-- Surrounded by walls (cubes) for context.
-- One or more lights illuminating the scene.
-- Texture applied both in real-time and raytraced mode.
+- Two cows in the scene  
+- Surrounded by cube “walls”  
+- One or more lights  
+- Texture applied in both raster + raytraced modes  
 
 ---
 
 ## How the Raytracer Works
 
-- Build a **Bounding Volume Hierarchy (BVH)** from the triangles.
-- Cast primary rays from the camera into the scene.
-- Find the nearest triangle hit using the BVH.
-- Calculate intersection point and surface normal.
-- Apply simple lighting:
-  - Ambient + Diffuse (no specular yet).
-  - Supports multiple light sources.
-- If texture mapping is enabled:
-  - Compute barycentric coordinates at hit point.
-  - Sample the object's texture using interpolated UV coordinates.
+1. Build a **BVH** from model triangles  
+2. Cast rays from camera → BVH traversal  
+3. Find nearest intersection  
+4. Compute hit point + normal  
+5. Apply lighting: Ambient + Diffuse (no specular yet)  
+6. If textured: interpolate UV via barycentrics → sample texture  
 
-The output is rendered to a full-screen quad as a texture.
+Output is rendered to a fullscreen quad as a texture.  
 
 ---
 
-## Dependencies
+## Chat + Commands
 
-| Library | Usage |
-|:--------|:------|
-| **GLFW** | Windowing and input |
-| **GLAD** | OpenGL function loading |
-| **GLM** | Math library for vectors/matrices |
-| **ImGui** | User Interface |
-| **stb_image** | Texture loading |
-| **stb_image_write** | (Optional) For saving screenshots |
+Open the app and use the right-side **Talk panel**.  
+
+### Example Commands
+```json
+{ "op": "load_model", "path": "cow.obj", "name": "Cow1", "transform": { "position": [2,0,0], "scale": [1,1,1] } }
+{ "op": "duplicate", "source": "Cow1", "name": "Cow2", "transform": { "position": [2,0,0] } }
+{ "op": "add_light", "type": "point", "position": [0,5,5], "color": [1,1,1], "intensity": 1.5 }
