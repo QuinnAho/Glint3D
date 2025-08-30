@@ -2,7 +2,7 @@
 
 This project is a flexible 3D OBJ model viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**, enhanced with **AI-powered natural language controls**.  
 It supports real-time rasterized modes (wireframe, shaded, point cloud) and an offline CPU raytracer with BVH acceleration.  
-Users can also interact with the app using **JSON commands** or **AI-driven natural language prompts**.
+Users can interact with the app using **direct JSON commands** or **plain natural language** (e.g., *"add a white light to the scene"*), which is automatically translated into JSON.
 
 ---
 
@@ -38,7 +38,11 @@ Users can also interact with the app using **JSON commands** or **AI-driven natu
 - Interactive camera movement
 - GUI controls (ImGui)
 - **Chat-based JSON commands** to load/duplicate models and add lights
-- **AI natural language bridge** using a local LLM (Ollama)
+- **AI natural language bridge**: type instructions like  
+  - *“add a white light to the scene”*  
+  - *“load cow.obj and place it at x=2”*  
+  - *“duplicate the cow to the left and make it smaller”*  
+  → The app automatically generates and applies the correct JSON.
 
 ---
 
@@ -124,7 +128,7 @@ Output is rendered to a fullscreen quad as a texture.
 
 Open the app and use the right-side **Talk panel**.  
 
-### Example Commands
+### Example JSON Commands
 ```json
 { "op": "load_model", "path": "cow.obj", "name": "Cow1", "transform": { "position": [2,0,0], "scale": [1,1,1] } }
 { "op": "duplicate", "source": "Cow1", "name": "Cow2", "transform": { "position": [2,0,0] } }
