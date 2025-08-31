@@ -107,19 +107,55 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PostBuildEvent>
+      <Command>
+if exist "$(VcpkgRoot)installed\x64-windows\debug\bin\assimp*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\debug\bin\assimp*.dll" "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\debug\bin\zlib*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\debug\bin\zlib*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\debug\bin\zstd*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\debug\bin\zstd*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\debug\bin\brotli*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\debug\bin\brotli*.dll" "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\assimp*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\assimp*.dll" "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\zlib*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\zlib*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\zstd*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\zstd*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\brotli*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\brotli*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\assimp*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\assimp*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\zlib*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\zlib*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\zstd*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\zstd*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\brotli*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\debug\bin\brotli*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\assimp*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\assimp*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\zlib*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\zlib*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\zstd*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\zstd*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" "$(OutDir)"
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PostBuildEvent>
+      <Command>
+if exist "$(VcpkgRoot)installed\x64-windows\bin\assimp*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\assimp*.dll" "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\zlib*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\zlib*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\zstd*.dll"   xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\zstd*.dll"   "$(OutDir)"
+if exist "$(VcpkgRoot)installed\x64-windows\bin\brotli*.dll" xcopy /y /d "$(VcpkgRoot)installed\x64-windows\bin\brotli*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\assimp*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\assimp*.dll" "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\zlib*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\zlib*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\zstd*.dll"   xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\zstd*.dll"   "$(OutDir)"
+if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" "$(OutDir)"
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_ASSIMP</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)Libraries\include;$(ProjectDir)Libraries\include\imgui\backends;$(ProjectDir)Libraries\include\imgui;$(ProjectDir)Libraries\lib;$(ProjectDir)Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)Libraries\include;$(ProjectDir)Libraries\include\imgui\backends;$(ProjectDir)Libraries\include\imgui;$(ProjectDir)Libraries\lib;$(ProjectDir)Libraries\include\stb;D:\Graphics\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Libraries\lib;D:\Graphics\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -128,9 +164,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_ASSIMP</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)Libraries\include;$(ProjectDir)Libraries\include\imgui\backends;$(ProjectDir)Libraries\include\imgui;$(ProjectDir)Libraries\lib;$(ProjectDir)Libraries\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)Libraries\include;$(ProjectDir)Libraries\include\imgui\backends;$(ProjectDir)Libraries\include\imgui;$(ProjectDir)Libraries\lib;$(ProjectDir)Libraries\include\stb;D:\Graphics\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -138,12 +174,13 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Libraries\lib;D:\Graphics\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
+    <ClCompile Include="src\assimp_loader.cpp" />
     <ClCompile Include="src\gizmo.cpp" />
     <ClCompile Include="src\nl_executor.cpp" />
     <ClCompile Include="src\axisrenderer.cpp" />
@@ -172,6 +209,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\application.h" />
+    <ClInclude Include="include\assimp_loader.h" />
     <ClInclude Include="include\gizmo.h" />
     <ClInclude Include="include\nl_executor.h" />
     <ClInclude Include="include\axisrenderer.h" />

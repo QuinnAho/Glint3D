@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "assimp_loader.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION  
 #include "stb_image_write.h"
@@ -570,6 +571,19 @@ void Application::renderGUI()
         std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
     }
 
+    // Sample assets quick-load
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Samples", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (ImGui::Button("Load sample triangle (PLY)"))
+        {
+            bool ok = loadObjInFrontOfCamera("SampleTrianglePLY", "assets/models/triangle.ply", 2.0f, glm::vec3(1.0f));
+            if (!ok) m_chatScrollback.push_back("Failed to load sample PLY triangle.");
+            else     m_chatScrollback.push_back("Loaded sample PLY triangle in front of camera.");
+        }
+    }
+
     // Lighting
     ImGui::Spacing();
     ImGui::Separator();
@@ -813,8 +827,38 @@ void Application::addObject(std::string name,
     float wallReflectivity = 0.05f;             // VERY LOW reflectivity
 
 
-    // 1) Load the OBJ data (positions, faces, compute normals, etc.)
-    obj.objLoader.load(modelPath.c_str());
+    // 1) Load the mesh (OBJ via native loader; others via Assimp if enabled)
+    auto toLowerExt = [](std::string s){
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        return s;
+    };
+    std::string ext;
+    {
+        size_t dot = modelPath.find_last_of('.');
+        ext = (dot == std::string::npos) ? std::string() : toLowerExt(modelPath.substr(dot));
+    }
+    bool usedAssimp = false;
+    if (!ext.empty() && ext != ".obj")
+    {
+        std::vector<glm::vec3> positions;
+        std::vector<unsigned>  indices;
+        std::vector<glm::vec3> normals;
+        glm::vec3 minB, maxB;
+        std::string err;
+        if (AssimpImportMesh(modelPath, positions, indices, normals, minB, maxB, &err))
+        {
+            obj.objLoader.setFromRaw(positions, indices, normals);
+            usedAssimp = true;
+        }
+        else
+        {
+            std::cerr << "[Assimp] Failed to import '" << modelPath << "': " << err << "\n";
+        }
+    }
+    if (!usedAssimp)
+    {
+        obj.objLoader.load(modelPath.c_str());
+    }
 
     // 2) Compute bounding box center for pivot transforms
     glm::vec3 minBound = obj.objLoader.getMinBounds();
@@ -1101,19 +1145,28 @@ bool Application::loadObjAt(const std::string& name,
 
     std::vector<std::string> baseCandidates;
     baseCandidates.push_back(path);
-    if (!hasExt(path)) baseCandidates.push_back(path + ".obj");
+    if (!hasExt(path)) {
+        static const char* kExts[] = { ".obj", ".gltf", ".glb", ".fbx", ".dae", ".ply" };
+        for (const char* e : kExts) baseCandidates.push_back(path + e);
+    }
     // Lowercase variants
     auto low = toLower(path);
     if (low != path) {
         baseCandidates.push_back(low);
-        if (!hasExt(low)) baseCandidates.push_back(low + ".obj");
+        if (!hasExt(low)) {
+            static const char* kExts[] = { ".obj", ".gltf", ".glb", ".fbx", ".dae", ".ply" };
+            for (const char* e : kExts) baseCandidates.push_back(low + e);
+        }
     }
     // Strip trailing digits (e.g., "Cow1" -> "Cow") then lowercase
     auto noDigits = stripTrailingDigits(path);
     if (noDigits != path) {
         auto ndLow = toLower(noDigits);
         baseCandidates.push_back(ndLow);
-        if (!hasExt(ndLow)) baseCandidates.push_back(ndLow + ".obj");
+        if (!hasExt(ndLow)) {
+            static const char* kExts[] = { ".obj", ".gltf", ".glb", ".fbx", ".dae", ".ply" };
+            for (const char* e : kExts) baseCandidates.push_back(ndLow + e);
+        }
     }
 
     std::vector<std::string> prefixes = { "", "objs/", "assets/models/" };
@@ -1133,7 +1186,7 @@ bool Application::loadObjAt(const std::string& name,
         }
     }
     // Not found: log to chat scrollback for visibility
-    std::ostringstream os; os << "Model not found for '" << path << "'. Tried candidates in ['', 'objs/', 'assets/models/'] with .obj and lowercase variants.";
+    std::ostringstream os; os << "Model not found for '" << path << "'. Tried ['', 'objs/', 'assets/models/'] with extensions [.obj,.gltf,.glb,.fbx,.dae,.ply] and lowercase/numberless variants.";
     m_chatScrollback.push_back(os.str());
     return false;
 }

@@ -27,7 +27,8 @@ Users can interact with the app using **direct JSON commands** or **plain natura
 
 ## Features
 
-- Load and render OBJ models
+- Load and render OBJ models (native)
+- Optional Assimp import: glTF/GLB, FBX, DAE, PLY (and more)
 - Apply textures (e.g., cow texture)
 - Wireframe, point cloud, or solid rendering modes
 - Real-time Phong shading
@@ -86,6 +87,40 @@ Uses GLFW, GLAD, ImGui, GLM, and stb headers vendored under `Libraries/`.
 - Shaders load from `shaders/`  
 - Assets load from `assets/`  
 - ImGui config persists in `imgui.ini`  
+
+---
+
+## Assimp (Optional; for glTF/FBX/DAE/PLY)
+
+This project can use Assimp to import additional mesh formats. The code builds without Assimp; if not enabled, non-OBJ imports fall back and log an error.
+
+Steps (recommended with vcpkg):
+
+1) Install vcpkg and integrate
+- `git clone https://github.com/microsoft/vcpkg`
+- `vcpkg\\bootstrap-vcpkg.bat`
+- `vcpkg integrate install`
+
+2) Install Assimp
+- `vcpkg install assimp:x64-windows`
+
+3) Add to Project Properties (x64 Debug/Release):
+- C/C++ > Preprocessor > Preprocessor Definitions: add `USE_ASSIMP`
+- C/C++ > Additional Include Directories: add `$(VcpkgRoot)installed\\x64-windows\\include`
+- Linker > Additional Library Directories: add `$(VcpkgRoot)installed\\x64-windows\\lib`
+- Linker > Additional Dependencies: add `assimp-vc143-mt.lib` (debug may be `assimp-vc143-mtd.lib`)
+
+4) Runtime DLL (if using dynamic libs)
+- Copy `assimp-vc143-mt.dll` from vcpkg `installed\\x64-windows\\bin` to your output folder (e.g., `x64/Debug`)
+
+Notes:
+- Importer lives in `Project1/src/assimp_loader.cpp` guarded by `#ifdef USE_ASSIMP`.
+- `Application::addObject` chooses loader by extension; non-OBJ uses Assimp.
+- Command loader tries extensions: `.obj, .gltf, .glb, .fbx, .dae, .ply` under prefixes `['', 'objs/', 'assets/models/']`.
+
+Sample assets:
+- `Project1/assets/models/triangle.ply` — minimal triangle to validate Assimp path (PLY).
+  Use the GUI button “Load sample triangle (PLY)” under Render Settings → Samples.
 
 ---
 

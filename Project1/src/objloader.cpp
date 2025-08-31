@@ -52,6 +52,48 @@ void ObjLoader::load(const char* filename)
     computeNormals();
 }
 
+void ObjLoader::setFromRaw(const std::vector<glm::vec3>& positions,
+                           const std::vector<unsigned>& indices,
+                           const std::vector<glm::vec3>& normals)
+{
+    Positions = positions;
+    Faces.clear();
+    Faces.reserve(indices.size() / 3);
+    for (size_t i = 0; i + 2 < indices.size(); i += 3)
+    {
+        Face f{ indices[i + 0], indices[i + 1], indices[i + 2] };
+        Faces.push_back(f);
+    }
+
+    // Bounds
+    minBound = glm::vec3(std::numeric_limits<float>::max());
+    maxBound = glm::vec3(std::numeric_limits<float>::lowest());
+    for (const auto& v : Positions)
+    {
+        minBound = glm::min(minBound, v);
+        maxBound = glm::max(maxBound, v);
+    }
+
+    // Normals
+    if (!normals.empty() && normals.size() == Positions.size())
+    {
+        Normals = normals;
+    }
+    else
+    {
+        computeNormals();
+    }
+}
+
+void ObjLoader::reset()
+{
+    Positions.clear();
+    Faces.clear();
+    Normals.clear();
+    minBound = glm::vec3(std::numeric_limits<float>::max());
+    maxBound = glm::vec3(std::numeric_limits<float>::lowest());
+}
+
 /* ------------------------------------------------------------ */
 void ObjLoader::computeNormals()
 {

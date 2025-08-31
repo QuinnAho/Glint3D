@@ -11,6 +11,12 @@ public:
     ObjLoader();
 
     void load(const char* filename);
+    // Populate from raw arrays (triangulated). If normals is empty, they will be computed.
+    void setFromRaw(const std::vector<glm::vec3>& positions,
+                    const std::vector<unsigned>& indices, // 3*n entries
+                    const std::vector<glm::vec3>& normals = {});
+
+    void reset();
 
     int                  getVertCount()  const;
     int                  getIndexCount() const;
