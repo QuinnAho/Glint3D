@@ -9,6 +9,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "assimp_loader.h"
+#include "texture_cache.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION  
 #include "stb_image_write.h"
@@ -151,6 +152,11 @@ void Application::setupOpenGL()
     }
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
+
+    // Load PBR shader
+    m_pbrShader = new Shader();
+    if (!m_pbrShader->load("shaders/pbr.vert", "shaders/pbr.frag"))
+        std::cerr << "Failed to load PBR shader.\n";
 
     // ---- Setup raytracer now that sceneObjects exist ----
     m_raytracer = std::make_unique<Raytracer>();
@@ -446,7 +452,7 @@ void Application::renderScene()
 
     for (auto& obj : m_sceneObjects)
     {
-        if (!obj.shader) continue;
+        if (!obj.shader) obj.shader = m_standardShader;
         obj.shader->use();
 
         // Pass all the scene info
@@ -459,20 +465,37 @@ void Application::renderScene()
         glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
         obj.shader->setInt("shadowMap", 1);
 
-        obj.shader->setInt("shadingMode", m_shadingMode);
         obj.shader->setVec3("viewPos", m_cameraPos);
-        obj.shader->setVec3("objectColor", obj.color);
+        // Common shadow map binding
         m_lights.applyLights(obj.shader->getID());
         obj.material.apply(obj.shader->getID(), "material");
 
-        if (obj.texture)
+        // Setup per-shader specifics
+        if (obj.shader == m_pbrShader)
         {
-            obj.texture->bind(0);
-            obj.shader->setBool("useTexture", true);
-            obj.shader->setInt("cowTexture", 0);
+            // PBR uniforms
+            obj.shader->setVec4("baseColorFactor", obj.baseColorFactor);
+            obj.shader->setFloat("metallicFactor", obj.metallicFactor);
+            obj.shader->setFloat("roughnessFactor", obj.roughnessFactor);
+            // Textures
+            int unit = 0;
+            if (obj.baseColorTex) { obj.baseColorTex->bind(unit); obj.shader->setInt("baseColorTex", unit++); obj.shader->setBool("hasBaseColorMap", true);} else obj.shader->setBool("hasBaseColorMap", false);
+            if (obj.normalTex)    { obj.normalTex->bind(unit);    obj.shader->setInt("normalTex", unit++);    obj.shader->setBool("hasNormalMap", true);} else obj.shader->setBool("hasNormalMap", false);
+            if (obj.mrTex)        { obj.mrTex->bind(unit);        obj.shader->setInt("mrTex", unit++);        obj.shader->setBool("hasMRMap", true);} else obj.shader->setBool("hasMRMap", false);
         }
         else
-            obj.shader->setBool("useTexture", false);
+        {
+            obj.shader->setInt("shadingMode", m_shadingMode);
+            obj.shader->setVec3("objectColor", obj.color);
+            if (obj.texture)
+            {
+                obj.texture->bind(0);
+                obj.shader->setBool("useTexture", true);
+                obj.shader->setInt("cowTexture", 0);
+            }
+            else
+                obj.shader->setBool("useTexture", false);
+        }
 
         glBindVertexArray(obj.VAO);
         glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
@@ -843,11 +866,22 @@ void Application::addObject(std::string name,
         std::vector<glm::vec3> positions;
         std::vector<unsigned>  indices;
         std::vector<glm::vec3> normals;
+        std::vector<glm::vec2> uvs;
+        std::vector<glm::vec3> tangents;
         glm::vec3 minB, maxB;
         std::string err;
-        if (AssimpImportMesh(modelPath, positions, indices, normals, minB, maxB, &err))
+        PBRMaterial pbr;
+        if (AssimpImportMesh(modelPath, positions, indices, normals, minB, maxB, &err, &uvs, &tangents, &pbr, true))
         {
-            obj.objLoader.setFromRaw(positions, indices, normals);
+            obj.objLoader.setFromRaw(positions, indices, normals, uvs, tangents);
+            // Setup PBR textures via cache (no flip because uvs were flipped above)
+            if (!pbr.baseColorTex.empty()) obj.baseColorTex = TextureCache::instance().get(pbr.baseColorTex, false);
+            if (!pbr.normalTex.empty())    obj.normalTex    = TextureCache::instance().get(pbr.normalTex, false);
+            if (!pbr.mrTex.empty())        obj.mrTex        = TextureCache::instance().get(pbr.mrTex, false);
+            obj.baseColorFactor = pbr.baseColorFactor;
+            obj.metallicFactor  = pbr.metallicFactor;
+            obj.roughnessFactor = pbr.roughnessFactor;
+            if (m_pbrShader) obj.shader = m_pbrShader; // prefer PBR for imported assets
             usedAssimp = true;
         }
         else
@@ -887,7 +921,7 @@ void Application::addObject(std::string name,
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glEnableVertexAttribArray(0);
 
-    // 4b) Normals (VBO_normals) - only if you have getNormals() in objLoader
+    // 4b) Normals (VBO_normals)
     glGenBuffers(1, &obj.VBO_normals);
     glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_normals);
     glBufferData(
@@ -900,7 +934,39 @@ void Application::addObject(std::string name,
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glEnableVertexAttribArray(1);
 
-    // 4c) Element Buffer (EBO)
+    // 4c) UVs (VBO_uvs) if present
+    if (obj.objLoader.hasTexcoords())
+    {
+        glGenBuffers(1, &obj.VBO_uvs);
+        glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_uvs);
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            obj.objLoader.getVertCount() * sizeof(glm::vec2),
+            obj.objLoader.getTexcoords(),
+            GL_STATIC_DRAW
+        );
+        // aUV in location = 2
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(2);
+    }
+
+    // 4d) Tangents (VBO_tangents) if present
+    if (obj.objLoader.hasTangents())
+    {
+        glGenBuffers(1, &obj.VBO_tangents);
+        glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_tangents);
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            obj.objLoader.getVertCount() * sizeof(glm::vec3),
+            obj.objLoader.getTangents(),
+            GL_STATIC_DRAW
+        );
+        // aTangent in location = 3
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(3);
+    }
+
+    // 4e) Element Buffer (EBO)
     glGenBuffers(1, &obj.EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
     glBufferData(
@@ -1300,6 +1366,8 @@ bool Application::removeObjectByName(const std::string& name)
             if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
             if (obj.VBO_positions) glDeleteBuffers(1, &obj.VBO_positions);
             if (obj.VBO_normals) glDeleteBuffers(1, &obj.VBO_normals);
+            if (obj.VBO_uvs) glDeleteBuffers(1, &obj.VBO_uvs);
+            if (obj.VBO_tangents) glDeleteBuffers(1, &obj.VBO_tangents);
             if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
             m_sceneObjects.erase(m_sceneObjects.begin() + i);
             if (m_selectedObjectIndex == (int)i) m_selectedObjectIndex = -1;

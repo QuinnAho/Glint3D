@@ -181,6 +181,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
     <ClCompile Include="src\assimp_loader.cpp" />
+    <ClCompile Include="src\texture_cache.cpp" />
     <ClCompile Include="src\gizmo.cpp" />
     <ClCompile Include="src\nl_executor.cpp" />
     <ClCompile Include="src\axisrenderer.cpp" />
@@ -210,6 +211,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClInclude Include="include\application.h" />
     <ClInclude Include="include\assimp_loader.h" />
+    <ClInclude Include="include\texture_cache.h" />
     <ClInclude Include="include\gizmo.h" />
     <ClInclude Include="include\nl_executor.h" />
     <ClInclude Include="include\axisrenderer.h" />
@@ -241,6 +243,8 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
     <None Include="shaders\shadow_depth.vert" />
     <None Include="shaders\standard.frag" />
     <None Include="shaders\standard.vert" />
+    <None Include="shaders\pbr.vert" />
+    <None Include="shaders\pbr.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

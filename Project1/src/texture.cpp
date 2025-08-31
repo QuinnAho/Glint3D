@@ -11,12 +11,13 @@ Texture::~Texture()
         glDeleteTextures(1, &m_textureID);
 }
 
-bool Texture::loadFromFile(const std::string& filepath)
+bool Texture::loadFromFile(const std::string& filepath, bool flipY)
 {
     glGenTextures(1, &m_textureID);
     glBindTexture(GL_TEXTURE_2D, m_textureID);
 
     int width, height, channels;
+    stbi_set_flip_vertically_on_load(flipY ? 1 : 0);
     unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &channels, 0);
     if (!data)
     {

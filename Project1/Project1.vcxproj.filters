@@ -93,6 +93,9 @@
     <ClCompile Include="src\assimp_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\texture_cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\axisrenderer.h">
@@ -152,6 +155,9 @@
     <ClInclude Include="include\assimp_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\texture_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\grid.frag">
@@ -176,6 +182,12 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\shadow_depth.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\pbr.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\pbr.frag">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

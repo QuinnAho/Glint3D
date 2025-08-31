@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <iostream>
+#include <filesystem>
 
 #ifdef USE_ASSIMP
   #include <assimp/Importer.hpp>
@@ -15,7 +16,11 @@ bool AssimpImportMesh(const std::string& path,
                       std::vector<glm::vec3>& normals,
                       glm::vec3& minBound,
                       glm::vec3& maxBound,
-                      std::string* error)
+                      std::string* error,
+                      std::vector<glm::vec2>* uvs,
+                      std::vector<glm::vec3>* tangents,
+                      PBRMaterial* pbrOut,
+                      bool flipUV)
 {
     positions.clear();
     indices.clear();
@@ -35,7 +40,8 @@ bool AssimpImportMesh(const std::string& path,
         aiProcess_JoinIdenticalVertices |
         aiProcess_ImproveCacheLocality |
         aiProcess_PreTransformVertices |
-        aiProcess_SortByPType;
+        aiProcess_SortByPType |
+        aiProcess_CalcTangentSpace;
 
     const aiScene* scene = importer.ReadFile(path, flags);
     if (!scene || !scene->mRootNode)
@@ -53,6 +59,8 @@ bool AssimpImportMesh(const std::string& path,
         const unsigned baseIndex = static_cast<unsigned>(positions.size());
         positions.reserve(positions.size() + mesh->mNumVertices);
         normals.reserve(normals.size() + mesh->mNumVertices);
+        if (uvs) uvs->reserve((uvs->size()) + mesh->mNumVertices);
+        if (tangents) tangents->reserve((tangents->size()) + mesh->mNumVertices);
 
         for (unsigned v = 0; v < mesh->mNumVertices; ++v)
         {
@@ -69,6 +77,33 @@ bool AssimpImportMesh(const std::string& path,
             else
             {
                 normals.emplace_back(0.0f); // will be fixed later if needed
+            }
+
+            if (uvs)
+            {
+                if (mesh->HasTextureCoords(0))
+                {
+                    aiVector3D tuv = mesh->mTextureCoords[0][v];
+                    float u = tuv.x;
+                    float vflip = flipUV ? (1.0f - tuv.y) : tuv.y;
+                    uvs->emplace_back(u, vflip);
+                }
+                else
+                {
+                    uvs->emplace_back(0.0f, 0.0f);
+                }
+            }
+            if (tangents)
+            {
+                if (mesh->HasTangentsAndBitangents())
+                {
+                    aiVector3D t = mesh->mTangents[v];
+                    tangents->emplace_back(t.x, t.y, t.z);
+                }
+                else
+                {
+                    tangents->emplace_back(0.0f, 0.0f, 1.0f);
+                }
             }
         }
 
@@ -99,7 +134,41 @@ bool AssimpImportMesh(const std::string& path,
         for (auto& n : normals) n = glm::normalize(n);
     }
 
+    // Try to fill a basic PBR material from the first material in the scene
+    if (pbrOut && scene->mNumMaterials > 0)
+    {
+        const aiMaterial* mat = scene->mMaterials[0];
+        aiColor4D base;
+        if (AI_SUCCESS == mat->Get(AI_MATKEY_BASE_COLOR, base))
+            pbrOut->baseColorFactor = glm::vec4(base.r, base.g, base.b, base.a);
+        float metallic = 1.0f, roughness = 1.0f;
+        mat->Get(AI_MATKEY_METALLIC_FACTOR, metallic);
+        mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
+        pbrOut->metallicFactor = metallic;
+        pbrOut->roughnessFactor = roughness;
+
+        // Resolve texture paths relative to asset directory
+        auto resolveTex = [&](aiTextureType type) -> std::string {
+            aiString p;
+            if (AI_SUCCESS == mat->GetTexture(type, 0, &p))
+            {
+                std::filesystem::path modelPath(path);
+                std::filesystem::path dir = modelPath.has_parent_path() ? modelPath.parent_path() : std::filesystem::path(".");
+                std::filesystem::path tex = p.C_Str();
+                if (tex.is_absolute()) return tex.string();
+                return (dir / tex).string();
+            }
+            return std::string();
+        };
+
+        pbrOut->baseColorTex = resolveTex(aiTextureType_BASE_COLOR);
+        if (pbrOut->baseColorTex.empty()) pbrOut->baseColorTex = resolveTex(aiTextureType_DIFFUSE);
+        pbrOut->normalTex     = resolveTex(aiTextureType_NORMALS);
+        pbrOut->mrTex         = resolveTex(aiTextureType_METALNESS);
+        if (pbrOut->mrTex.empty()) pbrOut->mrTex = resolveTex(aiTextureType_DIFFUSE_ROUGHNESS);
+        if (pbrOut->mrTex.empty()) pbrOut->mrTex = resolveTex(aiTextureType_UNKNOWN); // some exporters
+    }
+
     return !positions.empty() && !indices.empty();
 #endif
 }
-

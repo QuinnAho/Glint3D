@@ -27,16 +27,23 @@
 struct SceneObject
 {
     std::string name;
-    GLuint   VAO = 0, VBO_positions = 0, VBO_normals = 0, EBO = 0;
+    GLuint   VAO = 0, VBO_positions = 0, VBO_normals = 0, VBO_uvs = 0, VBO_tangents = 0, EBO = 0;
     glm::mat4 modelMatrix{ 1.0f };
 
     ObjLoader objLoader;
-    Texture* texture = nullptr;
+    Texture* texture = nullptr;       // legacy diffuse
+    Texture* baseColorTex = nullptr;  // PBR
+    Texture* normalTex = nullptr;     // PBR
+    Texture* mrTex = nullptr;         // PBR (metallic-roughness)
     Shader* shader = nullptr;
 
     bool      isStatic = false;
     glm::vec3 color{ 1.0f };
     Material  material;
+    // Basic PBR factors
+    glm::vec4 baseColorFactor{1.0f};
+    float metallicFactor = 1.0f;
+    float roughnessFactor = 1.0f;
 };
 
 class Application
@@ -164,7 +171,7 @@ private:
     glm::mat4 m_modelMatrix{ 1 }, m_viewMatrix{ 1 }, m_projectionMatrix{ 1 };
 
     ObjLoader m_objLoader;
-    Shader* m_standardShader = nullptr, * m_gridShader = nullptr, * m_rayScreenShader = nullptr, * m_outlineShader = nullptr;
+    Shader* m_standardShader = nullptr, * m_gridShader = nullptr, * m_rayScreenShader = nullptr, * m_outlineShader = nullptr, * m_pbrShader = nullptr;
     GLuint  m_VAO = 0, m_VBO = 0, m_EBO = 0;
     Grid    m_grid;
     AxisRenderer m_axisRenderer;

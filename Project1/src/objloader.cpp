@@ -54,7 +54,9 @@ void ObjLoader::load(const char* filename)
 
 void ObjLoader::setFromRaw(const std::vector<glm::vec3>& positions,
                            const std::vector<unsigned>& indices,
-                           const std::vector<glm::vec3>& normals)
+                           const std::vector<glm::vec3>& normals,
+                           const std::vector<glm::vec2>& uvs,
+                           const std::vector<glm::vec3>& tangents)
 {
     Positions = positions;
     Faces.clear();
@@ -83,6 +85,13 @@ void ObjLoader::setFromRaw(const std::vector<glm::vec3>& positions,
     {
         computeNormals();
     }
+
+    // UVs and tangents
+    Texcoords = uvs;
+    if (!tangents.empty() && tangents.size() == Positions.size())
+        Tangents = tangents;
+    else if (!Texcoords.empty() && !Normals.empty())
+        computeTangents();
 }
 
 void ObjLoader::reset()
@@ -113,6 +122,34 @@ void ObjLoader::computeNormals()
     for (glm::vec3& n : Normals) n = glm::normalize(n);
 }
 
+void ObjLoader::computeTangents()
+{
+    Tangents.assign(Positions.size(), glm::vec3(0.0f));
+    if (Texcoords.empty()) return;
+    for (const Face& f : Faces)
+    {
+        unsigned ia=f.a, ib=f.b, ic=f.c;
+        const glm::vec3 &v0=Positions[ia], &v1=Positions[ib], &v2=Positions[ic];
+        const glm::vec2 &uv0=Texcoords[ia], &uv1=Texcoords[ib], &uv2=Texcoords[ic];
+
+        glm::vec3 e1 = v1 - v0;
+        glm::vec3 e2 = v2 - v0;
+        glm::vec2 dUV1 = uv1 - uv0;
+        glm::vec2 dUV2 = uv2 - uv0;
+        float denom = dUV1.x * dUV2.y - dUV2.x * dUV1.y;
+        float r = (fabs(denom) < 1e-8f) ? 0.0f : 1.0f / denom;
+        glm::vec3 t = (e1 * dUV2.y - e2 * dUV1.y) * r;
+        Tangents[ia] += t;
+        Tangents[ib] += t;
+        Tangents[ic] += t;
+    }
+    for (size_t i=0;i<Tangents.size();++i)
+    {
+        glm::vec3 n = Normals.size()==Tangents.size()? Normals[i] : glm::vec3(0,0,1);
+        Tangents[i] = glm::normalize(Tangents[i] - n * glm::dot(n, Tangents[i]));
+    }
+}
+
 glm::vec3            ObjLoader::getMinBounds()  const { return minBound; }
 glm::vec3            ObjLoader::getMaxBounds()  const { return maxBound; }
 
@@ -132,4 +169,14 @@ const unsigned int* ObjLoader::getFaces() const
 const float* ObjLoader::getNormals() const
 {
     return reinterpret_cast<const float*>(Normals.data());
+}
+
+const float* ObjLoader::getTexcoords() const
+{
+    return reinterpret_cast<const float*>(Texcoords.data());
+}
+
+const float* ObjLoader::getTangents() const
+{
+    return reinterpret_cast<const float*>(Tangents.data());
 }
