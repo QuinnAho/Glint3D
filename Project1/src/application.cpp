@@ -9,9 +9,10 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "assimp_loader.h"
+#include "pbr_material.h"
 #include "texture_cache.h"
 #include "mesh_loader.h"
+#include "Material.h"
 #include <unordered_set>
 #ifndef __EMSCRIPTEN__
 #ifdef OIDN_ENABLED
@@ -53,6 +54,26 @@ Application::Application()
 {
     // Initialize the user input manager.
     m_userInput = new UserInput(this);
+}
+
+// Approximate a Blinn-Phong material from simple PBR factors for the CPU raytracer
+static Material PhongFromPBR(const glm::vec4& baseColor, float metallic, float roughness)
+{
+    Material m;
+    glm::vec3 albedo = glm::vec3(baseColor);
+    m.diffuse = albedo;
+    // Ambient as small fraction of albedo
+    m.ambient = albedo * 0.03f;
+    // Approximate specular color: F0 between 0.04 and albedo
+    glm::vec3 F0 = glm::mix(glm::vec3(0.04f), albedo, glm::clamp(metallic, 0.0f, 1.0f));
+    m.specular = F0;
+    // Map roughness [0,1] -> shininess [4,256]
+    float r = glm::clamp(roughness, 0.04f, 1.0f);
+    float gloss = (1.0f - r);
+    m.shininess = 4.0f + gloss * gloss * 252.0f; // bias + square curve
+    m.roughness = r;
+    m.metallic = glm::clamp(metallic, 0.0f, 1.0f);
+    return m;
 }
 
 Application::~Application()
@@ -1376,6 +1397,8 @@ void Application::addObject(std::string name,
         obj.baseColorFactor = pbr.baseColorFactor;
         obj.metallicFactor  = pbr.metallicFactor;
         obj.roughnessFactor = pbr.roughnessFactor;
+        // Keep raytracer material in sync with PBR factors
+        obj.material = PhongFromPBR(obj.baseColorFactor, obj.metallicFactor, obj.roughnessFactor);
         if (m_pbrShader && (!pbr.baseColorTex.empty() || !pbr.normalTex.empty() || !pbr.mrTex.empty()))
             obj.shader = m_pbrShader;
     }

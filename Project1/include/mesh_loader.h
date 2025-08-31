@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
-#include "assimp_loader.h"
+#include "pbr_material.h"
 
 struct MeshData {
     std::vector<glm::vec3> positions;
@@ -15,4 +15,3 @@ struct MeshData {
 
 // Unified entry to load mesh + optional PBR material. Chooses parser by extension.
 bool LoadMeshFromFile(const std::string& path, MeshData& out, PBRMaterial* pbrOut = nullptr, std::string* error = nullptr);
-

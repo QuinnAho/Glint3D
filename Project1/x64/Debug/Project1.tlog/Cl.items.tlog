@@ -1,5 +1,8 @@
 D:\class\OpenGLOBJViewer\Project1\src\application.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\application.obj
 D:\class\OpenGLOBJViewer\Project1\src\assimp_loader.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\assimp_loader.obj
+D:\class\OpenGLOBJViewer\Project1\src\importer_registry.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\importer_registry.obj
+D:\class\OpenGLOBJViewer\Project1\src\importers\obj_importer.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\obj_importer.obj
+D:\class\OpenGLOBJViewer\Project1\src\importers\assimp_importer.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\assimp_importer.obj
 D:\class\OpenGLOBJViewer\Project1\src\mesh_loader.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\mesh_loader.obj
 D:\class\OpenGLOBJViewer\Project1\src\texture_cache.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\texture_cache.obj
 D:\class\OpenGLOBJViewer\Project1\src\gizmo.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\gizmo.obj

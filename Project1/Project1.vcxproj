@@ -181,6 +181,9 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
     <ClCompile Include="src\assimp_loader.cpp" />
+    <ClCompile Include="src\importer_registry.cpp" />
+    <ClCompile Include="src\importers\obj_importer.cpp" />
+    <ClCompile Include="src\importers\assimp_importer.cpp" />
     <ClCompile Include="src\mesh_loader.cpp" />
     <ClCompile Include="src\texture_cache.cpp" />
     <ClCompile Include="src\gizmo.cpp" />
@@ -212,7 +215,10 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClInclude Include="include\application.h" />
     <ClInclude Include="include\assimp_loader.h" />
+    <ClInclude Include="include\importer.h" />
+    <ClInclude Include="include\importer_registry.h" />
     <ClInclude Include="include\mesh_loader.h" />
+    <ClInclude Include="include\pbr_material.h" />
     <ClInclude Include="include\texture_cache.h" />
     <ClInclude Include="include\gizmo.h" />
     <ClInclude Include="include\nl_executor.h" />

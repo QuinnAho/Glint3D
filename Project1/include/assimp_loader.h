@@ -3,17 +3,7 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
-
-// Lightweight PBR description extracted from imported assets
-struct PBRMaterial
-{
-    glm::vec4 baseColorFactor{1.0f};
-    float metallicFactor{1.0f};
-    float roughnessFactor{1.0f};
-    std::string baseColorTex;     // color or albedo
-    std::string normalTex;        // normal map (tangent-space)
-    std::string mrTex;            // metallic-roughness packed
-};
+#include "pbr_material.h"
 
 // Import a triangulated mesh and basic PBR material via Assimp.
 // - positions/normals always filled (normals auto-generated if missing)

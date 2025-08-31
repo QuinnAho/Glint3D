@@ -24,6 +24,9 @@ set(APP_SOURCES
     ${SRC_DIR}/gizmo.cpp
     ${SRC_DIR}/objloader.cpp
     ${SRC_DIR}/mesh_loader.cpp
+    ${SRC_DIR}/importer_registry.cpp
+    ${SRC_DIR}/importers/obj_importer.cpp
+    ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
     ${SRC_DIR}/InputHandler.cpp
