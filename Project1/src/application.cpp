@@ -12,6 +12,12 @@
 #include "assimp_loader.h"
 #include "texture_cache.h"
 #include "mesh_loader.h"
+#include <unordered_set>
+#ifndef __EMSCRIPTEN__
+#ifdef OIDN_ENABLED
+#include <OpenImageDenoise/oidn.hpp>
+#endif
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
@@ -221,7 +227,7 @@ void Application::setupOpenGL()
     glEnable(GL_DEPTH_TEST);
 #ifndef __EMSCRIPTEN__
     glEnable(GL_MULTISAMPLE);
-    glEnable(GL_FRAMEBUFFER_SRGB);
+    if (m_framebufferSRGBEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
 #endif
     m_axisRenderer.init();
     m_gizmo.init();
@@ -443,6 +449,9 @@ void Application::renderScene()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // ---- 2. Render normal scene ----
+#ifndef __EMSCRIPTEN__
+    if (m_framebufferSRGBEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
+#endif
     glViewport(0, 0, m_windowWidth, m_windowHeight);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -456,18 +465,18 @@ void Application::renderScene()
     {
         // Raytrace execution
 #ifdef __EMSCRIPTEN__
-        if (!m_traceDone)
-        {
-            // Run synchronously (single-threaded)
-            std::cout << "[Trace] Tracing on main thread (Web) ...\n";
-            m_framebuffer.resize(size_t(m_windowWidth) * m_windowHeight);
-            m_raytracer->renderImage(m_framebuffer, m_windowWidth, m_windowHeight, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
-            glBindTexture(GL_TEXTURE_2D, rayTexID);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-                m_windowWidth, m_windowHeight,
-                GL_RGB, GL_FLOAT, m_framebuffer.data());
-            m_traceDone = true;
-        }
+    if (!m_traceDone)
+    {
+        // Run synchronously (single-threaded)
+        std::cout << "[Trace] Tracing on main thread (Web) ...\n";
+        m_framebuffer.resize(size_t(m_windowWidth) * m_windowHeight);
+        m_raytracer->renderImage(m_framebuffer, m_windowWidth, m_windowHeight, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
+        glBindTexture(GL_TEXTURE_2D, rayTexID);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+            m_windowWidth, m_windowHeight,
+            GL_RGB, GL_FLOAT, m_framebuffer.data());
+        m_traceDone = true;
+    }
 #else
         // --- Start the raytrace ONCE ---
         if (!m_traceJob.valid() && !m_traceDone)
@@ -493,6 +502,13 @@ void Application::renderScene()
             m_traceJob.get(); // collect result (no exceptions)
             m_traceJob = std::future<void>(); // reset
 
+#ifndef __EMSCRIPTEN__
+#ifdef OIDN_ENABLED
+            if (m_denoise) {
+                denoise(m_framebuffer, nullptr, nullptr);
+            }
+#endif
+#endif
             glBindTexture(GL_TEXTURE_2D, rayTexID);
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
                 m_windowWidth, m_windowHeight,
@@ -669,9 +685,10 @@ void Application::renderGUI()
             selected = (m_renderMode == 2);      if (ImGui::MenuItem("Solid",   nullptr, selected)) m_renderMode = 2;
             selected = (m_renderMode == 3);      if (ImGui::MenuItem("Raytrace",nullptr, selected)) m_renderMode = 3;
             ImGui::Separator();
-            if (ImGui::MenuItem("Fullscreen")) toggleFullscreen();
-            ImGui::EndMenu();
-        }
+        if (ImGui::MenuItem("Fullscreen")) toggleFullscreen();
+        bool perfHud = m_showPerfHUD; if (ImGui::MenuItem("Perf HUD", nullptr, perfHud)) m_showPerfHUD = !m_showPerfHUD;
+        ImGui::EndMenu();
+    }
 
         if (ImGui::BeginMenu("Gizmo"))
         {
@@ -717,7 +734,19 @@ void Application::renderGUI()
         bool snap = m_snapEnabled; if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap; ImGui::SameLine();
 
         if (ImGui::SmallButton("Fullscreen")) toggleFullscreen(); ImGui::SameLine();
-        if (ImGui::SmallButton("Add Light")) { addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f); }
+        if (ImGui::SmallButton("Add Light")) { addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f); } ImGui::SameLine();
+#ifndef __EMSCRIPTEN__
+        if (ImGui::SmallButton("Why is it black?")) { m_showDiagnosticsPanel = true; } ImGui::SameLine();
+#else
+        if (ImGui::SmallButton("Why is it black?")) { m_showDiagnosticsPanel = true; } ImGui::SameLine();
+#endif
+#ifndef __EMSCRIPTEN__
+#ifdef OIDN_ENABLED
+        bool denoise = m_denoise; if (ImGui::Checkbox("Denoise", &denoise)) m_denoise = denoise;
+#else
+        ImGui::BeginDisabled(); bool dn=false; ImGui::Checkbox("Denoise", &dn); ImGui::EndDisabled();
+#endif
+#endif
 
         ImGui::EndMainMenuBar();
     }
@@ -752,6 +781,157 @@ void Application::renderGUI()
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Raytracing... please wait");
         else if (m_traceDone)
             ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Raytracer Done!");
+    }
+
+    // Diagnostics panel (Explain-my-render)
+    if (m_showDiagnosticsPanel)
+    {
+        ImGui::SetNextWindowSize(ImVec2(420, 280), ImGuiCond_Once);
+        if (ImGui::Begin("Render Diagnostics", &m_showDiagnosticsPanel))
+        {
+            int targetIdx = m_selectedObjectIndex;
+            if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
+            bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+
+            bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
+            bool noLights = (m_lights.m_lights.empty());
+            if (!noLights) {
+                bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
+                noLights = allZero;
+            }
+
+            bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
+
+            ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
+            if (hasTarget)
+            {
+                auto& obj = m_sceneObjects[targetIdx];
+                bool missingNormals = !obj.objLoader.hadNormalsFromSource();
+                bool backface = objectMostlyBackfacing(obj);
+
+                // Missing normals
+                if (missingNormals) {
+                    ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
+                    if (ImGui::SmallButton("Recompute (angle-weighted)")) {
+                        recomputeAngleWeightedNormalsForObject(targetIdx);
+                    }
+                } else {
+                    ImGui::Text("Normals: OK (from source)");
+                }
+
+                // Backface
+                if (backface) {
+                    ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces). "); ImGui::SameLine();
+                    if (ImGui::SmallButton("Flip Winding")) {
+                        obj.objLoader.flipWindingAndNormals();
+                        refreshIndexBuffer(obj);
+                        refreshNormalBuffer(obj);
+                    }
+                } else {
+                    ImGui::Text("Winding: OK (mostly front-facing)");
+                }
+            }
+
+            // Lights
+            if (noLights) {
+                ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
+                if (ImGui::SmallButton("Add Neutral Key Light")) {
+                    addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
+                }
+            } else {
+                ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
+            }
+
+            // sRGB
+            ImGui::Separator();
+            ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
+            if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) {
+                m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled;
+            }
+            if (srgbMismatch)
+            {
+                ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it.");
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Fix (disable FB sRGB)")) {
+                    m_framebufferSRGBEnabled = false;
+                }
+            }
+
+            ImGui::Separator();
+            if (m_useAI) {
+                if (ImGui::SmallButton("Ask AI to explain why it is black")) {
+                    std::ostringstream prompt;
+                    prompt << "Given this scene, explain why it might render black and propose one-click fixes. "
+                           << "Selected object: " << (hasTarget?m_sceneObjects[targetIdx].name:std::string("<none>"))
+                           << "; missingNormals=" << (hasTarget?(!m_sceneObjects[targetIdx].objLoader.hadNormalsFromSource()):false)
+                           << "; backface=" << (hasTarget?objectMostlyBackfacing(m_sceneObjects[targetIdx]):false)
+                           << "; lights=" << m_lights.m_lights.size()
+                           << "; framebufferSRGB=" << (m_framebufferSRGBEnabled?"on":"off") << ".";
+                    std::string plan, err; std::string scene = sceneToJson();
+                    if (!m_ai.plan(prompt.str(), scene, plan, err)) m_chatScrollback.push_back(std::string("AI diag error: ")+err);
+                    else m_chatScrollback.push_back(std::string("AI diag: ")+plan);
+                }
+            }
+            if (ImGui::Button("Close")) m_showDiagnosticsPanel = false;
+        }
+        ImGui::End();
+    }
+
+    // Perf HUD overlay
+    if (m_showPerfHUD)
+    {
+        PerfStats stats{}; computePerfStats(stats);
+        ImGui::SetNextWindowPos(ImVec2(10, 30), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        ImGui::Begin("Perf HUD", &m_showPerfHUD, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Draw calls: %d", stats.drawCalls);
+        ImGui::Text("Triangles: %zu", stats.totalTriangles);
+        ImGui::Text("Materials: %d", stats.uniqueMaterialKeys);
+        ImGui::Text("Textures: %zu (%.2f MB)", stats.uniqueTextures, stats.texturesMB);
+        ImGui::Text("Geometry: %.2f MB", stats.geometryMB);
+        ImGui::Separator();
+        ImGui::Text("VRAM est: %.2f MB", stats.vramMB);
+        if (stats.topSharedCount >= 2)
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.8f,1.0f,0.2f,1.0f), "%d meshes share material: %s", stats.topSharedCount, stats.topSharedKey.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Instancing candidate")) {
+                m_chatScrollback.push_back("Perf coach: Consider instancing/batching meshes sharing material: " + stats.topSharedKey);
+            }
+        }
+        else if (stats.drawCalls > 50)
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High draw calls (%d): merge static meshes or instance.", stats.drawCalls);
+        }
+        else if (stats.totalTriangles > 50000)
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High triangle count (%.0fK): consider LOD or decimation.", stats.totalTriangles/1000.0);
+        }
+        // Optional AI suggestion
+        if (m_useAI)
+        {
+            if (ImGui::SmallButton("Ask AI for perf tips"))
+            {
+                std::ostringstream summary;
+                summary << "Scene perf: drawCalls=" << stats.drawCalls
+                        << ", tris=" << stats.totalTriangles
+                        << ", materials=" << stats.uniqueMaterialKeys
+                        << ", texMB=" << stats.texturesMB
+                        << ", geoMB=" << stats.geometryMB
+                        << ". TopShare='" << stats.topSharedKey << "' x" << stats.topSharedCount << ".";
+                std::string plan, err;
+                std::string scene = sceneToJson();
+                std::string prompt = std::string("Give one actionable performance suggestion for this scene (instancing, merging, texture atlases, LOD). Keep it to 1 sentence. ") + summary.str();
+                if (!m_ai.plan(prompt, scene, plan, err))
+                    m_chatScrollback.push_back(std::string("AI perf tip error: ") + err);
+                else
+                    m_chatScrollback.push_back(std::string("AI perf tip: ") + plan);
+            }
+        }
+        ImGui::End();
     }
 
 
@@ -1021,6 +1201,130 @@ glm::vec3 Application::getSelectedObjectCenterWorld() const
     glm::vec3 objCenter = (objMin + objMax) * 0.5f;
     glm::vec3 worldCenter = glm::vec3(obj.modelMatrix * glm::vec4(objCenter, 1.0f));
     return worldCenter;
+}
+
+// ---- Diagnostics helpers ----
+void Application::refreshNormalBuffer(SceneObject& obj)
+{
+    if (!obj.VBO_normals) return;
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_normals);
+    glBufferData(GL_ARRAY_BUFFER, obj.objLoader.getVertCount() * sizeof(glm::vec3), obj.objLoader.getNormals(), GL_STATIC_DRAW);
+}
+
+void Application::refreshIndexBuffer(SceneObject& obj)
+{
+    if (!obj.EBO) return;
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj.objLoader.getIndexCount() * sizeof(unsigned int), obj.objLoader.getFaces(), GL_STATIC_DRAW);
+}
+
+// ---- Perf coach helpers ----
+std::string Application::materialKeyFor(const SceneObject& obj, const Shader* pbrShader)
+{
+    std::ostringstream ss;
+    bool isPBR = (obj.shader == pbrShader);
+    ss << (isPBR?"PBR":"Std");
+    // Use texture pointer identities as keys (shared via TextureCache)
+    ss << "|BC=" << (void*)obj.baseColorTex;
+    ss << "|N="  << (void*)obj.normalTex;
+    ss << "|MR=" << (void*)obj.mrTex;
+    if (!isPBR)
+    {
+        // For standard, include useTexture flag and color
+        ss << "|TEX=" << (obj.texture?"1":"0");
+        if (!obj.texture)
+            ss << "|col=" << std::hex << ((int)(obj.color.r*255)<<16 | (int)(obj.color.g*255)<<8 | (int)(obj.color.b*255));
+    }
+    return ss.str();
+}
+
+void Application::computePerfStats(PerfStats& out) const
+{
+    out.drawCalls = static_cast<int>(m_sceneObjects.size());
+    // Triangles and geometry bytes
+    size_t tris = 0; double geoBytes = 0.0;
+    std::unordered_map<std::string, int> matCounts;
+    std::unordered_set<const Texture*> texSet;
+    for (const auto& obj : m_sceneObjects)
+    {
+        tris += static_cast<size_t>(obj.objLoader.getIndexCount() / 3);
+        int v = obj.objLoader.getVertCount();
+        // positions + normals always; UVs/tangents optional
+        geoBytes += double(v) * (3+3) * sizeof(float);
+        if (obj.objLoader.hasTexcoords()) geoBytes += double(v) * 2 * sizeof(float);
+        if (obj.objLoader.hasTangents())  geoBytes += double(v) * 3 * sizeof(float);
+        geoBytes += double(obj.objLoader.getIndexCount()) * sizeof(unsigned int);
+
+        // material key
+        std::string key = materialKeyFor(obj, m_pbrShader);
+        matCounts[key] += 1;
+
+        // textures used by this object
+        if (obj.texture)      texSet.insert(obj.texture);
+        if (obj.baseColorTex) texSet.insert(obj.baseColorTex);
+        if (obj.normalTex)    texSet.insert(obj.normalTex);
+        if (obj.mrTex)        texSet.insert(obj.mrTex);
+    }
+    out.totalTriangles = tris;
+    out.geometryMB = geoBytes / (1024.0*1024.0);
+
+    // Unique materials and top shared
+    out.uniqueMaterialKeys = static_cast<int>(matCounts.size());
+    for (auto& kv : matCounts) {
+        if (kv.second > out.topSharedCount) { out.topSharedCount = kv.second; out.topSharedKey = kv.first; }
+    }
+
+    // Texture memory estimate from Texture objects' tracked dimensions
+    double texBytes = 0.0;
+    for (auto* t : texSet) {
+        int w = t->width(), h = t->height(), c = t->channels();
+        if (w>0 && h>0 && c>0) {
+            int bpp = (c>=4)?4:3; // approximate
+            double base = double(w) * double(h) * bpp;
+            double withMips = base * 4.0 / 3.0; // ~1.33x for mip chain
+            texBytes += withMips;
+        }
+    }
+    out.uniqueTextures = texSet.size();
+    out.texturesMB = texBytes / (1024.0*1024.0);
+    out.vramMB = out.texturesMB + out.geometryMB;
+}
+
+void Application::recomputeAngleWeightedNormalsForObject(int index)
+{
+    if (index < 0 || index >= (int)m_sceneObjects.size()) return;
+    auto& obj = m_sceneObjects[index];
+    obj.objLoader.computeNormalsAngleWeighted();
+    refreshNormalBuffer(obj);
+}
+
+bool Application::objectMostlyBackfacing(const SceneObject& obj) const
+{
+    int triCount = obj.objLoader.getIndexCount() / 3;
+    if (triCount <= 0) return false;
+    const unsigned int* idx = obj.objLoader.getFaces();
+    const float* pos = obj.objLoader.getPositions();
+    int samples = std::min(triCount, 200);
+    int step = std::max(1, triCount / samples);
+    int back = 0, total = 0;
+    for (int t = 0; t < triCount && total < samples; t += step)
+    {
+        unsigned ia = idx[t*3+0], ib = idx[t*3+1], ic = idx[t*3+2];
+        glm::vec3 v0(pos[ia*3+0], pos[ia*3+1], pos[ia*3+2]);
+        glm::vec3 v1(pos[ib*3+0], pos[ib*3+1], pos[ib*3+2]);
+        glm::vec3 v2(pos[ic*3+0], pos[ic*3+1], pos[ic*3+2]);
+        glm::vec3 w0 = glm::vec3(obj.modelMatrix * glm::vec4(v0, 1.0f));
+        glm::vec3 w1 = glm::vec3(obj.modelMatrix * glm::vec4(v1, 1.0f));
+        glm::vec3 w2 = glm::vec3(obj.modelMatrix * glm::vec4(v2, 1.0f));
+        glm::vec3 fn = glm::normalize(glm::cross(w1 - w0, w2 - w0));
+        glm::vec3 center = (w0 + w1 + w2) * (1.0f/3.0f);
+        glm::vec3 toCam = glm::normalize(m_cameraPos - center);
+        if (glm::dot(fn, toCam) <= 0.0f) back++;
+        total++;
+    }
+    if (total == 0) return false;
+    float ratio = float(back) / float(total);
+    return ratio > 0.95f;
 }
 
 void Application::addObject(std::string name,
@@ -1858,6 +2162,49 @@ std::string Application::buildShareLink() const
 #else
     // Desktop: just provide the query piece, or a placeholder base
     return std::string("?state=") + payload;
+#endif
+}
+
+bool Application::denoise(std::vector<glm::vec3>& color,
+                          const std::vector<glm::vec3>* normal,
+                          const std::vector<glm::vec3>* albedo)
+{
+#ifndef __EMSCRIPTEN__
+#ifdef OIDN_ENABLED
+    if (color.empty() || m_windowWidth <= 0 || m_windowHeight <= 0) return false;
+    try {
+        oidn::DeviceRef device = oidn::newDevice();
+        device.commit();
+
+        oidn::FilterRef filter = device.newFilter("RT");
+        filter.setImage("color", color.data(), oidn::Format::Float3, m_windowWidth, m_windowHeight);
+        std::vector<glm::vec3> out(color.size());
+        filter.setImage("output", out.data(), oidn::Format::Float3, m_windowWidth, m_windowHeight);
+        if (normal && !normal->empty())
+            filter.setImage("normal", normal->data(), oidn::Format::Float3, m_windowWidth, m_windowHeight);
+        if (albedo && !albedo->empty())
+            filter.setImage("albedo", albedo->data(), oidn::Format::Float3, m_windowWidth, m_windowHeight);
+        // Our buffer is LDR-ish after gamma; leave hdr=false for robustness here.
+        filter.set("hdr", false);
+        filter.commit();
+        filter.execute();
+
+        const char* errMsg = nullptr;
+        if (device.getError(errMsg) != oidn::Error::None) {
+            std::cerr << "OIDN error: " << (errMsg ? errMsg : "unknown") << "\n";
+            return false;
+        }
+
+        color.swap(out);
+        return true;
+    } catch (...) {
+        return false;
+    }
+#else
+    (void)color; (void)normal; (void)albedo; return false;
+#endif
+#else
+    (void)color; (void)normal; (void)albedo; return false;
 #endif
 }
 

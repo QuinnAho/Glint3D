@@ -34,6 +34,14 @@ public:
     glm::vec3            getMinBounds()  const;
     glm::vec3            getMaxBounds()  const;
 
+    // Diagnostics helpers
+    // Returns true if normals were provided by the source (not auto-computed here)
+    bool                 hadNormalsFromSource() const { return m_normalsProvidedFromSource; }
+    // Recompute vertex normals using angle-weighted faces (more robust smoothing)
+    void                 computeNormalsAngleWeighted();
+    // Flip triangle winding and invert vertex normals
+    void                 flipWindingAndNormals();
+
 private:
     void computeNormals();                       // helper
     void computeTangents();                      // requires positions + normals + texcoords
@@ -45,4 +53,6 @@ private:
     std::vector<glm::vec3> Tangents;
 
     glm::vec3 minBound, maxBound;
+
+    bool m_normalsProvidedFromSource = false;
 };

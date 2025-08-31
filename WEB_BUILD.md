@@ -33,3 +33,24 @@ Notes
 - WinHTTP-based AI networking is disabled on Web builds (clear error message returned).
 - Compute shaders are excluded from Web builds; CPU raytracer path remains available.
 
+Embed SDK (MVP)
+----------------
+
+A minimal embeddable wrapper is provided under `build-web/embed/`.
+
+- `build-web/embed/embed.js` exports `createViewer(selector, { src, viewerUrl })`.
+- It spawns an `<iframe>` pointing to your web build entry (`viewerUrl`, default `../index.html`) and passes initial ops via the `?state=` URL parameter.
+- `viewer.applyOps(opsArray)` appends more JSON Ops v1 and reloads the iframe with updated state. A convenience mapping turns `{ op:'add_light', type:'key' }` into a neutral point light.
+
+Example page:
+
+```
+<script type="module">
+  import { createViewer } from './embed.js';
+  const viewer = createViewer('#app', { src: 'assets/models/cube.obj', viewerUrl: '../index.html' });
+  viewer.applyOps([{ op:'add_light', type:'key' }]);
+  // You can pass any JSON Ops v1 here (see docs/json_ops_v1.md)
+</script>
+```
+
+See `build-web/embed/example.html` for a complete static demo.

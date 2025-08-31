@@ -88,6 +88,16 @@ public:
     bool        renderToPNG(const std::string& path, int width, int height);
     bool        applyJsonOpsV1(const std::string& json, std::string& error);
     std::string buildShareLink() const; // encodes ops history into URL with ?state=
+    // Denoiser
+    bool        denoise(std::vector<glm::vec3>& color,
+                        const std::vector<glm::vec3>* normal = nullptr,
+                        const std::vector<glm::vec3>* albedo = nullptr);
+    // Alias to match requested API naming
+    bool        Denoise(std::vector<glm::vec3>& color,
+                        const std::vector<glm::vec3>* normal = nullptr,
+                        const std::vector<glm::vec3>* albedo = nullptr) { return denoise(color, normal, albedo); }
+    void        setDenoiseEnabled(bool v) { m_denoise = v; }
+    bool        isDenoiseEnabled() const { return m_denoise; }
     bool        duplicateObject(const std::string& sourceName, const std::string& newName,
                                 const glm::vec3* deltaPos = nullptr,
                                 const glm::vec3* deltaScale = nullptr,
@@ -170,6 +180,27 @@ private:
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 private:
+    // Diagnostics helpers (Explain-my-render)
+    void recomputeAngleWeightedNormalsForObject(int index);
+    void refreshNormalBuffer(SceneObject& obj);
+    void refreshIndexBuffer(SceneObject& obj);
+    bool objectMostlyBackfacing(const SceneObject& obj) const;
+
+    // Perf coach helpers
+    struct PerfStats {
+        int drawCalls = 0;
+        size_t totalTriangles = 0;
+        int uniqueMaterialKeys = 0;
+        size_t uniqueTextures = 0;
+        double texturesMB = 0.0;
+        double geometryMB = 0.0;
+        double vramMB = 0.0; // textures + geometry (approx)
+        std::string topSharedKey;
+        int topSharedCount = 0;
+    };
+    void computePerfStats(PerfStats& out) const;
+    static std::string materialKeyFor(const SceneObject& obj, const Shader* pbrShader);
+
     GLFWwindow* m_window = nullptr;
     int   m_windowWidth = 800, m_windowHeight = 600;
     bool  m_headless = false;
@@ -253,4 +284,12 @@ private:
 
     // UI toggles
     bool m_showSettingsPanel = false; // move towards top-bar UI; panel optional
+    bool m_showDiagnosticsPanel = false; // "Why is it black?" panel
+    bool m_showPerfHUD = true;           // Perf HUD with counters
+
+    // Denoise toggle
+    bool m_denoise = false;
+
+    // sRGB framebuffer toggle (runtime)
+    bool m_framebufferSRGBEnabled = true;
 };

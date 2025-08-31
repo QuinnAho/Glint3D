@@ -10,7 +10,8 @@
 
 ObjLoader::ObjLoader()
     : minBound(std::numeric_limits<float>::max()),
-    maxBound(std::numeric_limits<float>::lowest())
+      maxBound(std::numeric_limits<float>::lowest()),
+      m_normalsProvidedFromSource(false)
 {}
 
 void ObjLoader::load(const char* filename)
@@ -49,6 +50,7 @@ void ObjLoader::load(const char* filename)
     }
     file.close();
 
+    m_normalsProvidedFromSource = false; // no VN parsed by this loader
     computeNormals();
 }
 
@@ -80,10 +82,12 @@ void ObjLoader::setFromRaw(const std::vector<glm::vec3>& positions,
     if (!normals.empty() && normals.size() == Positions.size())
     {
         Normals = normals;
+        m_normalsProvidedFromSource = true;
     }
     else
     {
         computeNormals();
+        m_normalsProvidedFromSource = false;
     }
 
     // UVs and tangents
@@ -120,6 +124,7 @@ void ObjLoader::computeNormals()
         Normals[f.c] += n;
     }
     for (glm::vec3& n : Normals) n = glm::normalize(n);
+    m_normalsProvidedFromSource = false;
 }
 
 void ObjLoader::computeTangents()
@@ -179,4 +184,43 @@ const float* ObjLoader::getTexcoords() const
 const float* ObjLoader::getTangents() const
 {
     return reinterpret_cast<const float*>(Tangents.data());
+}
+
+void ObjLoader::computeNormalsAngleWeighted()
+{
+    Normals.assign(Positions.size(), glm::vec3(0.0f));
+    auto angleBetween = [](const glm::vec3& a, const glm::vec3& b){
+        float la = glm::length(a); float lb = glm::length(b);
+        if (la <= 1e-20f || lb <= 1e-20f) return 0.0f;
+        float d = glm::clamp(glm::dot(a, b) / (la * lb), -1.0f, 1.0f);
+        return std::acos(d);
+    };
+    for (const Face& f : Faces)
+    {
+        unsigned ia=f.a, ib=f.b, ic=f.c;
+        const glm::vec3 &v0=Positions[ia], &v1=Positions[ib], &v2=Positions[ic];
+        glm::vec3 e01 = v1 - v0;
+        glm::vec3 e02 = v2 - v0;
+        glm::vec3 e10 = v0 - v1;
+        glm::vec3 e12 = v2 - v1;
+        glm::vec3 e20 = v0 - v2;
+        glm::vec3 e21 = v1 - v2;
+        glm::vec3 fn = glm::normalize(glm::cross(e01, e02));
+        float a0 = angleBetween(e01, e02);
+        float a1 = angleBetween(e12, e10);
+        float a2 = angleBetween(e20, e21);
+        Normals[ia] += fn * a0;
+        Normals[ib] += fn * a1;
+        Normals[ic] += fn * a2;
+    }
+    for (glm::vec3& n : Normals) n = glm::normalize(n);
+    m_normalsProvidedFromSource = false;
+}
+
+void ObjLoader::flipWindingAndNormals()
+{
+    for (auto& f : Faces) std::swap(f.b, f.c);
+    if (!Normals.empty()) {
+        for (auto& n : Normals) n = -n;
+    }
 }

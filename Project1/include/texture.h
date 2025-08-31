@@ -13,8 +13,14 @@ public:
     bool loadFromFile(const std::string& filepath, bool flipY = false);
     void bind(GLuint unit = 0) const;
 
+    // Perf introspection
+    int  width() const { return m_width; }
+    int  height() const { return m_height; }
+    int  channels() const { return m_channels; }
+
 private:
     GLuint m_textureID{0};
+    int m_width{0}, m_height{0}, m_channels{0};
 };
 
 #endif // TEXTURE_H

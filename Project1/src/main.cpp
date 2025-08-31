@@ -31,10 +31,12 @@ int main(int argc, char** argv)
     bool wantHeadless = args.has("--ops") || args.has("--render");
     int W = args.intOr("--w", 1024);
     int H = args.intOr("--h", 1024);
+    bool denoiseFlag = args.has("--denoise");
 
     auto* app = new Application();
     if (!app->init("OBJ Viewer", wantHeadless ? W : 800, wantHeadless ? H : 600, wantHeadless))
         return -1;
+    if (denoiseFlag) app->setDenoiseEnabled(true);
 
 #ifdef __EMSCRIPTEN__
     if (wantHeadless) return -1; // web build doesn't support headless here

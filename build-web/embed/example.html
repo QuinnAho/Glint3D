@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Embed Demo</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #app { height: 100%; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { createViewer } from './embed.js';
+      // Point to your web build entry (Emscripten viewer). Default assumes ../index.html
+      const viewer = createViewer('#app', {
+        src: 'assets/models/cube.obj',
+        viewerUrl: '../index.html'
+      });
+      // Add a neutral key light (convenience mapping to point light)
+      viewer.applyOps([{ op: 'add_light', type: 'key' }]);
+    </script>
+  </body>
+  </html>
+

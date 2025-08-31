@@ -1,4 +1,11 @@
-﻿  application.cpp
+﻿  BVHNode.cpp
+  application.cpp
+  main.cpp
+  nl_executor.cpp
+  texture.cpp
+  texture_cache.cpp
+  userinput.cpp
+  Generating Code...
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.

@@ -35,6 +35,9 @@ bool Texture::loadFromFile(const std::string& filepath, bool flipY)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    // store dims for perf HUD
+    m_width = width; m_height = height; m_channels = channels;
+
     stbi_image_free(data);
     glBindTexture(GL_TEXTURE_2D, 0);
 

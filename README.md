@@ -1,202 +1,144 @@
-# AI-Enhanced OBJ Viewer + Raytracer
+# OpenGL OBJ Viewer + Raytracer (with AI and Tools)
 
-At a glance — new in this build:
-- Optional Assimp import for glTF/GLB, FBX, DAE, PLY (and more)
-- PBR shader (Cook–Torrance) with BaseColor, Normal, Metallic/Roughness
-- Unified mesh loader (OBJ native or Assimp) with baked transforms and UV.v flip handled
-- Texture cache to deduplicate loads by path + flip
-- Per‑object shader toggle in the Materials panel (Standard vs PBR)
-- Emscripten main‑loop path added for future Web build
+This is a C++ OpenGL viewer and CPU raytracer with modern quality‑of‑life tools:
+- Natural‑language commands (via AI) and JSON Ops v1 scripting
+- PBR (Cook–Torrance) and a standard raster path
+- “Why is it black?” diagnostics with one‑click fixes
+- Perf HUD coach with counters + actionable hints
 
-This project is a flexible 3D OBJ model viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**, enhanced with **AI-powered natural language controls**.  
-It supports real-time rasterized modes (wireframe, shaded, point cloud) and an offline CPU raytracer with BVH acceleration.  
-Users can interact with the app using **direct JSON commands** or **plain natural language** (e.g., *"add a white light to the scene"*), which is automatically translated into JSON.
+Runs as a desktop app (GLFW/GLAD/ImGui). A headless path supports CLI rendering and scripted scene edits.
 
 ---
 
-## Rendering Modes
+## Quick Start
 
-**Phong**  
-![image](https://github.com/user-attachments/assets/1ab937e4-cb85-4944-b458-3a8d4a2fdd3e)
-
-**Flat**  
-![image](https://github.com/user-attachments/assets/e6bac5ab-9dde-42f5-a7c4-b591f3b8970d)
-
-**Raytraced (CPU, Not Real Time)**  
-![image](https://github.com/user-attachments/assets/007f764a-b7c3-4a76-926d-adddc16be4f1)
-
-**Wireframe**  
-![image](https://github.com/user-attachments/assets/72e6216c-8b49-4d11-8ef6-18a665b1514c)
-
-**Point Cloud**  
-![image](https://github.com/user-attachments/assets/0765d651-f80c-47e1-8f95-9e95d194c152)
+- Open `Project1/Project1.vcxproj` in Visual Studio 2022 (x64).
+- Build + run from the repo root so `shaders/` and `assets/` resolve.
+- Use the top menu to load sample models or recipes. Hold RMB to fly the camera.
 
 ---
 
-## Features
+## Highlights
 
-- Load and render OBJ models (native)
-- Optional Assimp import: glTF/GLB, FBX, DAE, PLY (and more)
-- Apply textures (e.g., cow texture)
-- Wireframe, point cloud, or solid rendering modes
-- Real-time Phong shading
-- CPU raytracer:
-  - BVH acceleration (Ray–AABB + Ray–Triangle)
-  - Point light support
-  - Textured raytraced surfaces
-- Interactive camera movement
-- GUI controls (ImGui)
-- **Chat-based JSON commands** to load/duplicate models and add lights
-- **AI natural language bridge**: type instructions like  
-  - *“add a white light to the scene”*  
-  - *“load cow.obj and place it at x=2”*  
-  - *“duplicate the cow to the left and make it smaller”*  
-  → The app automatically generates and applies the correct JSON.
+- Native OBJ loader; optional unified loader (glTF/GLB/FBX/DAE/PLY) via Assimp.
+- PBR shader: BaseColor, Normal, Metallic/Roughness; Standard shader with flat/Gouraud.
+- Texture cache deduplicates loads; per‑object shader choice (Standard vs PBR).
+- CPU raytracer with BVH; shows the result on a full‑screen quad; optional denoise.
+- Shareable scene state (JSON Ops v1) + headless render CLI.
 
 ---
 
-## Project Setup and Structure
+## New Tools (MVPs)
 
-### Overview
-A Visual Studio C++ OpenGL project for viewing OBJ models with a simple raytracing preview and AI-driven scene manipulation.  
-Uses GLFW, GLAD, ImGui, GLM, and stb headers vendored under `Libraries/`.
+1) Explain‑my‑render: “Why is it black?”
+- Detects and offers one‑click fixes:
+  - Missing normals → Recompute angle‑weighted normals
+  - Bad winding (mostly backfacing) → Flip triangle order + invert normals
+  - No lights / tone‑mapped black → Add a neutral key light
+  - sRGB mismatch (PBR gamma + sRGB FB) → Toggle framebuffer sRGB
+- Open via the menubar button “Why is it black?”.
 
-### Folder Layout
-- **src/** — C/C++ sources for rendering, input, loaders  
-- **include/** — Public headers  
-- **Libraries/** — Third-party headers and prebuilt libs (GLFW, ImGui, stb, GLM)  
-- **shaders/** — GLSL shaders  
-- **assets/** — Models + textures (e.g., cow.obj, cow-tex-fin.jpg)  
-
-### Requirements
-- Visual Studio 2022 (Desktop development with C++)  
-- Windows 10+ SDK  
-
-### Opening
-- Open `Project1.vcxproj` in Visual Studio  
-
-### Configuration
-- Platform: **x64** (Debug or Release)  
-- Language standard: **C++17**  
-- Includes (pre-configured):  
-  - `$(ProjectDir)include`  
-  - `$(ProjectDir)Libraries\include`  
-  - `$(ProjectDir)Libraries\include\imgui`  
-  - `$(ProjectDir)Libraries\include\stb`  
-- Libraries: `$(ProjectDir)Libraries\lib`  
-- Linker: `glfw3.lib; opengl32.lib; gdi32.lib; user32.lib; shell32.lib; legacy_stdio_definitions.lib`  
-
-### Build
-- Select **x64-Debug** or **x64-Release** → Build  
-- Output under `x64/`  
-- Working directory must be project root so shaders/assets resolve  
-
-### Runtime Notes
-- Shaders load from `shaders/`  
-- Assets load from `assets/`  
-- ImGui config persists in `imgui.ini`  
-
----
-
-## Assimp (Optional; for glTF/FBX/DAE/PLY)
-
-This project can use Assimp to import additional mesh formats. The code builds without Assimp; if not enabled, non-OBJ imports fall back and log an error.
-
-Steps (recommended with vcpkg):
-
-1) Install vcpkg and integrate
-- `git clone https://github.com/microsoft/vcpkg`
-- `vcpkg\\bootstrap-vcpkg.bat`
-- `vcpkg integrate install`
-
-2) Install Assimp
-- `vcpkg install assimp:x64-windows`
-
-3) Add to Project Properties (x64 Debug/Release):
-- C/C++ > Preprocessor > Preprocessor Definitions: add `USE_ASSIMP`
-- C/C++ > Additional Include Directories: add `$(VcpkgRoot)installed\\x64-windows\\include`
-- Linker > Additional Library Directories: add `$(VcpkgRoot)installed\\x64-windows\\lib`
-- Linker > Additional Dependencies: add `assimp-vc143-mt.lib` (debug may be `assimp-vc143-mtd.lib`)
-
-4) Runtime DLL (if using dynamic libs)
-- Copy `assimp-vc143-mt.dll` from vcpkg `installed\\x64-windows\\bin` to your output folder (e.g., `x64/Debug`)
-
-Notes:
-- Importer lives in `Project1/src/assimp_loader.cpp` guarded by `#ifdef USE_ASSIMP`.
-- `Application::addObject` chooses loader by extension; non-OBJ uses Assimp.
-- Command loader tries extensions: `.obj, .gltf, .glb, .fbx, .dae, .ply` under prefixes `['', 'objs/', 'assets/models/']`.
-
-Sample assets:
-- `Project1/assets/models/triangle.ply` — minimal triangle to validate Assimp path (PLY).
-  Use the GUI button “Load sample triangle (PLY)” under Render Settings → Samples.
+2) Perf Coach HUD
+- Overlay shows: draw calls, total triangles, materials, textures, texture MB, geometry MB, VRAM estimate.
+- Suggestions:
+  - “X meshes share material Y → instancing candidate.”
+  - High draw calls → merge static meshes or instance
+  - High triangle count → consider LOD/decimation
+- Toggle under View → “Perf HUD”.
+- Optional “Ask AI for perf tips” button when AI is enabled.
 
 ---
 
 ## Controls
 
-- Hold RMB: camera navigation and orbit
-  - W/A/S/D: move forward/left/back/right
-  - Space or E: move up; Left Ctrl or Q: move down
-  - Right-drag: orbit camera
-- Gizmo triad
-  - Shift+Q/W/E: Translate / Rotate / Scale
-  - X/Y/Z: constrain to axis
-  - L: toggle Local vs World gizmo orientation
-  - N: toggle snapping (translate/rotate/scale steps adjustable in UI)
-- Delete: delete currently selected object or light
-- Mouse
-  - Left-click: select object or gizmo axis
-  - Left-drag on axis: transform along that axis
-  - GUI: adjust speed, FOV, clipping planes, shading, and gizmo snap steps
+- RMB + WASD/E/Q/Space/Ctrl: fly camera; RMB drag to orbit
+- Gizmo: Shift+Q/W/E → Translate/Rotate/Scale; X/Y/Z pick axis; L toggles Local/World; N toggles snapping
+- F11: fullscreen
+- Delete: delete selection
 
 ---
 
-## Example Scene
+## Menubar
 
-- Two cows in the scene  
-- Surrounded by cube “walls”  
-- One or more lights  
-- Texture applied in both raster + raytraced modes  
-
----
-
-## How the Raytracer Works
-
-1. Build a **BVH** from model triangles  
-2. Cast rays from camera → BVH traversal  
-3. Find nearest intersection  
-4. Compute hit point + normal  
-5. Apply lighting: Ambient + Diffuse (no specular yet)  
-6. If textured: interpolate UV via barycentrics → sample texture  
-
-Output is rendered to a fullscreen quad as a texture.  
+- File → Load Cube / Load Plane, Copy Share Link, Toggle Settings Panel
+- View → Point/Wire/Solid/Raytrace, Fullscreen, Perf HUD
+- Gizmo → Mode, Axis, Local/Snap
+- Samples → Prebuilt recipes (see `assets/samples/recipes/`)
+- Toolbar quick buttons: Mode, Gizmo, Add Light, Denoise, Why is it black?
 
 ---
 
-## Chat + Commands
+## “Talk & AI” Panel
 
-Open the app and use the right-side **Talk panel**.  
+- Send natural language or JSON Ops v1 lines.
+- Enable “Use AI” and configure endpoint/model to let the planner generate a plan from your request.
+- Scene snapshots can be copied as JSON.
 
-**Example:**
+Docs: `docs/json_ops_v1.md` (schema in `schemas/json_ops_v1.json`).
 
-<img width="800" height="631" alt="image" src="https://github.com/user-attachments/assets/dc534961-42a9-4ec3-9295-b6d0dfa6692a" />
+---
 
-<img width="803" height="601" alt="image" src="https://github.com/user-attachments/assets/384430a8-36b2-45d8-ad9a-997282afff40" />
+## Headless + Scripting (CLI)
 
-<img width="792" height="633" alt="image" src="https://github.com/user-attachments/assets/cd61d91c-10ef-4edb-8fda-18e92bb973be" />
+Apply JSON Ops v1 and render to PNG without a window:
 
+- `--ops <file>`: apply JSON Ops v1 from file
+- `--render <out.png>`: render to PNG (optionally with `--w`/`--h`)
+- `--w <int> --h <int>`: output resolution
+- `--denoise`: enable denoiser (if compiled with OIDN)
 
-### Example JSON Commands
-```json
-{ "op": "load_model", "path": "cow.obj", "name": "Cow1", "transform": { "position": [2,0,0], "scale": [1,1,1] } }
-{ "op": "duplicate", "source": "Cow1", "name": "Cow2", "transform": { "position": [2,0,0] } }
-{ "op": "add_light", "type": "point", "position": [0,5,5], "color": [1,1,1], "intensity": 1.5 }
-\n## Natural Language Examples
-- place cow in front of me 3
-- add light at 0 5 0 intensity 0.8
-- create material wood color 0.6 0.4 0.2; assign material wood to Cow1
-- place 4 cube objects and arrange them so there are three walls and one floor
-- place 6 cube objects long and flat
-\nNotes:
-- Multi-placement supports adjectives: long, flat, tall, wide; or explicit `scale sx sy sz`.
-- The “three walls and one floor” pattern creates a U-shaped room in front of the camera using `cube.obj`.
+Example:
+```
+Project1.exe --ops recipe.json --render out.png --w 1024 --h 768
+```
+
+---
+
+## Troubleshooting
+
+- Black frame (raster):
+  - Use “Why is it black?” panel.
+  - Add at least one light; check intensities are > 0.
+  - For PBR, if colors look crushed, disable framebuffer sRGB in the panel.
+  - Recompute angle‑weighted normals if the model lacks normals.
+  - Flip winding if the object is mostly backfacing.
+
+- Dark/washed PBR:
+  - Avoid double‑gamma: PBR shader outputs gamma‑corrected color; disable FB sRGB.
+
+- Headless asset paths:
+  - Run from repo root or provide absolute paths so `assets/` resolves.
+
+---
+
+## Build Notes
+
+- Toolchain: Visual Studio 2022, C++17, x64.
+- Third‑party: GLFW, ImGui, stb, GLM under `Libraries/`.
+- Optional: Assimp via vcpkg (`USE_ASSIMP`) for non‑OBJ formats.
+  - Include/Lib dirs and DLL steps are typical for vcpkg.
+
+---
+
+## Repo Layout
+
+- `Project1/src` – rendering, UI, loaders, raytracer
+- `Project1/include` – headers
+- `Project1/shaders` – GLSL
+- `Project1/assets` – sample models, textures, recipes
+- `docs/json_ops_v1.md`, `schemas/json_ops_v1.json` – scripting docs/schema
+
+---
+
+## Samples
+
+Use the Samples menu or load recipes manually:
+- `assets/samples/recipes/three-point-lighting.json`
+- `assets/samples/recipes/isometric-hero.json`
+
+---
+
+## License
+
+See repository license if present. Third‑party components retain their respective licenses.
+
