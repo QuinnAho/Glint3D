@@ -10,6 +10,7 @@
 
 // Include the centralized Ray class
 #include "ray.h"
+#include "gizmo.h"
 
 // Forward declaration of Application
 class Application;
@@ -32,6 +33,17 @@ private:
     // Mouse state for this input handler
     bool m_firstMouse;
     double m_lastX, m_lastY;
+
+    // Gizmo state (interaction only; render state lives in Application)
+    bool m_gizmoDragging = false;
+    GizmoAxis m_activeAxis = GizmoAxis::None;
+    float m_axisStartS = 0.0f;
+    glm::vec3 m_dragOriginWorld{0};
+    glm::vec3 m_dragAxisDir{0};
+    glm::mat4 m_modelStart{1.0f};
+    int m_dragObjectIndex = -1;
+
+    Ray makeRayFromScreen(double mouseX, double mouseY) const;
 };
 
 #endif

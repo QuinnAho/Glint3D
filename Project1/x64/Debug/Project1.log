@@ -1,2 +1,5 @@
 ﻿  application.cpp
+  light.cpp
+  userinput.cpp
+  Generating Code...
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe

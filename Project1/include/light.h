@@ -24,12 +24,13 @@ public:
     // New functions for indicator visualization
     void initIndicator();         // Create geometry (a small cube)
     bool initIndicatorShader();   // Compile and link the indicator shader
-    void renderIndicators(const glm::mat4& view, const glm::mat4& projection) const;
+    void renderIndicators(const glm::mat4& view, const glm::mat4& projection, int selectedIndex) const;
 
     glm::vec4 m_globalAmbient = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
     std::vector<LightSource> m_lights;
 
     const LightSource* getFirstLight() const;
+    bool removeLightAt(size_t index);
 
 private:
 

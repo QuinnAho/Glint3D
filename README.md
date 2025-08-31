@@ -91,14 +91,20 @@ Uses GLFW, GLAD, ImGui, GLM, and stb headers vendored under `Libraries/`.
 
 ## Controls
 
-| Key | Action |
-|:----|:-------|
-| `W A S D` | Move camera forward/left/backward/right |
-| `Q` / `E` | Move camera up / down |
-| Left-Click + Drag | Rotate model |
-| Right-Click + Drag | Rotate camera view |
-| GUI Sliders | Adjust speed, FOV, clipping planes |
-| Buttons | Switch between wireframe, solid, point cloud, raytrace |
+- Hold RMB: camera navigation and orbit
+  - W/A/S/D: move forward/left/back/right
+  - Space or E: move up; Left Ctrl or Q: move down
+  - Right-drag: orbit camera
+- Gizmo triad
+  - Shift+Q/W/E: Translate / Rotate / Scale
+  - X/Y/Z: constrain to axis
+  - L: toggle Local vs World gizmo orientation
+  - N: toggle snapping (translate/rotate/scale steps adjustable in UI)
+- Delete: delete currently selected object or light
+- Mouse
+  - Left-click: select object or gizmo axis
+  - Left-drag on axis: transform along that axis
+  - GUI: adjust speed, FOV, clipping planes, shading, and gizmo snap steps
 
 ---
 
@@ -142,3 +148,12 @@ Open the app and use the right-side **Talk panel**.
 { "op": "load_model", "path": "cow.obj", "name": "Cow1", "transform": { "position": [2,0,0], "scale": [1,1,1] } }
 { "op": "duplicate", "source": "Cow1", "name": "Cow2", "transform": { "position": [2,0,0] } }
 { "op": "add_light", "type": "point", "position": [0,5,5], "color": [1,1,1], "intensity": 1.5 }
+\n## Natural Language Examples
+- place cow in front of me 3
+- add light at 0 5 0 intensity 0.8
+- create material wood color 0.6 0.4 0.2; assign material wood to Cow1
+- place 4 cube objects and arrange them so there are three walls and one floor
+- place 6 cube objects long and flat
+\nNotes:
+- Multi-placement supports adjectives: long, flat, tall, wide; or explicit `scale sx sy sz`.
+- The “three walls and one floor” pattern creates a U-shaped room in front of the camera using `cube.obj`.

@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
+    <ClCompile Include="src\gizmo.cpp" />
     <ClCompile Include="src\nl_executor.cpp" />
     <ClCompile Include="src\axisrenderer.cpp" />
     <ClCompile Include="src\BVHNode.cpp" />
@@ -171,6 +172,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\application.h" />
+    <ClInclude Include="include\gizmo.h" />
     <ClInclude Include="include\nl_executor.h" />
     <ClInclude Include="include\axisrenderer.h" />
     <ClInclude Include="include\BVHNode.h" />

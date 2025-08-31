@@ -140,6 +140,97 @@ bool Executor::execute(const std::string& text, std::vector<std::string>& outLog
         }
     }
 
+    // Multi-place with arrangement: "place 4 cube objects ... arrange them ... three walls and one floor"
+    // Also supports simple adjectives like "long", "flat", "tall", "wide" affecting default scale
+    if (iequalsPrefix(t, "place ")){
+        auto toks = tokenize(t);
+        if (toks.size() >= 3){
+            // Try to parse count in second token
+            int count = 1;
+            try { count = std::stoi(toks[1]); } catch(...) { /* not a number */ }
+            if (count > 1) {
+                // Base name/path for the object to place
+                std::string baseName = toks[2];
+                std::string path = baseName; // rely on Application::loadObjAt path resolution
+
+                // Heuristic scale from adjectives
+                glm::vec3 baseScale(1.0f);
+                if (tl.find(" long") != std::string::npos) baseScale.x = std::max(baseScale.x, 4.0f);
+                if (tl.find(" flat") != std::string::npos) baseScale.y = std::min(baseScale.y, 0.2f);
+                if (tl.find(" tall") != std::string::npos) baseScale.y = std::max(baseScale.y, 3.0f);
+                if (tl.find(" wide") != std::string::npos) baseScale.x = std::max(baseScale.x, 4.0f);
+
+                // Explicit numeric scale override if present: "scale sx sy sz"
+                auto sclPos = tl.find(" scale ");
+                if (sclPos != std::string::npos) {
+                    // Try to parse three numbers following 'scale'
+                    auto rest = t.substr(sclPos + 7);
+                    auto v = parseVec3(rest);
+                    if (v) baseScale = *v;
+                }
+
+                // Default placement reference in front of camera
+                glm::vec3 camPos = m_app.getCameraPosition();
+                glm::vec3 front  = glm::normalize(m_app.getCameraFront());
+                glm::vec3 up     = glm::normalize(m_app.getCameraUp());
+                glm::vec3 right  = glm::normalize(glm::cross(front, up));
+
+                // Recognize special arrangement: three walls and one floor
+                bool wantWallsFloor = (tl.find("three walls") != std::string::npos || tl.find("3 walls") != std::string::npos)
+                                   && (tl.find("one floor")   != std::string::npos || tl.find("1 floor")   != std::string::npos);
+
+                if (wantWallsFloor) {
+                    // Force count to 4 for this pattern
+                    const float roomSize = 6.0f;     // X/Z extent
+                    const float wallHeight = 3.0f;   // Y for walls
+                    const float thickness = 0.2f;    // small thickness
+                    const float distForward = 3.0f;  // center the room a bit ahead
+
+                    glm::vec3 center = camPos + front * distForward;
+
+                    // Floor
+                    glm::vec3 floorScale(roomSize, thickness, roomSize);
+                    if (baseScale.x > 1.0f) floorScale.x = baseScale.x; // allow adjective override for length
+                    if (baseScale.y < 1.0f) floorScale.y = std::min(baseScale.y, thickness);
+                    if (baseScale.z > 1.0f) floorScale.z = baseScale.z;
+                    glm::vec3 floorPos = center - up * (floorScale.y * 0.5f);
+
+                    // Back wall (across X)
+                    glm::vec3 backScale(roomSize, wallHeight, thickness);
+                    glm::vec3 backPos = center - front * (roomSize * 0.5f - backScale.z * 0.5f) + up * (backScale.y * 0.5f);
+
+                    // Left and right walls (along Z)
+                    glm::vec3 sideScale(thickness, wallHeight, roomSize);
+                    glm::vec3 leftPos  = center - right * (roomSize * 0.5f - sideScale.x * 0.5f) + up * (sideScale.y * 0.5f);
+                    glm::vec3 rightPos = center + right * (roomSize * 0.5f - sideScale.x * 0.5f) + up * (sideScale.y * 0.5f);
+
+                    // Place objects
+                    bool ok = true;
+                    ok &= m_app.loadObjAt(baseName + "_floor", path, floorPos, floorScale);
+                    ok &= m_app.loadObjAt(baseName + "_wall_back", path, backPos, backScale);
+                    ok &= m_app.loadObjAt(baseName + "_wall_left", path, leftPos, sideScale);
+                    ok &= m_app.loadObjAt(baseName + "_wall_right", path, rightPos, sideScale);
+
+                    outLog.push_back(ok ? "Placed 3 walls and 1 floor (U-shape)" : "Failed to place room arrangement");
+                    return ok;
+                }
+
+                // Generic multi-placement: line in front, spaced along camera-right
+                const float distForward = 2.5f;
+                const float spacing = 2.0f;
+                glm::vec3 start = camPos + front * distForward - right * (spacing * 0.5f * (float)(count - 1));
+                bool allOk = true;
+                for (int i = 0; i < count; ++i) {
+                    std::ostringstream nm; nm << baseName << (i+1);
+                    glm::vec3 pos = start + right * (spacing * (float)i);
+                    allOk &= m_app.loadObjAt(nm.str(), path, pos, baseScale);
+                }
+                outLog.push_back(allOk ? ("Placed " + std::to_string(count) + " objects of '" + baseName + "'") : "Failed to place some objects");
+                return allOk;
+            }
+        }
+    }
+
     // Place/load obj in front of camera: "place cow" or "place cow at x y z" or "load my.obj in front of me [d]"
     if (iequalsPrefix(t, "place ") || iequalsPrefix(t, "load ")){
         auto toks = tokenize(t);

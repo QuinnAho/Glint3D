@@ -181,6 +181,7 @@ void Application::setupOpenGL()
 
     glEnable(GL_DEPTH_TEST);
     m_axisRenderer.init();
+    m_gizmo.init();
 
     m_lights.initIndicator();
     if (!m_lights.initIndicatorShader())
@@ -220,6 +221,7 @@ void Application::cleanup()
 {
     // Cleanup axis
     m_axisRenderer.cleanup();
+    m_gizmo.cleanup();
 
     // Cleanup VAO, VBO, EBO
     glDeleteVertexArrays(1, &m_VAO);
@@ -281,19 +283,26 @@ void Application::processInput()
     // Cross product for right vector
     glm::vec3 rightVec = glm::normalize(glm::cross(m_cameraFront, m_cameraUp));
 
-    // WASD, Q/E for camera movement
-    if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS)
-        m_cameraPos += speed * m_cameraFront;
-    if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS)
-        m_cameraPos -= speed * m_cameraFront;
-    if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS)
-        m_cameraPos -= speed * rightVec;
-    if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS)
-        m_cameraPos += speed * rightVec;
-    if (glfwGetKey(m_window, GLFW_KEY_Q) == GLFW_PRESS)
-        m_cameraPos -= speed * m_cameraUp;
-    if (glfwGetKey(m_window, GLFW_KEY_E) == GLFW_PRESS)
-        m_cameraPos += speed * m_cameraUp;
+    // Camera movement only while RMB pressed (UE style)
+    if (m_rightMousePressed) {
+        if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS)
+            m_cameraPos += speed * m_cameraFront;
+        if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS)
+            m_cameraPos -= speed * m_cameraFront;
+        if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS)
+            m_cameraPos -= speed * rightVec;
+        if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS)
+            m_cameraPos += speed * rightVec;
+        // Vertical: Space up, LeftCtrl down, also E up / Q down while RMB
+        if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS)
+            m_cameraPos += speed * m_cameraUp;
+        if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+            m_cameraPos -= speed * m_cameraUp;
+        if (glfwGetKey(m_window, GLFW_KEY_E) == GLFW_PRESS)
+            m_cameraPos += speed * m_cameraUp;
+        if (glfwGetKey(m_window, GLFW_KEY_Q) == GLFW_PRESS)
+            m_cameraPos -= speed * m_cameraUp;
+    }
 
     // F11 fullscreen toggle (edge-triggered)
     if (glfwGetKey(m_window, GLFW_KEY_F11) == GLFW_PRESS) {
@@ -303,6 +312,34 @@ void Application::processInput()
     if (glfwGetKey(m_window, GLFW_KEY_F11) == GLFW_RELEASE) {
         m_f11Held = false;
     }
+
+    // Gizmo mode shortcuts with Shift: Shift+Q=Translate, Shift+W=Rotate, Shift+E=Scale
+    bool shiftDown = (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ||
+                     (glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+    if (shiftDown) {
+        if (glfwGetKey(m_window, GLFW_KEY_Q) == GLFW_PRESS) m_gizmoMode = GizmoMode::Translate;
+        if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) m_gizmoMode = GizmoMode::Rotate;
+        if (glfwGetKey(m_window, GLFW_KEY_E) == GLFW_PRESS) m_gizmoMode = GizmoMode::Scale;
+    }
+
+    // Axis highlight shortcuts: X/Y/Z
+    if (glfwGetKey(m_window, GLFW_KEY_X) == GLFW_PRESS) m_gizmoAxis = GizmoAxis::X;
+    if (glfwGetKey(m_window, GLFW_KEY_Y) == GLFW_PRESS) m_gizmoAxis = GizmoAxis::Y;
+    if (glfwGetKey(m_window, GLFW_KEY_Z) == GLFW_PRESS) m_gizmoAxis = GizmoAxis::Z;
+
+    // Toggle local/world with L (edge-triggered)
+    if (glfwGetKey(m_window, GLFW_KEY_L) == GLFW_PRESS) {
+        if (!m_lHeld) { m_gizmoLocalSpace = !m_gizmoLocalSpace; }
+        m_lHeld = true;
+    }
+    if (glfwGetKey(m_window, GLFW_KEY_L) == GLFW_RELEASE) m_lHeld = false;
+
+    // Toggle snapping with N (edge-triggered)
+    if (glfwGetKey(m_window, GLFW_KEY_N) == GLFW_PRESS) {
+        if (!m_nHeld) { m_snapEnabled = !m_snapEnabled; }
+        m_nHeld = true;
+    }
+    if (glfwGetKey(m_window, GLFW_KEY_N) == GLFW_RELEASE) m_nHeld = false;
 }
 
 
@@ -384,7 +421,7 @@ void Application::renderScene()
         glBindVertexArray(0);
 
         renderAxisIndicator();
-        m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
+        m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix, m_selectedLightIndex);
         renderGUI();
         glfwSwapBuffers(m_window);
         return;
@@ -445,12 +482,12 @@ void Application::renderScene()
     if (m_outlineShader && m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
     {
         const auto& obj = m_sceneObjects[m_selectedObjectIndex];
-        glm::mat4 modelScaled = obj.modelMatrix * glm::scale(glm::mat4(1.0f), glm::vec3(1.03f));
+        glm::mat4 modelScaled = obj.modelMatrix * glm::scale(glm::mat4(1.0f), glm::vec3(1.01f));
         m_outlineShader->use();
         m_outlineShader->setMat4("model", modelScaled);
         m_outlineShader->setMat4("view", m_viewMatrix);
         m_outlineShader->setMat4("projection", m_projectionMatrix);
-        m_outlineShader->setVec3("outlineColor", glm::vec3(1.0f, 0.9f, 0.1f));
+        m_outlineShader->setVec3("outlineColor", glm::vec3(0.2f, 0.7f, 1.0f));
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
         glBindVertexArray(obj.VAO);
@@ -459,9 +496,27 @@ void Application::renderScene()
         glCullFace(GL_BACK);
     }
 
+    // Draw gizmo at selected object's center
+    if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
+    {
+        glm::vec3 center = getSelectedObjectCenterWorld();
+        float dist = glm::length(m_cameraPos - center);
+        float gscale = glm::clamp(dist * 0.15f, 0.5f, 10.0f);
+        // Orientation basis: local object's axes (normalized) or world
+        glm::mat3 R(1.0f);
+        if (m_gizmoLocalSpace) {
+            const auto& obj = m_sceneObjects[m_selectedObjectIndex];
+            glm::mat3 M3(obj.modelMatrix);
+            R[0] = glm::normalize(glm::vec3(M3[0]));
+            R[1] = glm::normalize(glm::vec3(M3[1]));
+            R[2] = glm::normalize(glm::vec3(M3[2]));
+        }
+        m_gizmo.render(m_viewMatrix, m_projectionMatrix, center, R, gscale, m_gizmoAxis, m_gizmoMode);
+    }
+
     renderAxisIndicator();
     renderGUI();
-    m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
+    m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix, m_selectedLightIndex);
     glfwSwapBuffers(m_window);
 }
 
@@ -477,9 +532,10 @@ void Application::renderGUI()
     ImGui::SetNextWindowSize(ImVec2(400, 400), ImGuiCond_Always);
 
     ImGui::Begin("Render Settings");
-    ImGui::Text("Use WASD to move, Q/E for up/down.");
-    ImGui::Text("Left-click & drag to rotate model.");
-    ImGui::Text("Right-click & drag to rotate camera.");
+    ImGui::Text("Hold RMB to move camera (W/A/S/D, Space/Ctrl, E/Q up/down).");
+    ImGui::Text("Gizmo: Shift+Q/W/E = Move/Rotate/Scale, X/Y/Z = axis");
+    ImGui::Text("Left-click a gizmo axis and drag to edit.");
+    ImGui::Text("Right-click & drag to orbit camera.");
 
     ImGui::SliderFloat("Camera Speed", &m_cameraSpeed, 0.01f, 1.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &m_sensitivity, 0.01f, 1.0f);
@@ -535,6 +591,21 @@ void Application::renderGUI()
                 ImGui::TreePop();
             }
         }
+    }
+
+    // Gizmo settings
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Gizmo", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        bool local = m_gizmoLocalSpace;
+        if (ImGui::Checkbox("Local space", &local)) m_gizmoLocalSpace = local;
+        ImGui::SameLine();
+        bool snap = m_snapEnabled;
+        if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap;
+        ImGui::DragFloat("Translate Snap", &m_snapTranslate, 0.05f, 0.01f, 10.0f, "%.2f");
+        ImGui::DragFloat("Rotate Snap (deg)", &m_snapRotateDeg, 1.0f, 1.0f, 90.0f, "%.0f");
+        ImGui::DragFloat("Scale Snap", &m_snapScale, 0.01f, 0.01f, 10.0f, "%.2f");
     }
 
     // Materials
@@ -694,6 +765,17 @@ void Application::renderAxisIndicator()
     glm::mat4 identity = glm::mat4(1.0f);
 
     m_axisRenderer.render(axisModel, identity, axisProjection);
+}
+
+glm::vec3 Application::getSelectedObjectCenterWorld() const
+{
+    if (m_selectedObjectIndex < 0 || m_selectedObjectIndex >= (int)m_sceneObjects.size()) return glm::vec3(0);
+    const auto& obj = m_sceneObjects[m_selectedObjectIndex];
+    glm::vec3 objMin = obj.objLoader.getMinBounds();
+    glm::vec3 objMax = obj.objLoader.getMaxBounds();
+    glm::vec3 objCenter = (objMin + objMax) * 0.5f;
+    glm::vec3 worldCenter = glm::vec3(obj.modelMatrix * glm::vec4(objCenter, 1.0f));
+    return worldCenter;
 }
 
 void Application::addObject(std::string name,
@@ -1174,3 +1256,17 @@ bool Application::removeObjectByName(const std::string& name)
     }
     return false;
 }
+
+bool Application::removeLightAtIndex(int i)
+{
+    if (i < 0) return false;
+    bool ok = m_lights.removeLightAt((size_t)i);
+    if (ok) {
+        if (m_selectedLightIndex == i) m_selectedLightIndex = -1;
+        else if (m_selectedLightIndex > i) m_selectedLightIndex--;
+    }
+    return ok;
+}
+
+int Application::getLightCount() const { return static_cast<int>(m_lights.m_lights.size()); }
+glm::vec3 Application::getLightPosition(int i) const { return m_lights.m_lights[i].position; }

@@ -198,7 +198,7 @@ bool Light::initIndicatorShader()
 }
 
 // Render visual indicators for each light using the indicator shader stored in the Light class
-void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection) const
+void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection, int selectedIndex) const
 {
     if (m_indicatorShader == 0)
         return; // Shader not initialized
@@ -221,6 +221,22 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection)
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
+    // Draw selected as a thin wireframe box overlay (modern highlight)
+    if (selectedIndex >= 0 && selectedIndex < (int)m_lights.size()) {
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), m_lights[selectedIndex].position) * glm::scale(glm::mat4(1.0f), glm::vec3(1.3f));
+        GLint modelLoc = glGetUniformLocation(m_indicatorShader, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        GLint colorLoc = glGetUniformLocation(m_indicatorShader, "indicatorColor");
+        glm::vec3 selColor(0.2f, 0.7f, 1.0f);
+        glUniform3fv(colorLoc, 1, glm::value_ptr(selColor));
+        // Render as lines
+        GLint polyMode[2];
+        glGetIntegerv(GL_POLYGON_MODE, polyMode);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glLineWidth(2.0f);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glPolygonMode(GL_FRONT_AND_BACK, polyMode[0]);
+    }
     glBindVertexArray(0);
 }
 
@@ -229,4 +245,11 @@ const LightSource* Light::getFirstLight() const
     if (m_lights.empty())
         return nullptr;
     return &m_lights[0];
+}
+
+bool Light::removeLightAt(size_t index)
+{
+    if (index >= m_lights.size()) return false;
+    m_lights.erase(m_lights.begin() + index);
+    return true;
 }

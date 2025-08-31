@@ -65,6 +65,7 @@ static std::string build_planner_instructions() {
     os << "Use object names from the scene where helpful.\n";
     os << "Supported commands (free-form, natural but structured):\n";
     os << "- place <name> [in front of me <d>] | [at x y z] [scale sx sy sz]\n";
+    os << "- place <count> <name> objects [scale sx sy sz | long | flat | tall | wide] [arrange into three walls and one floor]\n";
     os << "- add light [at x y z] [color r g b] [intensity v]\n";
     os << "- create material <name> [color r g b] [specular r g b] [ambient r g b] [shininess s] [roughness r] [metallic m]\n";
     os << "- assign material <mat> to <object>\n";

@@ -22,6 +22,7 @@
 #include "Grid.h"
 #include "nl_executor.h"
 #include "ai_bridge.h"
+#include "gizmo.h"
 
 struct SceneObject
 {
@@ -78,6 +79,26 @@ public:
     std::string getSelectedObjectName() const;
     bool        moveObjectByName(const std::string& name, const glm::vec3& delta);
     bool        removeObjectByName(const std::string& name);
+    // Light selection
+    int         getSelectedLightIndex() const { return m_selectedLightIndex; }
+    void        setSelectedLightIndex(int i) { m_selectedLightIndex = i; if (i >= 0) m_selectedObjectIndex = -1; }
+    bool        removeLightAtIndex(int i);
+    int         getLightCount() const;
+    glm::vec3   getLightPosition(int i) const;
+    glm::vec3   getSelectedObjectCenterWorld() const;
+    // Gizmo helpers
+    GizmoMode   getGizmoMode() const { return m_gizmoMode; }
+    void        setGizmoMode(GizmoMode m) { m_gizmoMode = m; }
+    GizmoAxis   getGizmoAxis() const { return m_gizmoAxis; }
+    void        setGizmoAxis(GizmoAxis a) { m_gizmoAxis = a; }
+    Gizmo&      getGizmo() { return m_gizmo; }
+    bool        isGizmoLocalSpace() const { return m_gizmoLocalSpace; }
+    void        toggleGizmoLocalSpace() { m_gizmoLocalSpace = !m_gizmoLocalSpace; }
+    bool        isSnapEnabled() const { return m_snapEnabled; }
+    void        toggleSnap() { m_snapEnabled = !m_snapEnabled; }
+    float       snapTranslateStep() const { return m_snapTranslate; }
+    float       snapRotateStepDeg() const { return m_snapRotateDeg; }
+    float       snapScaleStep() const { return m_snapScale; }
 
     bool  isLeftMousePressed()  const { return m_leftMousePressed; }
     bool  isRightMousePressed() const { return m_rightMousePressed; }
@@ -133,6 +154,7 @@ private:
 
     std::vector<SceneObject> m_sceneObjects;
     int   m_selectedObjectIndex = -1;
+    int   m_selectedLightIndex = -1;
 
     glm::vec3 m_cameraPos{ 0,0,10 }, m_cameraFront{ 0,0,-1 }, m_cameraUp{ 0,1,0 };
     float m_fov = 45.f, m_nearClip = 0.1f, m_farClip = 100.f;
@@ -189,4 +211,18 @@ private:
     int  m_windowPosX = 100, m_windowPosY = 100;
     int  m_windowedWidth = 800, m_windowedHeight = 600;
 
+    // Gizmo
+    Gizmo m_gizmo;
+    GizmoMode m_gizmoMode = GizmoMode::Translate;
+    GizmoAxis m_gizmoAxis = GizmoAxis::None; // highlighted/active axis
+    bool m_gizmoLocalSpace = true; // local (true) vs world (false)
+    // Snapping
+    bool  m_snapEnabled = false;
+    float m_snapTranslate = 0.5f;
+    float m_snapRotateDeg = 15.0f;
+    float m_snapScale = 0.1f;
+    // key edge toggles
+    bool m_lHeld = false; // local/world toggle key
+    bool m_nHeld = false; // snap toggle key
+    bool m_deleteHeld = false; // delete key edge
 };
