@@ -10,11 +10,10 @@ int main()
         return -1;
 
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop_arg(&Application::emscriptenFrame, app, 0, true);
+    emscripten_set_main_loop_arg([](void* p){ static_cast<Application*>(p)->frame(); }, app, 0, true);
 #else
     app->run();
     delete app;
 #endif
     return 0;
 }
-

@@ -23,6 +23,7 @@ set(APP_SOURCES
     ${SRC_DIR}/light.cpp
     ${SRC_DIR}/InputHandler.cpp
     ${SRC_DIR}/RayUtils.cpp
+    ${SRC_DIR}/BVHNode.cpp
     ${SRC_DIR}/raytracer.cpp
     ${SRC_DIR}/commands.cpp
     ${SRC_DIR}/nl_executor.cpp
@@ -33,40 +34,54 @@ set(APP_SOURCES
 )
 
 set(IMGUI_SOURCES
-    ${IMGUI_DIR}/imgui.cpp
+    Project1/Libraries/include/imgui/imgui.cpp
+    Project1/Libraries/include/imgui/imgui_draw.cpp
+    Project1/Libraries/include/imgui/imgui_tables.cpp
+    Project1/Libraries/include/imgui/imgui_widgets.cpp
     ${IMGUI_DIR}/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/imgui_impl_opengl3.cpp
 )
 
+# Web (Emscripten) build
 if (EMSCRIPTEN)
-    # Build a single-page app with WebGL2.
+    add_definitions(-D__EMSCRIPTEN__)
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
+
     add_executable(objviewer
         ${APP_SOURCES}
         ${IMGUI_SOURCES}
     )
+
     target_include_directories(objviewer PRIVATE
         Project1/include
         Project1
         Project1/Libraries/include
+        Project1/Libraries/include/stb
+        Project1/Libraries/include/imgui
+        Project1/Libraries/include/imgui/backends
     )
+
     # Emscripten ports and flags
     target_link_options(objviewer PRIVATE
-        "-s" "USE_GLFW=3"
-        "-s" "FULL_ES3=1"
-        "-s" "WASM=1"
-        # keep memory flexible for assets
-        "-s" "ALLOW_MEMORY_GROWTH=1"
-        # WebGL2 only
-        "-s" "MIN_WEBGL_VERSION=2"
-        "-s" "MAX_WEBGL_VERSION=2"
-        # Preload assets and shaders into VFS
-        "--preload-file" "Project1/assets@/assets"
-        "--preload-file" "Project1/shaders@/shaders"
-        "--preload-file" "Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg"
+        -sUSE_GLFW=3
+        -sFULL_ES3=1
+        -sWASM=1
+        -sALLOW_MEMORY_GROWTH=1
+        -sMIN_WEBGL_VERSION=2
+        -sMAX_WEBGL_VERSION=2
+        -sFORCE_FILESYSTEM=1
+        "-sEXPORTED_FUNCTIONS=['_main']"
+        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets@/assets"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/shaders@/shaders"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg"
     )
+
+    # ImGui ES3 path
+    target_compile_definitions(objviewer PRIVATE IMGUI_IMPL_OPENGL_ES3)
+
+# Desktop build
 else()
-    # Desktop build (GLAD + GLFW + OpenGL)
     add_executable(objviewer
         ${APP_SOURCES}
         ${IMGUI_SOURCES}
@@ -74,15 +89,20 @@ else()
         ${SRC_DIR}/gl43_compat.cpp
         ${SRC_DIR}/compute_shader.cpp
     )
+
     target_include_directories(objviewer PRIVATE
         Project1/include
         Project1
         Project1/Libraries/include
+        Project1/Libraries/include/stb
+        Project1/Libraries/include/imgui
+        Project1/Libraries/include/imgui/backends
     )
 
-    # Try to find glfw and OpenGL
+    # OpenGL
     find_package(OpenGL REQUIRED)
-    # First search for a CMake package, then a module
+
+    # GLFW (prefer config, fallback to module)
     find_package(glfw3 CONFIG QUIET)
     if (NOT glfw3_FOUND)
         find_package(glfw3 QUIET)
@@ -95,18 +115,20 @@ else()
             target_link_libraries(objviewer PRIVATE glfw3 OpenGL::GL)
         endif()
     else()
-        message(WARNING "glfw3 not found by CMake. You may need to provide it manually or use the existing MSVC solution.")
-        # Fallback: attempt to link by name (may succeed if present in default linker paths)
+        message(WARNING "glfw3 not found. Attempting to link by name.")
         target_link_libraries(objviewer PRIVATE OpenGL::GL glfw)
     endif()
 
     if (WIN32)
         target_link_libraries(objviewer PRIVATE gdi32 user32 shell32)
     endif()
-endif()
 
-if (EMSCRIPTEN)
-    # ImGui: ensure ES3 path
-    target_compile_definitions(objviewer PRIVATE IMGUI_IMPL_OPENGL_ES3)
+    # ---- Assimp on desktop only ----
+    find_package(assimp CONFIG QUIET)
+    if (assimp_FOUND)
+        target_link_libraries(objviewer PRIVATE assimp::assimp)
+        target_compile_definitions(objviewer PRIVATE HAVE_ASSIMP=1)
+    else()
+        message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
+    endif()
 endif()
-

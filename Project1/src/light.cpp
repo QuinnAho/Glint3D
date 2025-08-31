@@ -130,6 +130,30 @@ void Light::initIndicator()
 // Initialize the indicator shader within the Light class
 bool Light::initIndicatorShader()
 {
+#ifdef __EMSCRIPTEN__
+    const char* vertexShaderSource = R"(
+        #version 300 es
+        layout(location = 0) in vec3 aPos;
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+        void main()
+        {
+            gl_Position = projection * view * model * vec4(aPos, 1.0);
+        }
+    )";
+
+    const char* fragmentShaderSource = R"(
+        #version 300 es
+        precision highp float;
+        out vec4 FragColor;
+        uniform vec3 indicatorColor;
+        void main()
+        {
+            FragColor = vec4(indicatorColor, 1.0);
+        }
+    )";
+#else
     const char* vertexShaderSource = R"(
         #version 330 core
         layout(location = 0) in vec3 aPos;
@@ -151,6 +175,7 @@ bool Light::initIndicatorShader()
             FragColor = vec4(indicatorColor, 1.0);
         }
     )";
+#endif
 
     // Compile vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -229,13 +254,18 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection,
         GLint colorLoc = glGetUniformLocation(m_indicatorShader, "indicatorColor");
         glm::vec3 selColor(0.2f, 0.7f, 1.0f);
         glUniform3fv(colorLoc, 1, glm::value_ptr(selColor));
-        // Render as lines
+        // Render highlight overlay. On WebGL2 skip polygon mode (not available) and just draw filled overlay.
+#ifndef __EMSCRIPTEN__
+        // Render as lines on desktop
         GLint polyMode[2];
         glGetIntegerv(GL_POLYGON_MODE, polyMode);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glLineWidth(2.0f);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glPolygonMode(GL_FRONT_AND_BACK, polyMode[0]);
+#else
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+#endif
     }
     glBindVertexArray(0);
 }

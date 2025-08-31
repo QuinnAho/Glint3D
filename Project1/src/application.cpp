@@ -232,8 +232,13 @@ void Application::setupOpenGL()
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowDepthTexture, 0);
+#ifdef __EMSCRIPTEN__
+    // WebGL2/GLES3: use glDrawBuffers with zero buffers, skip glReadBuffer
+    glDrawBuffers(0, nullptr);
+#else
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
+#endif
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Load shadow shader
