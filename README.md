@@ -115,8 +115,24 @@ Project1.exe --ops recipe.json --render out.png --w 1024 --h 768
 
 - Toolchain: Visual Studio 2022, C++17, x64.
 - Third‑party: GLFW, ImGui, stb, GLM under `Libraries/`.
-- Optional: Assimp via vcpkg (`USE_ASSIMP`) for non‑OBJ formats.
+- Optional: Assimp via vcpkg (`USE_ASSIMP`) for non-OBJ formats.
   - Include/Lib dirs and DLL steps are typical for vcpkg.
+
+---
+
+## Texture Compression (KTX2/Basis)
+
+- Runtime prefers `.ktx2` next to requested PNG/JPG; if present, it loads `.ktx2`. Otherwise it falls back to STB PNG/JPG.
+- KTX2 loading is optional and compiled when `ENABLE_KTX2=ON` in CMake and `libktx` is available. Without it, `.ktx2` is ignored and PNG/JPG are used.
+- Offline conversion scripts:
+  - Windows PowerShell: `tools/texc.ps1` (requires `toktx` in PATH)
+    - Example: `powershell -ExecutionPolicy Bypass -File tools/texc.ps1 -Root Project1/assets -Mode etc1s`
+  - Bash: `tools/texc.sh` (requires `toktx` in PATH)
+    - Example: `bash tools/texc.sh -r Project1/assets -m etc1s -j 4`
+- Recommended modes:
+  - `etc1s`: smallest (good default for web, color/albedo)
+  - `uastc`: higher quality (use for normals/roughness if banding appears)
+- Web build: assets folder is preloaded; `.ktx2` files next to images are automatically available.
 
 ---
 
@@ -141,4 +157,3 @@ Use the Samples menu or load recipes manually:
 ## License
 
 See repository license if present. Third‑party components retain their respective licenses.
-

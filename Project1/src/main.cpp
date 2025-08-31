@@ -8,6 +8,21 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+// Global application pointer for JS bridge
+static Application* g_app = nullptr;
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE
+    int app_apply_ops_json(const char* json)
+    {
+        if (!g_app || !json) return 0;
+        std::string err; // collect error for debugging
+        bool ok = g_app->applyJsonOpsV1(std::string(json), err);
+        if (!ok) {
+            emscripten_log(EM_LOG_CONSOLE, "applyJsonOpsV1 error: %s", err.c_str());
+        }
+        return ok ? 1 : 0;
+    }
+}
 #endif
 
 namespace {
@@ -39,6 +54,8 @@ int main(int argc, char** argv)
     if (denoiseFlag) app->setDenoiseEnabled(true);
 
 #ifdef __EMSCRIPTEN__
+    // Assign global for JS bridge
+    g_app = app;
     if (wantHeadless) return -1; // web build doesn't support headless here
     // Web: parse ?state=... and replay ops
     {

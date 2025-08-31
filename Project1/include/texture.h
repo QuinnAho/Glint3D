@@ -19,6 +19,9 @@ public:
     int  channels() const { return m_channels; }
 
 private:
+    // Optional: KTX2/Basis loader when KTX2_ENABLED is defined
+    bool loadFromKTX2(const std::string& filepath);
+
     GLuint m_textureID{0};
     int m_width{0}, m_height{0}, m_channels{0};
 };

@@ -23,6 +23,16 @@ Flags and Preloaded Assets
   - `--preload-file Project1/shaders@/shaders`
   - `--preload-file Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg`
 
+Texture Compression (KTX2)
+--------------------------
+
+- Runtime prefers `.ktx2` textures where available and falls back to PNG/JPG.
+- To enable `.ktx2` loading at runtime, build with `-DENABLE_KTX2=ON` and provide `libktx` for Emscripten (or stubbed off if unavailable). When not enabled, `.ktx2` is skipped and PNG/JPG are used.
+- Offline conversion: use `tools/texc.sh` or `tools/texc.ps1` to generate `.ktx2` next to existing images.
+  - ETC1S (recommended default for web): `bash tools/texc.sh -r Project1/assets -m etc1s`
+  - UASTC (higher quality): `bash tools/texc.sh -r Project1/assets -m uastc`
+  - Windows PowerShell equivalents available.
+
 Paths
 - Shaders under `/shaders/...` (code loads `shaders/...`)
 - Assets under `/assets/...`

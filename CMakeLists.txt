@@ -4,6 +4,9 @@ project(OpenGLOBJViewer C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Optional: KTX2/Basis (libktx)
+option(ENABLE_KTX2 "Enable KTX2/Basis texture support via libktx" OFF)
+
 # Source lists
 set(SRC_DIR Project1/src)
 set(IMGUI_DIR Project1)
@@ -63,6 +66,21 @@ if (EMSCRIPTEN)
         Project1/Libraries/include/imgui/backends
     )
 
+    if (ENABLE_KTX2)
+        # Expect libktx to be available as a port or prebuilt library
+        # Define macro; linking depends on environment configuration
+        target_compile_definitions(objviewer PRIVATE KTX2_ENABLED=1)
+        # If a CMake package exists, try it (may be skipped on web)
+        find_package(ktx CONFIG QUIET)
+        if (ktx_FOUND)
+            if (TARGET KTX::ktx)
+                target_link_libraries(objviewer PRIVATE KTX::ktx)
+            elseif (TARGET ktx)
+                target_link_libraries(objviewer PRIVATE ktx)
+            endif()
+        endif()
+    endif()
+
     # Emscripten ports and flags
     target_link_options(objviewer PRIVATE
         -sUSE_GLFW=3
@@ -72,7 +90,7 @@ if (EMSCRIPTEN)
         -sMIN_WEBGL_VERSION=2
         -sMAX_WEBGL_VERSION=2
         -sFORCE_FILESYSTEM=1
-        "-sEXPORTED_FUNCTIONS=['_main']"
+        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets@/assets"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/shaders@/shaders"
@@ -141,5 +159,21 @@ else()
         target_compile_definitions(objviewer PRIVATE OIDN_ENABLED=1)
     else()
         message(STATUS "OpenImageDenoise not found; denoiser disabled.")
+    endif()
+
+    if (ENABLE_KTX2)
+        find_package(ktx CONFIG QUIET)
+        if (ktx_FOUND)
+            if (TARGET KTX::ktx)
+                target_link_libraries(objviewer PRIVATE KTX::ktx)
+            elseif (TARGET ktx)
+                target_link_libraries(objviewer PRIVATE ktx)
+            else()
+                message(WARNING "libktx found but target not recognized; link it manually.")
+            endif()
+            target_compile_definitions(objviewer PRIVATE KTX2_ENABLED=1)
+        else()
+            message(WARNING "ENABLE_KTX2=ON but libktx not found. KTX2 at runtime will be disabled.")
+        endif()
     endif()
 endif()
