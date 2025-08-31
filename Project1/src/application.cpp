@@ -111,6 +111,17 @@ bool Application::init(const std::string& windowTitle, int width, int height, bo
     // Setup our OpenGL resources (compile shaders, load model, etc.)
     setupOpenGL();
 
+    // Initial console messages (welcome + controls)
+#ifndef WEB_USE_HTML_UI
+    if (!m_bootMessageShown) {
+        m_chatScrollback.push_back("Welcome — ask me anything. Type in the Console below.");
+        m_chatScrollback.push_back("Tip: Hold Right Mouse Button to move (W/A/S/D, Space/Ctrl, E/Q up/down).");
+        m_chatScrollback.push_back("Gizmo: Shift+Q/W/E = Move/Rotate/Scale, X/Y/Z = axis.");
+        m_chatScrollback.push_back("Edit gizmo via Right-Click menu. Lighting: select a light to edit.");
+        m_bootMessageShown = true;
+    }
+#endif
+
     return true;
 }
 
@@ -168,6 +179,10 @@ void Application::initImGui()
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+#ifdef IMGUI_HAS_DOCKING
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+#endif
 
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     #ifdef __EMSCRIPTEN__
@@ -175,6 +190,35 @@ void Application::initImGui()
     #else
     ImGui_ImplOpenGL3_Init("#version 330");
     #endif
+
+    // Modern dark theme tweaks
+    ImGuiStyle& style = ImGui::GetStyle();
+#ifdef IMGUI_HAS_DOCKING
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        style.WindowRounding = 6.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
+#endif
+    style.FrameRounding = 6.0f;
+    style.GrabRounding = 6.0f;
+    style.TabRounding = 6.0f;
+    auto& c = style.Colors;
+    c[ImGuiCol_WindowBg]        = ImVec4(0.10f, 0.11f, 0.12f, 1.00f);
+    c[ImGuiCol_Header]          = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    c[ImGuiCol_HeaderHovered]   = ImVec4(0.28f, 0.32f, 0.36f, 1.00f);
+    c[ImGuiCol_HeaderActive]    = ImVec4(0.24f, 0.26f, 0.30f, 1.00f);
+    c[ImGuiCol_TitleBg]         = ImVec4(0.10f, 0.11f, 0.12f, 1.00f);
+    c[ImGuiCol_TitleBgActive]   = ImVec4(0.12f, 0.13f, 0.14f, 1.00f);
+    c[ImGuiCol_Button]          = ImVec4(0.18f, 0.20f, 0.22f, 1.00f);
+    c[ImGuiCol_ButtonHovered]   = ImVec4(0.25f, 0.28f, 0.31f, 1.00f);
+    c[ImGuiCol_ButtonActive]    = ImVec4(0.22f, 0.25f, 0.28f, 1.00f);
+    c[ImGuiCol_Tab]             = ImVec4(0.14f, 0.15f, 0.17f, 1.00f);
+    c[ImGuiCol_TabHovered]      = ImVec4(0.28f, 0.32f, 0.36f, 1.00f);
+    c[ImGuiCol_TabActive]       = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    c[ImGuiCol_FrameBg]         = ImVec4(0.14f, 0.15f, 0.17f, 1.00f);
+    c[ImGuiCol_FrameBgHovered]  = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    c[ImGuiCol_FrameBgActive]   = ImVec4(0.18f, 0.20f, 0.22f, 1.00f);
     #endif
 }
 
@@ -388,6 +432,15 @@ void Application::emscriptenFrame(void* arg)
 
 void Application::processInput()
 {
+    // Respect UI focus: avoid camera movement while UI is capturing input (unless RMB camera-lock is active)
+#ifndef WEB_USE_HTML_UI
+    if (!m_headless) {
+        ImGuiIO& io = ImGui::GetIO();
+        // If not holding RMB to control camera, and UI wants input, skip scene input
+        if (!m_rightMousePressed && (io.WantCaptureMouse || io.WantCaptureKeyboard))
+            return;
+    }
+#endif
     float speed = m_cameraSpeed * 0.2f; // Movement speed scaling
 
     // Cross product for right vector
@@ -689,6 +742,11 @@ void Application::renderGUI()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    // Global dockspace covering the main viewport (if docking supported)
+#ifdef IMGUI_HAS_DOCKING
+    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+#endif
+
     // Main menu bar + toolbar buttons
     if (ImGui::BeginMainMenuBar())
     {
@@ -725,75 +783,22 @@ void Application::renderGUI()
         ImGui::EndMenu();
     }
 
-        if (ImGui::BeginMenu("Gizmo"))
-        {
-            bool sel = (m_gizmoMode == GizmoMode::Translate); if (ImGui::MenuItem("Translate", nullptr, sel)) m_gizmoMode = GizmoMode::Translate;
-            sel = (m_gizmoMode == GizmoMode::Rotate);         if (ImGui::MenuItem("Rotate",    nullptr, sel)) m_gizmoMode = GizmoMode::Rotate;
-            sel = (m_gizmoMode == GizmoMode::Scale);          if (ImGui::MenuItem("Scale",     nullptr, sel)) m_gizmoMode = GizmoMode::Scale;
-            ImGui::Separator();
-            bool local = m_gizmoLocalSpace; if (ImGui::MenuItem("Local Space", nullptr, local)) m_gizmoLocalSpace = !m_gizmoLocalSpace;
-            bool snap  = m_snapEnabled;     if (ImGui::MenuItem("Snap",        nullptr, snap))  m_snapEnabled = !m_snapEnabled;
-            ImGui::Separator();
-            if (ImGui::MenuItem("Axis X", nullptr, m_gizmoAxis==GizmoAxis::X)) m_gizmoAxis = GizmoAxis::X;
-            if (ImGui::MenuItem("Axis Y", nullptr, m_gizmoAxis==GizmoAxis::Y)) m_gizmoAxis = GizmoAxis::Y;
-            if (ImGui::MenuItem("Axis Z", nullptr, m_gizmoAxis==GizmoAxis::Z)) m_gizmoAxis = GizmoAxis::Z;
-            ImGui::EndMenu();
-        }
+        // Removed Gizmo and Samples menus; Gizmo options available via right-click popup
 
-        if (ImGui::BeginMenu("Samples"))
-        {
-            if (ImGui::MenuItem("Three-Point Lighting")) {
-                std::ifstream f("assets/samples/recipes/three-point-lighting.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
-            }
-            if (ImGui::MenuItem("Studio Turntable")) {
-                std::ifstream f("assets/samples/recipes/studio-turntable.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
-            }
-            if (ImGui::MenuItem("Isometric Hero")) {
-                std::ifstream f("assets/samples/recipes/isometric-hero.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
-            }
-            ImGui::EndMenu();
-        }
-
-        // Quick toolbar items inline on the menubar
-        ImGui::Separator(); ImGui::Text("Mode:"); ImGui::SameLine();
-        if (ImGui::SmallButton("Point"))   m_renderMode = 0; ImGui::SameLine();
-        if (ImGui::SmallButton("Wire"))    m_renderMode = 1; ImGui::SameLine();
-        if (ImGui::SmallButton("Solid"))   m_renderMode = 2; ImGui::SameLine();
-        if (ImGui::SmallButton("Raytrace")) m_renderMode = 3; ImGui::SameLine();
-
-        ImGui::Separator(); ImGui::Text("Gizmo:"); ImGui::SameLine();
-        if (ImGui::SmallButton("Move"))   m_gizmoMode = GizmoMode::Translate; ImGui::SameLine();
-        if (ImGui::SmallButton("Rotate")) m_gizmoMode = GizmoMode::Rotate;    ImGui::SameLine();
-        if (ImGui::SmallButton("Scale"))  m_gizmoMode = GizmoMode::Scale;     ImGui::SameLine();
-        bool localSpace = m_gizmoLocalSpace; if (ImGui::Checkbox("Local", &localSpace)) m_gizmoLocalSpace = localSpace; ImGui::SameLine();
-        bool snap = m_snapEnabled; if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap; ImGui::SameLine();
-
-        if (ImGui::SmallButton("Fullscreen")) toggleFullscreen(); ImGui::SameLine();
-        if (ImGui::SmallButton("Add Light")) { addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f); } ImGui::SameLine();
-#ifndef __EMSCRIPTEN__
-        if (ImGui::SmallButton("Why is it black?")) { m_showDiagnosticsPanel = true; } ImGui::SameLine();
-#else
-        if (ImGui::SmallButton("Why is it black?")) { m_showDiagnosticsPanel = true; } ImGui::SameLine();
-#endif
-#ifndef __EMSCRIPTEN__
-#ifdef OIDN_ENABLED
-        bool denoise = m_denoise; if (ImGui::Checkbox("Denoise", &denoise)) m_denoise = denoise;
-#else
-        ImGui::BeginDisabled(); bool dn=false; ImGui::Checkbox("Denoise", &dn); ImGui::EndDisabled();
-#endif
-#endif
 
         ImGui::EndMainMenuBar();
     }
 
     if (m_showSettingsPanel) {
-    ImGui::SetNextWindowPos(ImVec2(10, 30), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(420, 460), ImGuiCond_Once);
-    ImGui::Begin("Settings");
-    ImGui::Text("Hold RMB to move camera (W/A/S/D, Space/Ctrl, E/Q up/down).");
-    ImGui::Text("Gizmo: Shift+Q/W/E = Move/Rotate/Scale, X/Y/Z = axis");
-    ImGui::Text("Left-click a gizmo axis and drag to edit.");
-    ImGui::Text("Right-click & drag to orbit camera.");
+    {
+    ImGuiIO& io = ImGui::GetIO();
+    float consoleH = io.DisplaySize.y * 0.25f;
+    float rightW = 420.0f;
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - rightW - 10.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(rightW, io.DisplaySize.y - consoleH - 20.0f), ImGuiCond_Always);
+    ImGui::Begin("Settings & Diagnostics");
+    }
+    // Usage tips moved to Console on startup
 
     ImGui::SliderFloat("Camera Speed", &m_cameraSpeed, 0.01f, 1.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &m_sensitivity, 0.01f, 1.0f);
@@ -818,98 +823,68 @@ void Application::renderGUI()
             ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Raytracer Done!");
     }
 
-    // Diagnostics panel (Explain-my-render)
-    if (m_showDiagnosticsPanel)
+    // Diagnostics (Explain-my-render) now integrated into Settings panel
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Diagnostics", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::SetNextWindowSize(ImVec2(420, 280), ImGuiCond_Once);
-        if (ImGui::Begin("Render Diagnostics", &m_showDiagnosticsPanel))
+        int targetIdx = m_selectedObjectIndex;
+        if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
+        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+
+        bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
+        bool noLights = (m_lights.m_lights.empty());
+        if (!noLights) {
+            bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
+            noLights = allZero;
+        }
+
+        bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
+
+        ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
+        if (hasTarget)
         {
-            int targetIdx = m_selectedObjectIndex;
-            if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
-            bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+            auto& obj = m_sceneObjects[targetIdx];
+            bool missingNormals = !obj.objLoader.hadNormalsFromSource();
+            bool backface = objectMostlyBackfacing(obj);
 
-            bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
-            bool noLights = (m_lights.m_lights.empty());
-            if (!noLights) {
-                bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
-                noLights = allZero;
-            }
-
-            bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
-
-            ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
-            if (hasTarget)
-            {
-                auto& obj = m_sceneObjects[targetIdx];
-                bool missingNormals = !obj.objLoader.hadNormalsFromSource();
-                bool backface = objectMostlyBackfacing(obj);
-
-                // Missing normals
-                if (missingNormals) {
-                    ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
-                    if (ImGui::SmallButton("Recompute (angle-weighted)")) {
-                        recomputeAngleWeightedNormalsForObject(targetIdx);
-                    }
-                } else {
-                    ImGui::Text("Normals: OK (from source)");
-                }
-
-                // Backface
-                if (backface) {
-                    ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces). "); ImGui::SameLine();
-                    if (ImGui::SmallButton("Flip Winding")) {
-                        obj.objLoader.flipWindingAndNormals();
-                        refreshIndexBuffer(obj);
-                        refreshNormalBuffer(obj);
-                    }
-                } else {
-                    ImGui::Text("Winding: OK (mostly front-facing)");
-                }
-            }
-
-            // Lights
-            if (noLights) {
-                ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
-                if (ImGui::SmallButton("Add Neutral Key Light")) {
-                    addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
+            if (missingNormals) {
+                ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
+                if (ImGui::SmallButton("Recompute (angle-weighted)")) {
+                    recomputeAngleWeightedNormalsForObject(targetIdx);
                 }
             } else {
-                ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
+                ImGui::Text("Normals: OK (from source)");
             }
 
-            // sRGB
-            ImGui::Separator();
-            ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
-            if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) {
-                m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled;
-            }
-            if (srgbMismatch)
-            {
-                ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it.");
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Fix (disable FB sRGB)")) {
-                    m_framebufferSRGBEnabled = false;
+            if (backface) {
+                ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces)."); ImGui::SameLine();
+                if (ImGui::SmallButton("Flip Winding")) {
+                    obj.objLoader.flipWindingAndNormals();
+                    refreshIndexBuffer(obj);
+                    refreshNormalBuffer(obj);
                 }
+            } else {
+                ImGui::Text("Winding: OK (mostly front-facing)");
             }
-
-            ImGui::Separator();
-            if (m_useAI) {
-                if (ImGui::SmallButton("Ask AI to explain why it is black")) {
-                    std::ostringstream prompt;
-                    prompt << "Given this scene, explain why it might render black and propose one-click fixes. "
-                           << "Selected object: " << (hasTarget?m_sceneObjects[targetIdx].name:std::string("<none>"))
-                           << "; missingNormals=" << (hasTarget?(!m_sceneObjects[targetIdx].objLoader.hadNormalsFromSource()):false)
-                           << "; backface=" << (hasTarget?objectMostlyBackfacing(m_sceneObjects[targetIdx]):false)
-                           << "; lights=" << m_lights.m_lights.size()
-                           << "; framebufferSRGB=" << (m_framebufferSRGBEnabled?"on":"off") << ".";
-                    std::string plan, err; std::string scene = sceneToJson();
-                    if (!m_ai.plan(prompt.str(), scene, plan, err)) m_chatScrollback.push_back(std::string("AI diag error: ")+err);
-                    else m_chatScrollback.push_back(std::string("AI diag: ")+plan);
-                }
-            }
-            if (ImGui::Button("Close")) m_showDiagnosticsPanel = false;
         }
-        ImGui::End();
+
+        if (noLights) {
+            ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
+            if (ImGui::SmallButton("Add Neutral Key Light")) {
+                addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
+            }
+        } else {
+            ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
+        if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) { m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled; }
+        if (srgbMismatch) {
+            ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it."); ImGui::SameLine();
+            if (ImGui::SmallButton("Fix (disable FB sRGB)")) { m_framebufferSRGBEnabled = false; }
+        }
     }
 
     // Perf HUD overlay
@@ -979,65 +954,22 @@ void Application::renderGUI()
         std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
     }
 
-    // Sample assets quick-load
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Samples", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        if (ImGui::Button("Load sample triangle (PLY)"))
-        {
-            bool ok = loadObjInFrontOfCamera("SampleTrianglePLY", "assets/models/triangle.ply", 2.0f, glm::vec3(1.0f));
-            if (!ok) m_chatScrollback.push_back("Failed to load sample PLY triangle.");
-            else     m_chatScrollback.push_back("Loaded sample PLY triangle in front of camera.");
-        }
+    // Samples section removed per request
 
-        // Recipe loader (JSON Ops v1) from preloaded assets
-        ImGui::Separator();
-        ImGui::Text("Recipes:");
-        static int recipeIdx = 0;
-        const char* recipes[] = {
-            "three-point-lighting",
-            "studio-turntable",
-            "isometric-hero"
-        };
-        ImGui::Combo("##recipe_combo", &recipeIdx, recipes, IM_ARRAYSIZE(recipes));
-        ImGui::SameLine();
-        if (ImGui::Button("Load Recipe"))
-        {
-            std::string path = std::string("assets/samples/recipes/") + recipes[recipeIdx] + ".json";
-            std::ifstream f(path);
-            if (!f.good()) {
-                m_chatScrollback.push_back(std::string("Could not open recipe: ") + path);
-            } else {
-                std::ostringstream ss; ss << f.rdbuf();
-                std::string ops = ss.str();
-                std::string err;
-                if (!applyJsonOpsV1(ops, err)) m_chatScrollback.push_back(std::string("Recipe error: ") + err);
-                else m_chatScrollback.push_back(std::string("Loaded recipe: ") + recipes[recipeIdx]);
-            }
-        }
-    }
-
-    // Lighting
+    // Lighting (show selected only)
     ImGui::Spacing();
     ImGui::Separator();
     if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        // Global ambient light
         ImGui::ColorEdit4("Global Ambient", glm::value_ptr(m_lights.m_globalAmbient));
-
-        // Loop through lights
-        for (size_t i = 0; i < m_lights.m_lights.size(); ++i)
-        {
-            auto& light = m_lights.m_lights[i];
-            std::string label = "Light " + std::to_string(i);
-            if (ImGui::TreeNode(label.c_str()))
-            {
-                ImGui::Checkbox(("Enabled##" + label).c_str(), &light.enabled);
-                ImGui::ColorEdit3(("Color##" + label).c_str(), glm::value_ptr(light.color));
-                ImGui::SliderFloat(("Intensity##" + label).c_str(), &light.intensity, 0.0f, 5.0f);
-                ImGui::TreePop();
-            }
+        int sel = m_selectedLightIndex;
+        if (sel >= 0 && sel < (int)m_lights.m_lights.size()) {
+            auto& light = m_lights.m_lights[(size_t)sel];
+            ImGui::Checkbox("Enabled", &light.enabled);
+            ImGui::ColorEdit3("Color", glm::value_ptr(light.color));
+            ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 5.0f);
+        } else {
+            ImGui::TextDisabled("No light selected.");
         }
     }
 
@@ -1106,104 +1038,131 @@ void Application::renderGUI()
         }
     }
 
-    // --- Talk & AI (combined UI) ---
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Talk & AI", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        ImGui::Checkbox("Preview only (no-op)", &m_previewOnly);
-        ImGui::SameLine();
-        ImGui::Checkbox("Use AI", &m_useAI);
-        if (m_useAI)
-        {
-            char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
-            char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
-            if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
-                m_aiConfig.endpoint = endpointBuf;
-                m_ai.setConfig(m_aiConfig);
-            }
-            if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
-                m_aiConfig.model = modelBuf;
-                m_ai.setConfig(m_aiConfig);
-            }
-        }
-
-        ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
-        ImGui::Text("Enter a command (natural language):");
-        ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 120.0f), flags);
-
-        if (!m_aiBusy && ImGui::Button("Submit"))
-        {
-            std::string input(m_chatInput);
-            if (!input.empty()) {
-                if (m_useAI) {
-                    // Kick off async AI planning
-                    std::string scene = sceneToJson();
-                    m_aiBusy = true;
-                    m_aiFuture = std::async(std::launch::async, [this, input, scene]() {
-                        std::string plan, err; (void)err;
-                        std::string e;
-                        bool ok = m_ai.plan(input, scene, plan, e);
-                        if (ok) return std::make_pair(plan, std::string());
-                        return std::make_pair(std::string(), e);
-                    });
-                } else {
-                    std::vector<std::string> logs;
-                    bool ok = m_nl.execute(input, logs);
-                    for (auto& l : logs) m_chatScrollback.push_back(l);
-                    if (!ok) m_chatScrollback.push_back("(no changes)");
-                }
-            }
-            m_chatInput[0] = '\0';
-        }
-
-        if (m_aiBusy)
-            ImGui::TextColored(ImVec4(1,1,0,1), "AI planning...");
-
-        // Collect AI plan if ready
-        if (m_aiFuture.valid() && m_aiFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        {
-            auto pr = m_aiFuture.get();
-            m_aiBusy = false;
-            if (!pr.second.empty()) {
-                m_chatScrollback.push_back(std::string("AI error: ") + pr.second);
-            } else {
-                m_chatScrollback.push_back(std::string("AI plan:\n") + pr.first);
-                std::istringstream is(pr.first);
-                std::string line;
-                while (std::getline(is, line)) {
-                    if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
-                    std::vector<std::string> logs;
-                    bool ok = m_nl.execute(line, logs);
-                    for (auto& l : logs) m_chatScrollback.push_back(l);
-                    if (!ok) m_chatScrollback.push_back("(no changes)");
-                }
-            }
-        }
-
-        if (ImGui::Button("Copy Scene JSON")) {
-            auto json = sceneToJson();
-            ImGui::SetClipboardText(json.c_str());
-            m_chatScrollback.push_back("Scene JSON copied to clipboard.");
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Output:");
-        if (ImGui::BeginChild("##scrollback", ImVec2(0,160), true, ImGuiWindowFlags_HorizontalScrollbar))
-        {
-            for (const auto& line : m_chatScrollback) {
-                ImGui::TextUnformatted(line.c_str());
-                ImGui::Separator();
-            }
-        }
-        ImGui::EndChild();
-    }
+    // Removed Talk & AI from Settings; now its own window
 
     ImGui::End();
     }
 
+    // AI Assistant panel (separate window)
+    renderChatPanelNL();
+
+    // Scene context menu (right-click): gizmo + selection actions
+    // Open on RMB release without drag (so RMB-drag still orbits camera)
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsMouseDragging(ImGuiMouseButton_Right))
+        ImGui::OpenPopup("SceneContext");
+    if (ImGui::BeginPopup("SceneContext"))
+    {
+        ImGui::TextUnformatted("Gizmo");
+        ImGui::Separator();
+        bool sel = (m_gizmoMode == GizmoMode::Translate); if (ImGui::MenuItem("Translate", nullptr, sel)) m_gizmoMode = GizmoMode::Translate;
+        sel = (m_gizmoMode == GizmoMode::Rotate);         if (ImGui::MenuItem("Rotate",    nullptr, sel)) m_gizmoMode = GizmoMode::Rotate;
+        sel = (m_gizmoMode == GizmoMode::Scale);          if (ImGui::MenuItem("Scale",     nullptr, sel)) m_gizmoMode = GizmoMode::Scale;
+        ImGui::Separator();
+        bool local = m_gizmoLocalSpace; if (ImGui::MenuItem("Local Space", nullptr, local)) m_gizmoLocalSpace = !m_gizmoLocalSpace;
+        bool snap  = m_snapEnabled;     if (ImGui::MenuItem("Snap",        nullptr, snap))  m_snapEnabled = !m_snapEnabled;
+        ImGui::Separator();
+        if (ImGui::MenuItem("Axis X", nullptr, m_gizmoAxis==GizmoAxis::X)) m_gizmoAxis = GizmoAxis::X;
+        if (ImGui::MenuItem("Axis Y", nullptr, m_gizmoAxis==GizmoAxis::Y)) m_gizmoAxis = GizmoAxis::Y;
+        if (ImGui::MenuItem("Axis Z", nullptr, m_gizmoAxis==GizmoAxis::Z)) m_gizmoAxis = GizmoAxis::Z;
+        ImGui::Separator();
+        // Selection ops
+        bool hasObj = (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size());
+        bool hasLight = (m_selectedLightIndex >= 0 && m_selectedLightIndex < (int)m_lights.m_lights.size());
+        if (ImGui::MenuItem("Delete Selected", nullptr, false, hasObj || hasLight))
+        {
+            if (hasObj) {
+                std::string name = m_sceneObjects[(size_t)m_selectedObjectIndex].name;
+                if (removeObjectByName(name)) m_chatScrollback.push_back(std::string("Deleted object: ")+name);
+            } else if (hasLight) {
+                if (removeLightAtIndex(m_selectedLightIndex)) m_chatScrollback.push_back("Deleted selected light.");
+            }
+        }
+        if (ImGui::MenuItem("Duplicate Selected", nullptr, false, hasObj || hasLight))
+        {
+            if (hasObj) {
+                const auto& src = m_sceneObjects[(size_t)m_selectedObjectIndex];
+                std::string newName = src.name + std::string("_copy");
+                glm::vec3 dpos(0.2f, 0.0f, 0.0f);
+                if (duplicateObject(src.name, newName, &dpos, nullptr, nullptr))
+                    m_chatScrollback.push_back(std::string("Duplicated object as: ")+newName);
+            } else if (hasLight) {
+                auto L = m_lights.m_lights[(size_t)m_selectedLightIndex];
+                addPointLightAt(L.position + glm::vec3(0.2f,0,0), L.color, L.intensity);
+                m_chatScrollback.push_back("Duplicated selected light.");
+            }
+        }
+        ImGui::EndPopup();
+    }
+
+    // Bottom console window (central output log)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        float H = io.DisplaySize.y * 0.25f;
+        ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - H), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, H), ImGuiCond_Always);
+        ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+        if (ImGui::BeginChild("##console_scrollback", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_HorizontalScrollbar))
+        {
+            for (const auto& line : m_chatScrollback) {
+                ImGui::TextUnformatted(line.c_str());
+            }
+        }
+        ImGui::EndChild();
+        static char quick[256] = {0};
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputText("##console_input", quick, IM_ARRAYSIZE(quick), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            std::string cmd = quick; quick[0] = '\0';
+            // Handle yes/y suggestion to open diagnostics
+            bool handled = false;
+            if (m_aiSuggestOpenDiag && !cmd.empty()) {
+                std::string s = cmd; for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+                if (s == "yes" || s == "y") {
+                    m_showSettingsPanel = true; m_aiSuggestOpenDiag = false; handled = true;
+                    m_chatScrollback.push_back("Opening settings + diagnostics panel.");
+                }
+            }
+            if (!handled && !cmd.empty()) {
+                if (m_useAI) {
+                    std::string plan, err;
+                    std::string scene = sceneToJson();
+                    if (!m_ai.plan(cmd, scene, plan, err)) {
+                        m_chatScrollback.push_back(std::string("AI error: ") + err);
+                    } else {
+                        m_chatScrollback.push_back(std::string("AI plan:\n") + plan);
+                        std::istringstream is(plan);
+                        std::string line;
+                        while (std::getline(is, line)) {
+                            if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+                            std::vector<std::string> logs;
+                            bool ok = m_nl.execute(line, logs);
+                            for (auto& l : logs) m_chatScrollback.push_back(l);
+                            if (!ok) m_chatScrollback.push_back("(no changes)");
+                        }
+                    }
+                } else {
+                    std::vector<std::string> logs;
+                    bool ok = m_nl.execute(cmd, logs);
+                    for (auto& l : logs) m_chatScrollback.push_back(l);
+                    if (!ok) m_chatScrollback.push_back("(no changes)");
+                }
+            }
+        }
+        ImGui::End();
+    }
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    // Multi-viewport rendering for docking branch
+#ifdef IMGUI_HAS_DOCKING
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        GLFWwindow* backup = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup);
+    }
+#endif
 #endif
 }
 
@@ -1527,6 +1486,13 @@ void Application::mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     Application* app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
     if (!app) return;
+#ifndef WEB_USE_HTML_UI
+    if (!app->m_headless) {
+        ImGuiIO& io = ImGui::GetIO();
+        // Allow mouse look when RMB is pressed even if UI wants the mouse
+        if (io.WantCaptureMouse && !app->m_rightMousePressed) return;
+    }
+#endif
     if (app->m_userInput) {
         app->m_userInput->mouseCallback(xpos, ypos);
     }
@@ -1537,6 +1503,13 @@ void Application::mouseButtonCallback(GLFWwindow* window, int button, int action
 {
     Application* app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
     if (!app) return;
+#ifndef WEB_USE_HTML_UI
+    if (!app->m_headless) {
+        ImGuiIO& io = ImGui::GetIO();
+        // Always forward right-button events for camera lock; otherwise respect UI capture
+        if (io.WantCaptureMouse && button != GLFW_MOUSE_BUTTON_RIGHT) return;
+    }
+#endif
     if (app->m_userInput) {
         app->m_userInput->mouseButtonCallback(button, action, mods);
     }
@@ -1642,10 +1615,13 @@ bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, co
 // New natural-language chat panel
 void Application::renderChatPanelNL()
 {
-    const float panelWidth = 420.0f;
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - panelWidth - 10.0f, 10.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelWidth, ImGui::GetIO().DisplaySize.y - 20.0f), ImGuiCond_Always);
-    ImGui::Begin("Talk", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGuiIO& io = ImGui::GetIO();
+    float consoleH = io.DisplaySize.y * 0.25f;
+    float aiH = 120.0f;
+    float rightW = 420.0f;
+    ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - consoleH - aiH - 4), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - rightW, aiH), ImGuiCond_Always);
+    ImGui::Begin("AI Assistant", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
     ImGui::Checkbox("Preview only (no-op)", &m_previewOnly);
     ImGui::SameLine();
@@ -1665,57 +1641,94 @@ void Application::renderChatPanelNL()
     }
     ImGui::Separator();
 
-    ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
-    ImGui::Text("Enter a command (natural language):");
-    ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 140.0f), flags);
-    if (ImGui::Button("Submit"))
-    {
-        std::string input(m_chatInput);
-        if (!input.empty()) {
-            if (m_useAI) {
-                std::string plan, err;
-                std::string scene = sceneToJson();
-                if (!m_ai.plan(input, scene, plan, err)) {
-                    m_chatScrollback.push_back(std::string("AI error: ") + err);
-                } else {
-                    m_chatScrollback.push_back(std::string("AI plan:\n") + plan);
-                    // Execute each non-empty line
-                    std::istringstream is(plan);
-                    std::string line;
-                    while (std::getline(is, line)) {
-                        if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
-                        std::vector<std::string> logs;
-                        bool ok = m_nl.execute(line, logs);
-                        for (auto& l : logs) m_chatScrollback.push_back(l);
-                        if (!ok) m_chatScrollback.push_back("(no changes)");
-                    }
-                }
-            } else {
-                std::vector<std::string> logs;
-                bool ok = m_nl.execute(input, logs);
-                for (auto& l : logs) m_chatScrollback.push_back(l);
-                if (!ok) m_chatScrollback.push_back("(no changes)");
-            }
-        }
-        m_chatInput[0] = '\0';
-    }
+    ImGui::TextDisabled("Type commands in Console at the bottom.");
 
     if (ImGui::Button("Copy Scene JSON")) {
         auto json = sceneToJson();
         ImGui::SetClipboardText(json.c_str());
         m_chatScrollback.push_back("Scene JSON copied to clipboard.");
     }
-
-    ImGui::Separator();
-    ImGui::Text("Output:");
-    if (ImGui::BeginChild("##scrollback", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar))
-    {
-        for (const auto& line : m_chatScrollback) {
-            ImGui::TextUnformatted(line.c_str());
-            ImGui::Separator();
+    ImGui::SameLine();
+    if (ImGui::Button("Diagnose Scene")) {
+        int targetIdx = m_selectedObjectIndex; if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
+        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+        std::ostringstream prompt;
+        prompt << "Given this scene, explain why it might render black and propose one-click fixes. "
+               << "Selected object: " << (hasTarget?m_sceneObjects[targetIdx].name:std::string("<none>"))
+               << "; missingNormals=" << (hasTarget?(!m_sceneObjects[targetIdx].objLoader.hadNormalsFromSource()):false)
+               << "; backface=" << (hasTarget?objectMostlyBackfacing(m_sceneObjects[targetIdx]):false)
+               << "; lights=" << m_lights.m_lights.size()
+               << "; framebufferSRGB=" << (m_framebufferSRGBEnabled?"on":"off") << ".";
+        std::string plan, err; std::string scene = sceneToJson();
+        if (!m_ai.plan(prompt.str(), scene, plan, err)) m_chatScrollback.push_back(std::string("AI diag error: ")+err);
+        else {
+            m_chatScrollback.push_back(std::string("AI diag: ")+plan);
+            m_chatScrollback.push_back("Open render diagnostics? (type 'yes' in Console)");
+            m_aiSuggestOpenDiag = true;
         }
     }
-    ImGui::EndChild();
+
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Diagnostics", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        int targetIdx = m_selectedObjectIndex;
+        if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
+        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+
+        bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
+        bool noLights = (m_lights.m_lights.empty());
+        if (!noLights) {
+            bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
+            noLights = allZero;
+        }
+
+        bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
+
+        ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
+        if (hasTarget)
+        {
+            auto& obj = m_sceneObjects[targetIdx];
+            bool missingNormals = !obj.objLoader.hadNormalsFromSource();
+            bool backface = objectMostlyBackfacing(obj);
+
+            if (missingNormals) {
+                ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
+                if (ImGui::SmallButton("Recompute (angle-weighted)")) {
+                    recomputeAngleWeightedNormalsForObject(targetIdx);
+                }
+            } else {
+                ImGui::Text("Normals: OK (from source)");
+            }
+
+            if (backface) {
+                ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces)."); ImGui::SameLine();
+                if (ImGui::SmallButton("Flip Winding")) {
+                    obj.objLoader.flipWindingAndNormals();
+                    refreshIndexBuffer(obj);
+                    refreshNormalBuffer(obj);
+                }
+            } else {
+                ImGui::Text("Winding: OK (mostly front-facing)");
+            }
+        }
+
+        if (noLights) {
+            ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
+            if (ImGui::SmallButton("Add Neutral Key Light")) {
+                addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
+            }
+        } else {
+            ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
+        if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) { m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled; }
+        if (srgbMismatch) {
+            ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it."); ImGui::SameLine();
+            if (ImGui::SmallButton("Fix (disable FB sRGB)")) { m_framebufferSRGBEnabled = false; }
+        }
+    }
 
     ImGui::End();
 }
@@ -1812,8 +1825,6 @@ bool Application::assignMaterialToObject(const std::string& objectName, const st
     }
     return false;
 }
-
-// sceneToJson() moved to src/scene_io.cpp
 
 void Application::toggleFullscreen()
 {

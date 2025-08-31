@@ -250,13 +250,15 @@ private:
     char m_chatInput[2048] = {0};
     std::vector<std::string> m_chatScrollback; // parsed outputs and errors
     bool m_previewOnly = false; // preview no-op for NL text (kept for UI parity)
-    bool m_useAI = false;      // when true, send scene JSON + instruction to AI planner
+    bool m_useAI = true;      // default ON: AI planner enabled by default
     nl::Executor m_nl{ *this };
     AIConfig m_aiConfig{};
     AIPlanner m_ai{ m_aiConfig };
     // Async AI planning
     std::future<std::pair<std::string, std::string>> m_aiFuture; // (plan, error)
     bool m_aiBusy = false;
+    bool m_aiSuggestOpenDiag = false; // pending suggestion to open diagnostics
+    bool m_bootMessageShown = false;   // log welcome/instructions once
 
     // Fullscreen toggle state
     bool m_fullscreen = false;
@@ -283,8 +285,8 @@ private:
     std::vector<std::string> m_opsHistory;
 
     // UI toggles
-    bool m_showSettingsPanel = false; // move towards top-bar UI; panel optional
-    bool m_showDiagnosticsPanel = false; // "Why is it black?" panel
+    bool m_showSettingsPanel = true; // show Settings initially
+    bool m_showDiagnosticsPanel = false; // legacy flag; diagnostics now in Settings panel
     bool m_showPerfHUD = true;           // Perf HUD with counters
 
     // Denoise toggle

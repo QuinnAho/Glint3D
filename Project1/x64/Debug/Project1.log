@@ -1,7 +1,4 @@
-﻿  json_ops_v1.cpp
-  scene_io.cpp
-  render_offscreen.cpp
-  Generating Code...
+﻿  application.cpp
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.
