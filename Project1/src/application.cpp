@@ -86,6 +86,12 @@ bool Application::initGLFW(const std::string& windowTitle, int width, int height
     if (!glfwInit())
         return false;
 
+    // Nicer default visuals
+    glfwWindowHint(GLFW_SAMPLES, 4);            // MSAA 4x
+#ifndef __EMSCRIPTEN__
+    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+#endif
+
     // Create a windowed mode window and its OpenGL context
     m_window = glfwCreateWindow(width, height, windowTitle.c_str(), nullptr, nullptr);
     if (!m_window)
@@ -94,6 +100,7 @@ bool Application::initGLFW(const std::string& windowTitle, int width, int height
         return false;
     }
     glfwMakeContextCurrent(m_window);
+    glfwSwapInterval(1); // vsync
 
     // Store a pointer to 'this' in the GLFW window user pointer,
     // so we can retrieve it in static callbacks
@@ -102,6 +109,7 @@ bool Application::initGLFW(const std::string& windowTitle, int width, int height
     // Register mouse callbacks
     glfwSetCursorPosCallback(m_window, mouseCallback);
     glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
+    glfwSetFramebufferSizeCallback(m_window, Application::framebufferSizeCallback);
 
     return true;
 }
@@ -205,6 +213,10 @@ void Application::setupOpenGL()
     }
 
     glEnable(GL_DEPTH_TEST);
+#ifndef __EMSCRIPTEN__
+    glEnable(GL_MULTISAMPLE);
+    glEnable(GL_FRAMEBUFFER_SRGB);
+#endif
     m_axisRenderer.init();
     m_gizmo.init();
 
@@ -1064,7 +1076,7 @@ Application* Application::getApplication(GLFWwindow* window)
 // Static mouse position callback
 void Application::mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    Application* app = getApplication(window);
+    Application* app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
     if (!app) return;
     if (app->m_userInput) {
         app->m_userInput->mouseCallback(xpos, ypos);
@@ -1074,7 +1086,7 @@ void Application::mouseCallback(GLFWwindow* window, double xpos, double ypos)
 // Static mouse button callback
 void Application::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
-    Application* app = getApplication(window);
+    Application* app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
     if (!app) return;
     if (app->m_userInput) {
         app->m_userInput->mouseButtonCallback(button, action, mods);
@@ -1296,7 +1308,7 @@ bool Application::loadObjAt(const std::string& name,
         }
     }
 
-    std::vector<std::string> prefixes = { "", "objs/", "assets/models/" };
+    std::vector<std::string> prefixes = { "", "assets/models/" };
 
     for (const auto& base : baseCandidates) {
         for (const auto& pref : prefixes) {
@@ -1313,7 +1325,7 @@ bool Application::loadObjAt(const std::string& name,
         }
     }
     // Not found: log to chat scrollback for visibility
-    std::ostringstream os; os << "Model not found for '" << path << "'. Tried ['', 'objs/', 'assets/models/'] with extensions [.obj,.gltf,.glb,.fbx,.dae,.ply] and lowercase/numberless variants.";
+    std::ostringstream os; os << "Model not found for '" << path << "'. Tried ['', 'assets/models/'] with extensions [.obj,.gltf,.glb,.fbx,.dae,.ply] and lowercase/numberless variants.";
     m_chatScrollback.push_back(os.str());
     return false;
 }
@@ -1398,6 +1410,39 @@ void Application::toggleFullscreen()
     } else {
         glfwSetWindowMonitor(m_window, nullptr, m_windowPosX, m_windowPosY, m_windowedWidth, m_windowedHeight, 0);
         m_fullscreen = false;
+    }
+
+    // Ensure our internal size matches framebuffer size immediately
+    int fbw = 0, fbh = 0;
+    glfwGetFramebufferSize(m_window, &fbw, &fbh);
+    if (fbw > 0 && fbh > 0) {
+        m_windowWidth = fbw;
+        m_windowHeight = fbh;
+        glViewport(0, 0, m_windowWidth, m_windowHeight);
+        // Reallocate ray texture to new size
+        if (rayTexID != 0) {
+            glBindTexture(GL_TEXTURE_2D, rayTexID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_windowWidth, m_windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+        }
+    }
+}
+
+// Static callback - resize viewport and dependent textures
+void Application::framebufferSizeCallback(GLFWwindow* window, int width, int height)
+{
+    if (!window) return;
+    Application* app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (!app) return;
+    if (width <= 0 || height <= 0) return;
+
+    app->m_windowWidth = width;
+    app->m_windowHeight = height;
+
+    glViewport(0, 0, width, height);
+    // Reallocate ray texture to match new size
+    if (app->rayTexID != 0) {
+        glBindTexture(GL_TEXTURE_2D, app->rayTexID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
     }
 }
 

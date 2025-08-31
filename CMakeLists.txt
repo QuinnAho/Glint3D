@@ -11,6 +11,7 @@ set(IMGUI_DIR Project1)
 set(APP_SOURCES
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/application.cpp
+    ${SRC_DIR}/ai_instructions.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp

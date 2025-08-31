@@ -1,25 +1,5 @@
-﻿  BVHNode.cpp
-  InputHandler.cpp
-D:\class\OpenGLOBJViewer\Project1\src\InputHandler.cpp(46,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  RayUtils.cpp
-D:\class\OpenGLOBJViewer\Project1\src\InputHandler.cpp(47,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+﻿  application.cpp
   ai_bridge.cpp
-  application.cpp
-  axisrenderer.cpp
-  gizmo.cpp
-  grid.cpp
-  light.cpp
-  main.cpp
-  material.cpp
-  nl_executor.cpp
-  raytracer.cpp
-  shader.cpp
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(61,22): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(63,24): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(71,18): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(73,20): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
-  texture.cpp
-  userinput.cpp
   Generating Code...
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,

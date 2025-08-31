@@ -1,4 +1,5 @@
 #include "ai_bridge.h"
+#include "ai_instructions.h"
 
 #if !defined(__EMSCRIPTEN__)
 
@@ -41,45 +42,7 @@ static std::wstring widen(const std::string& s) {
     return w;
 }
 
-// Build strict instructions to force JSON-only output following our micro-DSL
-static std::string build_instructions() {
-    std::ostringstream os;
-    os << "You convert natural language into a strict JSON command batch for a 3D app.\n";
-    os << "Output ONLY JSON. No prose, no markdown.\n";
-    os << "Schema: an object or array of objects with fields:\n";
-    os << "{ \"op\": one of [load_model, duplicate, add_light], ... }\n";
-    os << "load_model: { op, path, name?, transform?{ position:[x,y,z], scale:[x,y,z], rotation:[x,y,z] } }\n";
-    os << "duplicate:  { op, source, name?, transform?{ position:[dx,dy,dz], scale? } }\n";
-    os << "add_light:  { op, type: 'point'|'directional', position?, direction?, color?, intensity? }\n";
-    os << "Vectors are arrays of 3 numbers.\n";
-    os << "Examples:\n";
-    os << "User: load cow.obj and move it right 2\n";
-    os << "[{\"op\":\"load_model\",\"path\":\"cow.obj\",\"name\":\"Cow1\",\"transform\":{\"position\":[2,0,0]}}]\n";
-    os << "User: duplicate Cow1 left 1 and add a light above\n";
-    os << "[{\"op\":\"duplicate\",\"source\":\"Cow1\",\"name\":\"Cow2\",\"transform\":{\"position\":[-1,0,0]}},{\"op\":\"add_light\",\"type\":\"point\",\"position\":[0,5,0]}]\n";
-    return os.str();
-}
-
-static std::string build_planner_instructions() {
-    std::ostringstream os;
-    os << "You are a scene assistant for a 3D app.\n";
-    os << "Given USER instruction and SCENE JSON, output a plan as imperative commands, one per line.\n";
-    os << "No explanations, no markdown, only commands.\n";
-    os << "Use object names from the scene where helpful.\n";
-    os << "Supported commands (free-form, natural but structured):\n";
-    os << "- place <name> [in front of me <d>] | [at x y z] [scale sx sy sz]\n";
-    os << "- place <count> <name> objects [scale sx sy sz | long | flat | tall | wide] [arrange into three walls and one floor]\n";
-    os << "- add light [at x y z] [color r g b] [intensity v]\n";
-    os << "- create material <name> [color r g b] [specular r g b] [ambient r g b] [shininess s] [roughness r] [metallic m]\n";
-    os << "- assign material <mat> to <object>\n";
-    os << "- fullscreen\n";
-    os << "Examples:\n";
-    os << "USER: put the cow 3 meters ahead and add a soft light above\n";
-    os << "place cow in front of me 3\nadd light at 0 5 0 intensity 0.6\n";
-    os << "USER: make a wood material and apply it to Cow1\n";
-    os << "create material wood color 0.6 0.4 0.2 roughness 0.8\nassign material wood to Cow1\n";
-    return os.str();
-}
+// Instruction builders moved to ai_instructions.{h,cpp}
 
 bool NLToJSONBridge::translate(const std::string& natural, std::string& outJson, std::string& error) {
     // Target Ollama: POST /api/generate with {model, system, prompt, stream:false}

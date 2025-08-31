@@ -156,6 +156,7 @@ private:
     static void mouseButtonCallback(GLFWwindow*, int, int, int);
     static Application* getApplication(GLFWwindow*);
     static void emscriptenFrame(void* arg);
+    static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 private:
     GLFWwindow* m_window = nullptr;
