@@ -1,5 +1,13 @@
 # AI-Enhanced OBJ Viewer + Raytracer
 
+At a glance — new in this build:
+- Optional Assimp import for glTF/GLB, FBX, DAE, PLY (and more)
+- PBR shader (Cook–Torrance) with BaseColor, Normal, Metallic/Roughness
+- Unified mesh loader (OBJ native or Assimp) with baked transforms and UV.v flip handled
+- Texture cache to deduplicate loads by path + flip
+- Per‑object shader toggle in the Materials panel (Standard vs PBR)
+- Emscripten main‑loop path added for future Web build
+
 This project is a flexible 3D OBJ model viewer and CPU-based raytracer written in **C++**, **OpenGL**, and **GLM**, enhanced with **AI-powered natural language controls**.  
 It supports real-time rasterized modes (wireframe, shaded, point cloud) and an offline CPU raytracer with BVH acceleration.  
 Users can interact with the app using **direct JSON commands** or **plain natural language** (e.g., *"add a white light to the scene"*), which is automatically translated into JSON.

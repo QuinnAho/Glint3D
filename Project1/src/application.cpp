@@ -10,6 +10,10 @@
 #include "imgui_impl_opengl3.h"
 #include "assimp_loader.h"
 #include "texture_cache.h"
+#include "mesh_loader.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION  
 #include "stb_image_write.h"
@@ -281,6 +285,27 @@ void Application::run()
     }
     // On exit, cleanup resources
     cleanup();
+}
+
+void Application::frame()
+{
+    if (!m_window) return;
+    if (glfwWindowShouldClose(m_window)) {
+#ifdef __EMSCRIPTEN__
+        emscripten_cancel_main_loop();
+#endif
+        cleanup();
+        return;
+    }
+    glfwPollEvents();
+    processInput();
+    renderScene();
+}
+
+void Application::emscriptenFrame(void* arg)
+{
+    Application* app = static_cast<Application*>(arg);
+    if (app) app->frame();
 }
 
 void Application::processInput()
@@ -664,6 +689,14 @@ void Application::renderGUI()
 
             if (ImGui::TreeNode(treeNodeLabel.c_str()))
             {
+                // Shader selection per object
+                const char* shaderChoices[] = { "Standard", "PBR" };
+                int shaderIdx = (obj.shader == m_pbrShader) ? 1 : 0;
+                if (ImGui::Combo(("Shader##" + std::to_string(i)).c_str(), &shaderIdx, shaderChoices, IM_ARRAYSIZE(shaderChoices)))
+                {
+                    obj.shader = (shaderIdx == 1 && m_pbrShader) ? m_pbrShader : m_standardShader;
+                }
+
                 glm::vec4 specColor(obj.material.specular, 1.0f);
                 if (ImGui::ColorEdit4(("Specular##" + std::to_string(i)).c_str(), glm::value_ptr(specColor)))
                 {
@@ -678,6 +711,19 @@ void Application::renderGUI()
                     &obj.material.roughness, 0.0f, 1.0f);
                 ImGui::SliderFloat(("Metallic##" + std::to_string(i)).c_str(),
                     &obj.material.metallic, 0.0f, 1.0f);
+
+                if (obj.shader == m_pbrShader)
+                {
+                    ImGui::Separator();
+                    ImGui::Text("PBR Factors");
+                    ImGui::ColorEdit4(("BaseColor##" + std::to_string(i)).c_str(), glm::value_ptr(obj.baseColorFactor));
+                    ImGui::SliderFloat(("Metallic (PBR)##" + std::to_string(i)).c_str(), &obj.metallicFactor, 0.0f, 1.0f);
+                    ImGui::SliderFloat(("Roughness (PBR)##" + std::to_string(i)).c_str(), &obj.roughnessFactor, 0.04f, 1.0f);
+                    ImGui::Text("Maps: Base=%s Normal=%s MR=%s",
+                        obj.baseColorTex?"yes":"no",
+                        obj.normalTex?"yes":"no",
+                        obj.mrTex?"yes":"no");
+                }
 
                 ImGui::TreePop();
             }
@@ -850,48 +896,22 @@ void Application::addObject(std::string name,
     float wallReflectivity = 0.05f;             // VERY LOW reflectivity
 
 
-    // 1) Load the mesh (OBJ via native loader; others via Assimp if enabled)
-    auto toLowerExt = [](std::string s){
-        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return (char)std::tolower(c); });
-        return s;
-    };
-    std::string ext;
-    {
-        size_t dot = modelPath.find_last_of('.');
-        ext = (dot == std::string::npos) ? std::string() : toLowerExt(modelPath.substr(dot));
-    }
-    bool usedAssimp = false;
-    if (!ext.empty() && ext != ".obj")
-    {
-        std::vector<glm::vec3> positions;
-        std::vector<unsigned>  indices;
-        std::vector<glm::vec3> normals;
-        std::vector<glm::vec2> uvs;
-        std::vector<glm::vec3> tangents;
-        glm::vec3 minB, maxB;
-        std::string err;
-        PBRMaterial pbr;
-        if (AssimpImportMesh(modelPath, positions, indices, normals, minB, maxB, &err, &uvs, &tangents, &pbr, true))
-        {
-            obj.objLoader.setFromRaw(positions, indices, normals, uvs, tangents);
-            // Setup PBR textures via cache (no flip because uvs were flipped above)
-            if (!pbr.baseColorTex.empty()) obj.baseColorTex = TextureCache::instance().get(pbr.baseColorTex, false);
-            if (!pbr.normalTex.empty())    obj.normalTex    = TextureCache::instance().get(pbr.normalTex, false);
-            if (!pbr.mrTex.empty())        obj.mrTex        = TextureCache::instance().get(pbr.mrTex, false);
-            obj.baseColorFactor = pbr.baseColorFactor;
-            obj.metallicFactor  = pbr.metallicFactor;
-            obj.roughnessFactor = pbr.roughnessFactor;
-            if (m_pbrShader) obj.shader = m_pbrShader; // prefer PBR for imported assets
-            usedAssimp = true;
-        }
-        else
-        {
-            std::cerr << "[Assimp] Failed to import '" << modelPath << "': " << err << "\n";
-        }
-    }
-    if (!usedAssimp)
-    {
-        obj.objLoader.load(modelPath.c_str());
+    // 1) Load mesh + optional PBR via unified loader
+    MeshData mesh; PBRMaterial pbr;
+    std::string lerr;
+    if (!LoadMeshFromFile(modelPath, mesh, &pbr, &lerr)) {
+        // fallback to OBJ loader if unified loader fails unexpectedly
+        if (!mesh.positions.size()) obj.objLoader.load(modelPath.c_str());
+    } else {
+        obj.objLoader.setFromRaw(mesh.positions, mesh.indices, mesh.normals, mesh.uvs, mesh.tangents);
+        if (!pbr.baseColorTex.empty()) obj.baseColorTex = TextureCache::instance().get(pbr.baseColorTex, false);
+        if (!pbr.normalTex.empty())    obj.normalTex    = TextureCache::instance().get(pbr.normalTex, false);
+        if (!pbr.mrTex.empty())        obj.mrTex        = TextureCache::instance().get(pbr.mrTex, false);
+        obj.baseColorFactor = pbr.baseColorFactor;
+        obj.metallicFactor  = pbr.metallicFactor;
+        obj.roughnessFactor = pbr.roughnessFactor;
+        if (m_pbrShader && (!pbr.baseColorTex.empty() || !pbr.normalTex.empty() || !pbr.mrTex.empty()))
+            obj.shader = m_pbrShader;
     }
 
     // 2) Compute bounding box center for pivot transforms
@@ -979,13 +999,11 @@ void Application::addObject(std::string name,
     // 5) Unbind the VAO (optional, but often good practice)
     glBindVertexArray(0);
 
-    // 6) (Optional) Load a texture if provided
+    // 6) (Optional) Load a legacy diffuse texture if provided (via cache)
     if (!texturePath.empty()) {
-        obj.texture = new Texture();
-        if (!obj.texture->loadFromFile(texturePath)) {
+        obj.texture = TextureCache::instance().get(texturePath, false);
+        if (!obj.texture) {
             std::cerr << "Failed to load texture from: " << texturePath << std::endl;
-            delete obj.texture;
-            obj.texture = nullptr;
         }
     }
 

@@ -1,17 +1,7 @@
 ﻿  application.cpp
-  assimp_loader.cpp
-  texture_cache.cpp
   nl_executor.cpp
   BVHNode.cpp
-  grid.cpp
   main.cpp
-  objloader.cpp
-  raytracer.cpp
-  shader.cpp
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(60,22): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(62,24): warning C4566: character represented by universal-character-name '\u274C' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(70,18): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
-D:\class\OpenGLOBJViewer\Project1\src\shader.cpp(72,20): warning C4566: character represented by universal-character-name '\u2705' cannot be represented in the current code page (1252)
   texture.cpp
   userinput.cpp
   Generating Code...

@@ -96,6 +96,9 @@
     <ClCompile Include="src\texture_cache.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\mesh_loader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\axisrenderer.h">
@@ -113,7 +116,7 @@
     <ClInclude Include="include\raytracer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\texture.h">
+    <ClInclude Include="include\Texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\triangle.h">
@@ -156,6 +159,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\texture_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mesh_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

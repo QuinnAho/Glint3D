@@ -54,6 +54,7 @@ public:
 
     bool  init(const std::string& title, int w, int h);
     void  run();
+    void  frame(); // single frame step (for Emscripten main loop)
 
     /* getters used by UserInput */
     float       getMouseSensitivity() const { return m_sensitivity; }
@@ -154,6 +155,7 @@ private:
     static void mouseCallback(GLFWwindow*, double, double);
     static void mouseButtonCallback(GLFWwindow*, int, int, int);
     static Application* getApplication(GLFWwindow*);
+    static void emscriptenFrame(void* arg);
 
 private:
     GLFWwindow* m_window = nullptr;

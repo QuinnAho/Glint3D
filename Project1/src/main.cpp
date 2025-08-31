@@ -1,16 +1,20 @@
-﻿#include "application.h"
+#include "application.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 int main()
 {
-    Application app;
-    // Initialize with title and size
-    if (!app.init("OBJ Viewer", 800, 600))
-    {
+    auto* app = new Application();
+    if (!app->init("OBJ Viewer", 800, 600))
         return -1;
-    }
 
-    // Run the main loop
-    app.run();
-
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop_arg(&Application::emscriptenFrame, app, 0, true);
+#else
+    app->run();
+    delete app;
+#endif
     return 0;
 }
+

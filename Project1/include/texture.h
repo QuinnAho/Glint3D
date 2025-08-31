@@ -14,7 +14,8 @@ public:
     void bind(GLuint unit = 0) const;
 
 private:
-    GLuint m_textureID;
+    GLuint m_textureID{0};
 };
 
 #endif // TEXTURE_H
+

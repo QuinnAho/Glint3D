@@ -154,7 +154,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;glfw3.lib;opengl32.lib;gdi32.lib;user32.lib;shell32.lib;legacy_stdio_definitions.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)Libraries\lib;D:\Graphics\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -181,6 +181,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
     <ClCompile Include="src\assimp_loader.cpp" />
+    <ClCompile Include="src\mesh_loader.cpp" />
     <ClCompile Include="src\texture_cache.cpp" />
     <ClCompile Include="src\gizmo.cpp" />
     <ClCompile Include="src\nl_executor.cpp" />
@@ -211,6 +212,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
   <ItemGroup>
     <ClInclude Include="include\application.h" />
     <ClInclude Include="include\assimp_loader.h" />
+    <ClInclude Include="include\mesh_loader.h" />
     <ClInclude Include="include\texture_cache.h" />
     <ClInclude Include="include\gizmo.h" />
     <ClInclude Include="include\nl_executor.h" />
@@ -223,7 +225,7 @@ if exist "D:\Graphics\vcpkg\installed\x64-windows\bin\brotli*.dll" xcopy /y /d "
     <ClInclude Include="include\raytracer.h" />
     <ClInclude Include="include\RayUtils.h" />
     <ClInclude Include="include\shader.h" />
-    <ClInclude Include="include\texture.h" />
+    <ClInclude Include="include\Texture.h" />
     <ClInclude Include="include\triangle.h" />
     <ClInclude Include="include\userinput.h" />
     <ClInclude Include="include\objloader.h" />
