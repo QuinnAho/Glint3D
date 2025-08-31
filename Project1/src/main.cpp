@@ -1,19 +1,124 @@
 #include "application.h"
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <cstdio>
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
 
-int main()
+namespace {
+    struct Args {
+        std::vector<std::string> a;
+        Args(int argc, char** argv){ for(int i=0;i<argc;++i) a.emplace_back(argv[i]); }
+        bool has(const std::string& k) const { return std::find(a.begin(), a.end(), k) != a.end(); }
+        std::string value(const std::string& k, const std::string& def="") const {
+            for (size_t i=0;i+1<a.size();++i) if (a[i]==k) return a[i+1]; return def;
+        }
+        int intOr(const std::string& k, int def) const {
+            std::string v = value(k, ""); if (v.empty()) return def; try { return std::stoi(v); } catch(...) { return def; }
+        }
+    };
+    static std::string loadTextFile(const std::string& path){ std::ifstream f(path, std::ios::binary); if(!f) return {}; std::ostringstream ss; ss<<f.rdbuf(); return ss.str(); }
+}
+
+int main(int argc, char** argv)
 {
+    Args args(argc, argv);
+    bool wantHeadless = args.has("--ops") || args.has("--render");
+    int W = args.intOr("--w", 1024);
+    int H = args.intOr("--h", 1024);
+
     auto* app = new Application();
-    if (!app->init("OBJ Viewer", 800, 600))
+    if (!app->init("OBJ Viewer", wantHeadless ? W : 800, wantHeadless ? H : 600, wantHeadless))
         return -1;
 
 #ifdef __EMSCRIPTEN__
+    if (wantHeadless) return -1; // web build doesn't support headless here
+    // Web: parse ?state=... and replay ops
+    {
+        const char* s64 = emscripten_run_script_string("(function(){var p=(new URLSearchParams(window.location.search)).get('state');return p?p:'';})()");
+        if (s64 && *s64) {
+            // Base64 decode (URL-safe variants not used here)
+            auto b64dec = [](const std::string& in){
+                auto val = [](char c)->int{
+                    if (c>='A'&&c<='Z') return c-'A';
+                    if (c>='a'&&c<='z') return c-'a'+26;
+                    if (c>='0'&&c<='9') return c-'0'+52;
+                    if (c=='+') return 62; if (c=='/') return 63; return -1; };
+                std::string out; out.reserve((in.size()*3)/4);
+                int buf=0, bits=0;
+                for (char ch : in){ if (ch=='=') break; int v=val(ch); if (v<0) continue; buf=(buf<<6)|v; bits+=6; if (bits>=8){ bits-=8; out.push_back(char((buf>>bits)&0xFF)); } }
+                return out; };
+            std::string state = b64dec(s64);
+            if (!state.empty()) {
+                // Extract ops array and apply each element
+                auto pos = state.find("\"ops\"");
+                if (pos != std::string::npos) {
+                    auto colon = state.find(':', pos);
+                    auto lb = state.find('[', colon);
+                    if (lb != std::string::npos) {
+                        size_t i = lb + 1; int depth = 0; bool inString=false; char esc=0;
+                        while (i < state.size()) {
+                            // Skip whitespace and commas between elements
+                            while (i < state.size() && (state[i]==' '||state[i]=='\n'||state[i]=='\r'||state[i]=='\t'||state[i]==',')) ++i;
+                            if (i >= state.size() || state[i] == ']') break;
+                            size_t start = i;
+                            // Determine element type
+                            if (state[i] == '{' || state[i] == '[') {
+                                char open = state[i]; char close = (open=='{'?'}':']');
+                                depth = 1; ++i;
+                                while (i < state.size() && depth > 0) {
+                                    char c = state[i++];
+                                    if (inString) {
+                                        if (esc) { esc = 0; }
+                                        else if (c == '\\') esc = 1;
+                                        else if (c == '"') inString = false;
+                                    } else {
+                                        if (c == '"') inString = true;
+                                        else if (c == open) depth++;
+                                        else if (c == close) depth--;
+                                    }
+                                }
+                                size_t end = i; // one past
+                                std::string snippet = state.substr(start, end - start);
+                                std::string err;
+                                app->applyJsonOpsV1(snippet, err);
+                            } else {
+                                // Unexpected token; break
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     emscripten_set_main_loop_arg([](void* p){ static_cast<Application*>(p)->frame(); }, app, 0, true);
 #else
-    app->run();
-    delete app;
+    if (wantHeadless) {
+        // Apply ops if provided
+        if (args.has("--ops")) {
+            std::string ops = loadTextFile(args.value("--ops"));
+            if (ops.empty()) { fprintf(stderr, "Failed to read ops file\n"); return -2; }
+            std::string err;
+            if (!app->applyJsonOpsV1(ops, err)) { fprintf(stderr, "Ops error: %s\n", err.c_str()); return -3; }
+        }
+
+        // Render
+        if (args.has("--render")) {
+            std::string out = args.value("--render");
+            if (!app->renderToPNG(out, W, H)) { fprintf(stderr, "Render failed\n"); return -4; }
+        }
+        delete app;
+        return 0;
+    } else {
+        app->run();
+        delete app;
+        return 0;
+    }
 #endif
-    return 0;
 }

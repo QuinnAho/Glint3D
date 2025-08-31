@@ -52,7 +52,7 @@ public:
     Application();
     ~Application();
 
-    bool  init(const std::string& title, int w, int h);
+    bool  init(const std::string& title, int w, int h, bool headless = false);
     void  run();
     void  frame(); // single frame step (for Emscripten main loop)
 
@@ -84,6 +84,17 @@ public:
     bool        assignMaterialToObject(const std::string& objectName, const std::string& materialName);
     std::string sceneToJson() const; // camera, lights, objects, materials snapshot
     void        toggleFullscreen();   // public so NL executor can call
+    // Headless helpers / CLI
+    bool        renderToPNG(const std::string& path, int width, int height);
+    bool        applyJsonOpsV1(const std::string& json, std::string& error);
+    std::string buildShareLink() const; // encodes ops history into URL with ?state=
+    bool        duplicateObject(const std::string& sourceName, const std::string& newName,
+                                const glm::vec3* deltaPos = nullptr,
+                                const glm::vec3* deltaScale = nullptr,
+                                const glm::vec3* deltaRotDeg = nullptr);
+    void        setCameraTarget(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up);
+    void        setCameraFrontUp(const glm::vec3& position, const glm::vec3& front, const glm::vec3& up);
+    void        setCameraLens(float fovDeg, float nearZ, float farZ);
     std::string getSelectedObjectName() const;
     bool        moveObjectByName(const std::string& name, const glm::vec3& delta);
     bool        removeObjectByName(const std::string& name);
@@ -161,6 +172,7 @@ private:
 private:
     GLFWwindow* m_window = nullptr;
     int   m_windowWidth = 800, m_windowHeight = 600;
+    bool  m_headless = false;
 
     std::vector<SceneObject> m_sceneObjects;
     int   m_selectedObjectIndex = -1;
@@ -235,4 +247,10 @@ private:
     bool m_lHeld = false; // local/world toggle key
     bool m_nHeld = false; // snap toggle key
     bool m_deleteHeld = false; // delete key edge
+
+    // Share-state: store JSON Ops v1 history (raw JSON snippets)
+    std::vector<std::string> m_opsHistory;
+
+    // UI toggles
+    bool m_showSettingsPanel = false; // move towards top-bar UI; panel optional
 };

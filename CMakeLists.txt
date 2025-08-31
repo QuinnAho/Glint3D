@@ -12,6 +12,7 @@ set(APP_SOURCES
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/application.cpp
     ${SRC_DIR}/ai_instructions.cpp
+    ${SRC_DIR}/json_ops_v1.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
@@ -128,7 +129,7 @@ else()
     find_package(assimp CONFIG QUIET)
     if (assimp_FOUND)
         target_link_libraries(objviewer PRIVATE assimp::assimp)
-        target_compile_definitions(objviewer PRIVATE HAVE_ASSIMP=1)
+        target_compile_definitions(objviewer PRIVATE HAVE_ASSIMP=1 USE_ASSIMP=1)
     else()
         message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
     endif()

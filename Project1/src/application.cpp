@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdio>
+#include <fstream>
 #include <filesystem>
 
 #include "imgui.h"
@@ -53,10 +54,11 @@ Application::~Application()
     cleanup();
 }
 
-bool Application::init(const std::string& windowTitle, int width, int height)
+bool Application::init(const std::string& windowTitle, int width, int height, bool headless)
 {
     m_windowWidth = width;
     m_windowHeight = height;
+    m_headless = headless;
 
     // Init GLFW & create window
     if (!initGLFW(windowTitle, width, height))
@@ -93,6 +95,9 @@ bool Application::initGLFW(const std::string& windowTitle, int width, int height
 #endif
 
     // Create a windowed mode window and its OpenGL context
+    if (m_headless) {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    }
     m_window = glfwCreateWindow(width, height, windowTitle.c_str(), nullptr, nullptr);
     if (!m_window)
     {
@@ -126,6 +131,7 @@ bool Application::initGLAD()
 
 void Application::initImGui()
 {
+    if (m_headless) return; // no UI in headless
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -632,10 +638,94 @@ void Application::renderGUI()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(400, 400), ImGuiCond_Always);
+    // Main menu bar + toolbar buttons
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Load Cube")) {
+                loadObjInFrontOfCamera("Cube", "assets/models/cube.obj", 2.0f, glm::vec3(1.0f));
+            }
+            if (ImGui::MenuItem("Load Plane")) {
+                loadObjInFrontOfCamera("Plane", "assets/samples/models/plane.obj", 2.0f, glm::vec3(1.0f));
+            }
+            if (ImGui::MenuItem("Copy Share Link"))
+            {
+                std::string link = buildShareLink();
+                ImGui::SetClipboardText(link.c_str());
+                m_chatScrollback.push_back("Share link copied to clipboard.");
+            }
+            if (ImGui::MenuItem("Toggle Settings Panel", nullptr, m_showSettingsPanel))
+            {
+                m_showSettingsPanel = !m_showSettingsPanel;
+            }
+            ImGui::EndMenu();
+        }
 
-    ImGui::Begin("Render Settings");
+        if (ImGui::BeginMenu("View"))
+        {
+            bool selected = (m_renderMode == 0); if (ImGui::MenuItem("Point",   nullptr, selected)) m_renderMode = 0;
+            selected = (m_renderMode == 1);      if (ImGui::MenuItem("Wire",    nullptr, selected)) m_renderMode = 1;
+            selected = (m_renderMode == 2);      if (ImGui::MenuItem("Solid",   nullptr, selected)) m_renderMode = 2;
+            selected = (m_renderMode == 3);      if (ImGui::MenuItem("Raytrace",nullptr, selected)) m_renderMode = 3;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Fullscreen")) toggleFullscreen();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Gizmo"))
+        {
+            bool sel = (m_gizmoMode == GizmoMode::Translate); if (ImGui::MenuItem("Translate", nullptr, sel)) m_gizmoMode = GizmoMode::Translate;
+            sel = (m_gizmoMode == GizmoMode::Rotate);         if (ImGui::MenuItem("Rotate",    nullptr, sel)) m_gizmoMode = GizmoMode::Rotate;
+            sel = (m_gizmoMode == GizmoMode::Scale);          if (ImGui::MenuItem("Scale",     nullptr, sel)) m_gizmoMode = GizmoMode::Scale;
+            ImGui::Separator();
+            bool local = m_gizmoLocalSpace; if (ImGui::MenuItem("Local Space", nullptr, local)) m_gizmoLocalSpace = !m_gizmoLocalSpace;
+            bool snap  = m_snapEnabled;     if (ImGui::MenuItem("Snap",        nullptr, snap))  m_snapEnabled = !m_snapEnabled;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Axis X", nullptr, m_gizmoAxis==GizmoAxis::X)) m_gizmoAxis = GizmoAxis::X;
+            if (ImGui::MenuItem("Axis Y", nullptr, m_gizmoAxis==GizmoAxis::Y)) m_gizmoAxis = GizmoAxis::Y;
+            if (ImGui::MenuItem("Axis Z", nullptr, m_gizmoAxis==GizmoAxis::Z)) m_gizmoAxis = GizmoAxis::Z;
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Samples"))
+        {
+            if (ImGui::MenuItem("Three-Point Lighting")) {
+                std::ifstream f("assets/samples/recipes/three-point-lighting.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
+            }
+            if (ImGui::MenuItem("Studio Turntable")) {
+                std::ifstream f("assets/samples/recipes/studio-turntable.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
+            }
+            if (ImGui::MenuItem("Isometric Hero")) {
+                std::ifstream f("assets/samples/recipes/isometric-hero.json"); if (f.good()){ std::ostringstream ss; ss<<f.rdbuf(); std::string err; applyJsonOpsV1(ss.str(), err); }
+            }
+            ImGui::EndMenu();
+        }
+
+        // Quick toolbar items inline on the menubar
+        ImGui::Separator(); ImGui::Text("Mode:"); ImGui::SameLine();
+        if (ImGui::SmallButton("Point"))   m_renderMode = 0; ImGui::SameLine();
+        if (ImGui::SmallButton("Wire"))    m_renderMode = 1; ImGui::SameLine();
+        if (ImGui::SmallButton("Solid"))   m_renderMode = 2; ImGui::SameLine();
+        if (ImGui::SmallButton("Raytrace")) m_renderMode = 3; ImGui::SameLine();
+
+        ImGui::Separator(); ImGui::Text("Gizmo:"); ImGui::SameLine();
+        if (ImGui::SmallButton("Move"))   m_gizmoMode = GizmoMode::Translate; ImGui::SameLine();
+        if (ImGui::SmallButton("Rotate")) m_gizmoMode = GizmoMode::Rotate;    ImGui::SameLine();
+        if (ImGui::SmallButton("Scale"))  m_gizmoMode = GizmoMode::Scale;     ImGui::SameLine();
+        bool localSpace = m_gizmoLocalSpace; if (ImGui::Checkbox("Local", &localSpace)) m_gizmoLocalSpace = localSpace; ImGui::SameLine();
+        bool snap = m_snapEnabled; if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap; ImGui::SameLine();
+
+        if (ImGui::SmallButton("Fullscreen")) toggleFullscreen(); ImGui::SameLine();
+        if (ImGui::SmallButton("Add Light")) { addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f); }
+
+        ImGui::EndMainMenuBar();
+    }
+
+    if (m_showSettingsPanel) {
+    ImGui::SetNextWindowPos(ImVec2(10, 30), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(420, 460), ImGuiCond_Once);
+    ImGui::Begin("Settings");
     ImGui::Text("Hold RMB to move camera (W/A/S/D, Space/Ctrl, E/Q up/down).");
     ImGui::Text("Gizmo: Shift+Q/W/E = Move/Rotate/Scale, X/Y/Z = axis");
     ImGui::Text("Left-click a gizmo axis and drag to edit.");
@@ -685,6 +775,32 @@ void Application::renderGUI()
             if (!ok) m_chatScrollback.push_back("Failed to load sample PLY triangle.");
             else     m_chatScrollback.push_back("Loaded sample PLY triangle in front of camera.");
         }
+
+        // Recipe loader (JSON Ops v1) from preloaded assets
+        ImGui::Separator();
+        ImGui::Text("Recipes:");
+        static int recipeIdx = 0;
+        const char* recipes[] = {
+            "three-point-lighting",
+            "studio-turntable",
+            "isometric-hero"
+        };
+        ImGui::Combo("##recipe_combo", &recipeIdx, recipes, IM_ARRAYSIZE(recipes));
+        ImGui::SameLine();
+        if (ImGui::Button("Load Recipe"))
+        {
+            std::string path = std::string("assets/samples/recipes/") + recipes[recipeIdx] + ".json";
+            std::ifstream f(path);
+            if (!f.good()) {
+                m_chatScrollback.push_back(std::string("Could not open recipe: ") + path);
+            } else {
+                std::ostringstream ss; ss << f.rdbuf();
+                std::string ops = ss.str();
+                std::string err;
+                if (!applyJsonOpsV1(ops, err)) m_chatScrollback.push_back(std::string("Recipe error: ") + err);
+                else m_chatScrollback.push_back(std::string("Loaded recipe: ") + recipes[recipeIdx]);
+            }
+        }
     }
 
     // Lighting
@@ -725,63 +841,53 @@ void Application::renderGUI()
         ImGui::DragFloat("Scale Snap", &m_snapScale, 0.01f, 0.01f, 10.0f, "%.2f");
     }
 
-    // Materials
+    // Materials (selected object only)
     ImGui::Spacing();
     ImGui::Separator();
-    if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader("Material (Selected)", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        for (size_t i = 0; i < m_sceneObjects.size(); ++i)
+        if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
         {
-            SceneObject& obj = m_sceneObjects[i];
+            SceneObject& obj = m_sceneObjects[(size_t)m_selectedObjectIndex];
+            std::string displayName = obj.name.empty() ? std::string("Selected Object") : obj.name;
+            ImGui::TextUnformatted(displayName.c_str());
 
-            // If obj.name is empty, fall back to "Object i"
-            std::string displayName = obj.name.empty()
-                ? ("Object " + std::to_string(i))
-                : obj.name;
-
-            // Append an invisible unique ID (##Object_i) so ImGui tree nodes don't collide
-            std::string treeNodeLabel = displayName + "##Object_" + std::to_string(i);
-
-            if (ImGui::TreeNode(treeNodeLabel.c_str()))
+            // Shader selection per object
+            const char* shaderChoices[] = { "Standard", "PBR" };
+            int shaderIdx = (obj.shader == m_pbrShader) ? 1 : 0;
+            if (ImGui::Combo("Shader", &shaderIdx, shaderChoices, IM_ARRAYSIZE(shaderChoices)))
             {
-                // Shader selection per object
-                const char* shaderChoices[] = { "Standard", "PBR" };
-                int shaderIdx = (obj.shader == m_pbrShader) ? 1 : 0;
-                if (ImGui::Combo(("Shader##" + std::to_string(i)).c_str(), &shaderIdx, shaderChoices, IM_ARRAYSIZE(shaderChoices)))
-                {
-                    obj.shader = (shaderIdx == 1 && m_pbrShader) ? m_pbrShader : m_standardShader;
-                }
-
-                glm::vec4 specColor(obj.material.specular, 1.0f);
-                if (ImGui::ColorEdit4(("Specular##" + std::to_string(i)).c_str(), glm::value_ptr(specColor)))
-                {
-                    obj.material.specular = glm::vec3(specColor);
-                }
-
-                ImGui::ColorEdit3(("Diffuse##" + std::to_string(i)).c_str(), glm::value_ptr(obj.material.diffuse));
-                ImGui::ColorEdit3(("Ambient##" + std::to_string(i)).c_str(), glm::value_ptr(obj.material.ambient));
-                ImGui::SliderFloat(("Shininess##" + std::to_string(i)).c_str(),
-                    &obj.material.shininess, 1.0f, 128.0f);
-                ImGui::SliderFloat(("Roughness##" + std::to_string(i)).c_str(),
-                    &obj.material.roughness, 0.0f, 1.0f);
-                ImGui::SliderFloat(("Metallic##" + std::to_string(i)).c_str(),
-                    &obj.material.metallic, 0.0f, 1.0f);
-
-                if (obj.shader == m_pbrShader)
-                {
-                    ImGui::Separator();
-                    ImGui::Text("PBR Factors");
-                    ImGui::ColorEdit4(("BaseColor##" + std::to_string(i)).c_str(), glm::value_ptr(obj.baseColorFactor));
-                    ImGui::SliderFloat(("Metallic (PBR)##" + std::to_string(i)).c_str(), &obj.metallicFactor, 0.0f, 1.0f);
-                    ImGui::SliderFloat(("Roughness (PBR)##" + std::to_string(i)).c_str(), &obj.roughnessFactor, 0.04f, 1.0f);
-                    ImGui::Text("Maps: Base=%s Normal=%s MR=%s",
-                        obj.baseColorTex?"yes":"no",
-                        obj.normalTex?"yes":"no",
-                        obj.mrTex?"yes":"no");
-                }
-
-                ImGui::TreePop();
+                obj.shader = (shaderIdx == 1 && m_pbrShader) ? m_pbrShader : m_standardShader;
             }
+
+            glm::vec4 specColor(obj.material.specular, 1.0f);
+            if (ImGui::ColorEdit4("Specular", glm::value_ptr(specColor)))
+            {
+                obj.material.specular = glm::vec3(specColor);
+            }
+
+            ImGui::ColorEdit3("Diffuse", glm::value_ptr(obj.material.diffuse));
+            ImGui::ColorEdit3("Ambient", glm::value_ptr(obj.material.ambient));
+            ImGui::SliderFloat("Shininess", &obj.material.shininess, 1.0f, 128.0f);
+            ImGui::SliderFloat("Roughness", &obj.material.roughness, 0.0f, 1.0f);
+            ImGui::SliderFloat("Metallic", &obj.material.metallic, 0.0f, 1.0f);
+
+            if (obj.shader == m_pbrShader)
+            {
+                ImGui::Separator();
+                ImGui::Text("PBR Factors");
+                ImGui::ColorEdit4("BaseColor", glm::value_ptr(obj.baseColorFactor));
+                ImGui::SliderFloat("Metallic (PBR)", &obj.metallicFactor, 0.0f, 1.0f);
+                ImGui::SliderFloat("Roughness (PBR)", &obj.roughnessFactor, 0.04f, 1.0f);
+                ImGui::Text("Maps: Base=%s Normal=%s MR=%s",
+                    obj.baseColorTex?"yes":"no",
+                    obj.normalTex?"yes":"no",
+                    obj.mrTex?"yes":"no");
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("No object selected.");
         }
     }
 
@@ -879,6 +985,7 @@ void Application::renderGUI()
     }
 
     ImGui::End();
+    }
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1453,6 +1560,307 @@ std::string Application::getSelectedObjectName() const
     return std::string();
 }
 
+// ---- Headless: render current scene into an offscreen framebuffer and save PNG ----
+bool Application::renderToPNG(const std::string& outPath, int W, int H)
+{
+#ifdef __EMSCRIPTEN__
+    (void)outPath; (void)W; (void)H; return false;
+#else
+    // Ensure GL is initialized
+    if (!m_window) return false;
+
+    // Create color texture + depth renderbuffer
+    GLuint fbo = 0, color = 0, depth = 0;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    glGenTextures(1, &color);
+    glBindTexture(GL_TEXTURE_2D, color);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+
+    glGenRenderbuffers(1, &depth);
+    glBindRenderbuffer(GL_RENDERBUFFER, depth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, W, H);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depth);
+
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDeleteFramebuffers(1, &fbo);
+        glDeleteTextures(1, &color);
+        glDeleteRenderbuffers(1, &depth);
+        return false;
+    }
+
+    // Shadow pass (as in renderScene)
+    glViewport(0, 0, 1024, 1024);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-6.0f, 7.0f, 8.0f));
+    glm::mat4 lightView = glm::lookAt(lightDir * 20.0f, glm::vec3(0.0f), glm::vec3(0, 1, 0));
+    glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 1.0f, 50.0f);
+    m_lightSpaceMatrix = lightProjection * lightView;
+    m_shadowShader->use();
+    m_shadowShader->setMat4("lightSpaceMatrix", m_lightSpaceMatrix);
+    for (auto& obj : m_sceneObjects) {
+        m_shadowShader->setMat4("model", obj.modelMatrix);
+        glBindVertexArray(obj.VAO);
+        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+    }
+
+    // Normal pass to offscreen FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0, 0, W, H);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    float aspect = float(W) / float(H);
+    m_projectionMatrix = glm::perspective(glm::radians(m_fov), aspect, m_nearClip, m_farClip);
+    m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
+
+    // draw grid
+    m_grid.render(m_viewMatrix, m_projectionMatrix);
+    // draw objects
+    for (auto& obj : m_sceneObjects) {
+        if (!obj.shader) obj.shader = m_standardShader;
+        obj.shader->use();
+        obj.shader->setMat4("model", obj.modelMatrix);
+        obj.shader->setMat4("view", m_viewMatrix);
+        obj.shader->setMat4("projection", m_projectionMatrix);
+        obj.shader->setMat4("lightSpaceMatrix", m_lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
+        obj.shader->setInt("shadowMap", 1);
+        obj.shader->setVec3("viewPos", m_cameraPos);
+        m_lights.applyLights(obj.shader->getID());
+        obj.material.apply(obj.shader->getID(), "material");
+        if (obj.shader == m_pbrShader) {
+            obj.shader->setVec4("baseColorFactor", obj.baseColorFactor);
+            obj.shader->setFloat("metallicFactor", obj.metallicFactor);
+            obj.shader->setFloat("roughnessFactor", obj.roughnessFactor);
+        } else {
+            obj.shader->setInt("shadingMode", m_shadingMode);
+            obj.shader->setVec3("objectColor", obj.color);
+        }
+        glBindVertexArray(obj.VAO);
+        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
+    // Read back pixels (flip vertically)
+    std::vector<unsigned char> pixels(size_t(W) * size_t(H) * 4);
+    glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    std::vector<unsigned char> flipped(size_t(W) * size_t(H) * 4);
+    for (int y = 0; y < H; ++y) {
+        memcpy(&flipped[size_t(y) * size_t(W) * 4], &pixels[size_t(H - 1 - y) * size_t(W) * 4], size_t(W) * 4);
+    }
+
+    // Write PNG
+    int ok = stbi_write_png(outPath.c_str(), W, H, 4, flipped.data(), W * 4);
+
+    // Cleanup
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &color);
+    glDeleteRenderbuffers(1, &depth);
+
+    return ok != 0;
+#endif
+}
+
+// ---- JSON Ops v1 apply (minimal tolerant parser) ----
+namespace {
+    static inline std::string trim_copy(std::string s){
+        auto ns = [](int c){ return !std::isspace(c); };
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), ns));
+        s.erase(std::find_if(s.rbegin(), s.rend(), ns).base(), s.end());
+        return s;
+    }
+    static bool findString(const std::string& src, const std::string& key, std::string& out) {
+        auto pos = src.find("\"" + key + "\""); if (pos==std::string::npos) return false;
+        pos = src.find(':', pos); if (pos==std::string::npos) return false;
+        pos = src.find('"', pos); if (pos==std::string::npos) return false;
+        auto end = pos + 1; std::string s;
+        while (end < src.size()) { char c = src[end++]; if (c=='\\') { if (end<src.size()) s.push_back(src[end++]); } else if (c=='"') break; else s.push_back(c);} out = s; return true;
+    }
+    static bool findNumber(const std::string& src, const std::string& key, float& out) {
+        auto pos = src.find("\"" + key + "\""); if (pos==std::string::npos) return false; pos = src.find(':', pos); if (pos==std::string::npos) return false;
+        auto i = pos + 1; while (i<src.size() && (std::isspace((unsigned char)src[i])||src[i]=='"')) ++i;
+        std::string num; while (i<src.size() && (std::isdigit((unsigned char)src[i])||src[i]=='-'||src[i]=='+'||src[i]=='.'||src[i]=='e'||src[i]=='E')) num.push_back(src[i++]);
+        if (num.empty()) return false; try { out = std::stof(num); return true; } catch (...) { return false; }
+    }
+    static bool findVec3(const std::string& src, const std::string& key, glm::vec3& out) {
+        auto pos = src.find("\"" + key + "\""); if (pos==std::string::npos) return false; pos = src.find(':', pos); if (pos==std::string::npos) return false; pos = src.find('[', pos); if (pos==std::string::npos) return false;
+        auto end = src.find(']', pos); if (end==std::string::npos) return false; std::string inside = src.substr(pos+1, end-pos-1);
+        std::stringstream ss(inside); float x=0,y=0,z=0; char ch; if (!(ss>>x)) return false; ss>>ch; if (!(ss>>y)) return false; ss>>ch; if (!(ss>>z)) return false; out = glm::vec3(x,y,z); return true;
+    }
+}
+
+bool Application::applyJsonOpsV1(const std::string& json, std::string& error)
+{
+    std::string s = trim_copy(json);
+    if (s.empty()) { error = "Empty ops"; return false; }
+    // Remember original ops text for sharing
+    m_opsHistory.push_back(json);
+    std::vector<std::string> objects;
+    if (s[0] == '[') {
+        size_t pos = 0; while (true) {
+            auto l = s.find('{', pos); if (l==std::string::npos) break; int d=1; size_t r=l+1; while (r<s.size() && d>0){ if (s[r]=='{') d++; else if (s[r]=='}') d--; r++; }
+            if (d!=0) { error = "Unbalanced braces"; return false; }
+            objects.push_back(s.substr(l, r-l)); pos = r;
+        }
+    } else if (s[0] == '{') {
+        objects.push_back(s);
+    } else { error = "Top-level must be object or array"; return false; }
+
+    for (const auto& obj : objects) {
+        std::string op; if (!findString(obj, "op", op)) { error = "Missing op"; return false; }
+        if (op == "load") {
+            std::string path; if (!findString(obj, "path", path)) { error = "load: missing path"; return false; }
+            std::string name; findString(obj, "name", name);
+            glm::vec3 pos(0), scl(1), rot(0);
+            // parse transform
+            auto tpos = obj.find("\"transform\""); if (tpos != std::string::npos){ auto l=obj.find('{',tpos); auto r=obj.find('}',l); if (l!=std::string::npos&&r!=std::string::npos){ std::string t = obj.substr(l, r-l+1); findVec3(t, "position", pos); findVec3(t, "scale", scl); if (!findVec3(t, "rotation_deg", rot)) findVec3(t, "rotation", rot); }}
+            if (name.empty()) name = path;
+            bool ok = loadObjAt(name, path, pos, scl);
+            if (!ok) { error = std::string("Failed to load: ")+path; return false; }
+            // apply rotation about model center
+            for (auto& o : m_sceneObjects) if (o.name == name) {
+                glm::vec3 minB = o.objLoader.getMinBounds(), maxB = o.objLoader.getMaxBounds(); glm::vec3 center = (minB+maxB)*0.5f;
+                glm::mat4 M = glm::mat4(1.0f);
+                M = glm::translate(M, pos);
+                M = glm::rotate(M, glm::radians(rot.x), glm::vec3(1,0,0));
+                M = glm::rotate(M, glm::radians(rot.y), glm::vec3(0,1,0));
+                M = glm::rotate(M, glm::radians(rot.z), glm::vec3(0,0,1));
+                M = M * glm::scale(glm::mat4(1.0f), scl) * glm::translate(glm::mat4(1.0f), -center);
+                o.modelMatrix = M; break;
+            }
+        }
+        else if (op == "duplicate") {
+            std::string source; if (!findString(obj, "source", source)) { error = "duplicate: missing source"; return false; }
+            std::string name; if (!findString(obj, "name", name)) name = source + std::string("_copy");
+            glm::vec3 dpos(0), dscale(1), drot(0);
+            auto tpos2 = obj.find("\"transform_delta\""); if (tpos2 == std::string::npos) tpos2 = obj.find("\"transform\"");
+            if (tpos2 != std::string::npos){ auto l=obj.find('{',tpos2); auto r=obj.find('}',l); if (l!=std::string::npos&&r!=std::string::npos){ std::string t = obj.substr(l, r-l+1); findVec3(t, "position", dpos); findVec3(t, "scale", dscale); if (!findVec3(t, "rotation_deg", drot)) findVec3(t, "rotation", drot);} }
+            if (!duplicateObject(source, name, &dpos, &dscale, &drot)) { error = "duplicate failed"; return false; }
+        }
+        else if (op == "transform") {
+            std::string target; if (!findString(obj, "target", target)) { error = "transform: missing target"; return false; }
+            std::string mode; findString(obj, "mode", mode); bool isDelta = (mode == "delta");
+            glm::vec3 pos, scale, rot; bool hasPos=false, hasScale=false, hasRot=false;
+            auto tkey = isDelta ? "transform_delta" : "transform"; auto tp = obj.find(std::string("\"")+tkey+"\""); if (tp!=std::string::npos){ auto l=obj.find('{',tp); auto r=obj.find('}',l); if (l!=std::string::npos&&r!=std::string::npos){ std::string t = obj.substr(l, r-l+1); hasPos = findVec3(t, "position", pos); hasScale = findVec3(t, "scale", scale); hasRot = (findVec3(t, "rotation_deg", rot) || findVec3(t, "rotation", rot)); }}
+            for (auto& o : m_sceneObjects) if (o.name == target) {
+                if (isDelta) {
+                    if (hasPos) o.modelMatrix = glm::translate(o.modelMatrix, pos);
+                    if (hasScale) o.modelMatrix = o.modelMatrix * glm::scale(glm::mat4(1.0f), scale);
+                    if (hasRot) { glm::mat4 R(1.0f); R=glm::rotate(R, glm::radians(rot.x), {1,0,0}); R=glm::rotate(R, glm::radians(rot.y), {0,1,0}); R=glm::rotate(R, glm::radians(rot.z), {0,0,1}); o.modelMatrix = o.modelMatrix * R; }
+                } else {
+                    glm::vec3 minB = o.objLoader.getMinBounds(), maxB = o.objLoader.getMaxBounds(); glm::vec3 center = (minB+maxB)*0.5f;
+                    glm::mat4 M(1.0f);
+                    glm::vec3 P = hasPos ? pos : glm::vec3(0);
+                    glm::vec3 S = hasScale ? scale : glm::vec3(1);
+                    glm::vec3 Rdeg = hasRot ? rot : glm::vec3(0);
+                    M = glm::translate(M, P);
+                    M = glm::rotate(M, glm::radians(Rdeg.x), {1,0,0});
+                    M = glm::rotate(M, glm::radians(Rdeg.y), {0,1,0});
+                    M = glm::rotate(M, glm::radians(Rdeg.z), {0,0,1});
+                    M = M * glm::scale(glm::mat4(1.0f), S) * glm::translate(glm::mat4(1.0f), -center);
+                    o.modelMatrix = M;
+                }
+                break;
+            }
+        }
+        else if (op == "set_material") {
+            std::string target; if (!findString(obj, "target", target)) { error = "set_material: missing target"; return false; }
+            std::string matName; bool byName = findString(obj, "material_name", matName);
+            if (byName) { assignMaterialToObject(target, matName); }
+            else {
+                // inline material props
+                glm::vec3 color, spec, ambient; float shin=0, rough=0, metal=0; bool hc=false, hs=false, ha=false, hsh=false, hr=false, hm=false;
+                auto mp = obj.find("\"material\""); if (mp!=std::string::npos){ auto l=obj.find('{',mp); auto r=obj.find('}',l); if (l!=std::string::npos&&r!=std::string::npos){ std::string m = obj.substr(l, r-l+1); hc=findVec3(m, "color", color); hs=findVec3(m, "specular", spec); ha=findVec3(m, "ambient", ambient); hsh=findNumber(m, "shininess", shin); hr=findNumber(m, "roughness", rough); hm=findNumber(m, "metallic", metal);} }
+                for (auto& o : m_sceneObjects) if (o.name == target) {
+                    if (hc) o.material.diffuse = color; if (hs) o.material.specular = spec; if (ha) o.material.ambient = ambient; if (hsh) o.material.shininess = shin; if (hr) o.material.roughness = rough; if (hm) o.material.metallic = metal; break;
+                }
+            }
+        }
+        else if (op == "add_light") {
+            std::string type; findString(obj, "type", type); if (type.empty()) type = "point";
+            glm::vec3 pos(0), dir(0), col(1); float intensity = 1.0f; findVec3(obj, "position", pos); findVec3(obj, "direction", dir); findVec3(obj, "color", col); findNumber(obj, "intensity", intensity);
+            if (type == "point") addPointLightAt(pos, col, intensity);
+            else /*directional*/ addPointLightAt(-glm::normalize(dir)*10.0f, col, intensity); // simple approximation
+        }
+        else if (op == "set_camera") {
+            glm::vec3 pos(0), target(0), front(0), up(0,1,0); bool hp=findVec3(obj, "position", pos); bool ht=findVec3(obj, "target", target); bool hf=findVec3(obj, "front", front); findVec3(obj, "up", up);
+            float fov=0, nz=0, fz=0; findNumber(obj, "fov_deg", fov); findNumber(obj, "near", nz); findNumber(obj, "far", fz);
+            if (hp && ht) setCameraTarget(pos, target, up); else if (hp && hf) setCameraFrontUp(pos, front, up);
+            setCameraLens(fov, nz, fz);
+        }
+        else if (op == "render") {
+            // no-op here; handled by CLI flags
+        }
+        else { error = std::string("Unknown op: ")+op; return false; }
+    }
+    return true;
+}
+
+// ---- Share state: Base64 encode of { version, ops: [...] } into ?state= ----
+namespace {
+    static std::string b64encode(const std::string& in) {
+        static const char* tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string out; out.reserve(((in.size()+2)/3)*4);
+        size_t i=0; unsigned char a3[3];
+        while (i < in.size()) {
+            size_t len = 0; for (; len<3 && i<in.size(); ++len,++i) a3[len] = (unsigned char)in[i];
+            if (len==3) {
+                out.push_back(tbl[(a3[0] & 0xfc) >> 2]);
+                out.push_back(tbl[((a3[0] & 0x03) << 4) | ((a3[1] & 0xf0) >> 4)]);
+                out.push_back(tbl[((a3[1] & 0x0f) << 2) | ((a3[2] & 0xc0) >> 6)]);
+                out.push_back(tbl[a3[2] & 0x3f]);
+            } else if (len==2) {
+                out.push_back(tbl[(a3[0] & 0xfc) >> 2]);
+                out.push_back(tbl[((a3[0] & 0x03) << 4) | ((a3[1] & 0xf0) >> 4)]);
+                out.push_back(tbl[((a3[1] & 0x0f) << 2)]);
+                out.push_back('=');
+            } else if (len==1) {
+                out.push_back(tbl[(a3[0] & 0xfc) >> 2]);
+                out.push_back(tbl[((a3[0] & 0x03) << 4)]);
+                out.push_back('=');
+                out.push_back('=');
+            }
+        }
+        return out;
+    }
+}
+
+std::string Application::buildShareLink() const
+{
+    // Build minimal state JSON: { version:"1.0", ops:[ <history items> ] }
+    std::ostringstream body;
+    body << "{\"version\":\"1.0\",\"ops\":[";
+    for (size_t i=0;i<m_opsHistory.size();++i){
+        body << m_opsHistory[i];
+        if (i+1<m_opsHistory.size()) body << ",";
+    }
+    body << "]}";
+    std::string payload = b64encode(body.str());
+
+#ifdef __EMSCRIPTEN__
+    // Build full URL from current location (without existing query/hash)
+    std::string url;
+    const char* href = emscripten_run_script_string("(function(){var u=new URL(window.location.href);return (u.origin+u.pathname);})()");
+    if (href && *href) url = href;
+    else url = std::string("./");
+    url += std::string("?state=") + payload;
+    return url;
+#else
+    // Desktop: just provide the query piece, or a placeholder base
+    return std::string("?state=") + payload;
+#endif
+}
+
 bool Application::moveObjectByName(const std::string& name, const glm::vec3& delta)
 {
     for (auto& o : m_sceneObjects) {
@@ -1462,6 +1870,97 @@ bool Application::moveObjectByName(const std::string& name, const glm::vec3& del
         }
     }
     return false;
+}
+
+bool Application::duplicateObject(const std::string& sourceName, const std::string& newName,
+                                  const glm::vec3* deltaPos,
+                                  const glm::vec3* deltaScale,
+                                  const glm::vec3* deltaRotDeg)
+{
+    // Find source
+    int idx = -1;
+    for (int i = 0; i < (int)m_sceneObjects.size(); ++i) {
+        if (m_sceneObjects[i].name == sourceName) { idx = i; break; }
+    }
+    if (idx < 0) return false;
+    const SceneObject& src = m_sceneObjects[idx];
+
+    // Create copy with fresh GL buffers from CPU geometry
+    SceneObject obj = src; // copy material, shader choice, textures, factors, loader, etc.
+    obj.name = newName;
+    obj.VAO = obj.VBO_positions = obj.VBO_normals = obj.VBO_uvs = obj.VBO_tangents = obj.EBO = 0;
+
+    // Upload GL buffers identical to addObject() step 4
+    glGenVertexArrays(1, &obj.VAO);
+    glBindVertexArray(obj.VAO);
+
+    glGenBuffers(1, &obj.VBO_positions);
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_positions);
+    glBufferData(GL_ARRAY_BUFFER, obj.objLoader.getVertCount() * sizeof(glm::vec3), obj.objLoader.getPositions(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glGenBuffers(1, &obj.VBO_normals);
+    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_normals);
+    glBufferData(GL_ARRAY_BUFFER, obj.objLoader.getVertCount() * sizeof(glm::vec3), obj.objLoader.getNormals(), GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glEnableVertexAttribArray(1);
+
+    if (obj.objLoader.hasTexcoords()) {
+        glGenBuffers(1, &obj.VBO_uvs);
+        glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_uvs);
+        glBufferData(GL_ARRAY_BUFFER, obj.objLoader.getVertCount() * sizeof(glm::vec2), obj.objLoader.getTexcoords(), GL_STATIC_DRAW);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(2);
+    }
+    if (obj.objLoader.hasTangents()) {
+        glGenBuffers(1, &obj.VBO_tangents);
+        glBindBuffer(GL_ARRAY_BUFFER, obj.VBO_tangents);
+        glBufferData(GL_ARRAY_BUFFER, obj.objLoader.getVertCount() * sizeof(glm::vec3), obj.objLoader.getTangents(), GL_STATIC_DRAW);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(3);
+    }
+
+    glGenBuffers(1, &obj.EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj.objLoader.getIndexCount() * sizeof(unsigned int), obj.objLoader.getFaces(), GL_STATIC_DRAW);
+    glBindVertexArray(0);
+
+    // Set transform equal to source, then apply deltas
+    obj.modelMatrix = src.modelMatrix;
+    if (deltaPos)   obj.modelMatrix = glm::translate(obj.modelMatrix, *deltaPos);
+    if (deltaScale) obj.modelMatrix = obj.modelMatrix * glm::scale(glm::mat4(1.0f), *deltaScale);
+    if (deltaRotDeg) {
+        glm::mat4 R = glm::mat4(1.0f);
+        R = glm::rotate(R, glm::radians(deltaRotDeg->x), glm::vec3(1,0,0));
+        R = glm::rotate(R, glm::radians(deltaRotDeg->y), glm::vec3(0,1,0));
+        R = glm::rotate(R, glm::radians(deltaRotDeg->z), glm::vec3(0,0,1));
+        obj.modelMatrix = obj.modelMatrix * R;
+    }
+
+    m_sceneObjects.push_back(std::move(obj));
+    return true;
+}
+
+void Application::setCameraTarget(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up)
+{
+    m_cameraPos = position;
+    m_cameraUp = glm::normalize(up);
+    m_cameraFront = glm::normalize(target - position);
+}
+
+void Application::setCameraFrontUp(const glm::vec3& position, const glm::vec3& front, const glm::vec3& up)
+{
+    m_cameraPos = position;
+    m_cameraUp = glm::normalize(up);
+    m_cameraFront = glm::normalize(front);
+}
+
+void Application::setCameraLens(float fovDeg, float nearZ, float farZ)
+{
+    if (fovDeg > 0) m_fov = fovDeg;
+    if (nearZ > 0)  m_nearClip = nearZ;
+    if (farZ > 0)   m_farClip = farZ;
 }
 
 bool Application::removeObjectByName(const std::string& name)
