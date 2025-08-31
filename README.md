@@ -1,159 +1,69 @@
-# OpenGL OBJ Viewer + Raytracer (with AI and Tools)
+# OpenGLOBJViewer
 
-This is a C++ OpenGL viewer and CPU raytracer with modern quality‑of‑life tools:
-- Natural‑language commands (via AI) and JSON Ops v1 scripting
-- PBR (Cook–Torrance) and a standard raster path
-- “Why is it black?” diagnostics with one‑click fixes
-- Perf HUD coach with counters + actionable hints
+Problem → Simple viewers rarely scale from quick lookdev to shareable outputs, and they don’t run identically on desktop and web.
 
-Runs as a desktop app (GLFW/GLAD/ImGui). A headless path supports CLI rendering and scripted scene edits.
+Solution → A compact OpenGL viewer + CPU raytracer with JSON scripting and a web build. Drop in a model, tweak lighting/materials, and share or render — same ops on both platforms.
 
----
+60-sec tour → [GIF: Lookdev by prompt] (add docs/media/lookdev.gif) • [GIF: Turntable render] (add docs/media/turntable.gif)
 
-## Quick Start
+Try the web demo → build-web/objviewer.html (serve the folder) or publish to GitHub Pages and link it here.
 
-- Open `Project1/Project1.vcxproj` in Visual Studio 2022 (x64).
-- Build + run from the repo root so `shaders/` and `assets/` resolve.
-- Use the top menu to load sample models or recipes. Hold RMB to fly the camera.
+Getting started
+- Desktop (Windows): open `Project1/Project1.vcxproj`, build x64, run from repo root so `shaders/` and `assets/` resolve.
+- Web: see `WEB_BUILD.md` (Emscripten). Outputs `objviewer.html` in `build-web/` with preloaded `assets/` and `shaders/`.
+- Examples: load JSON from `examples/` (below) or from `Project1/assets/samples/recipes/`.
 
----
+JSON Ops quickstart
+- Format: a list of ops. Docs: `docs/json_ops_v1.md` (schema: `schemas/json_ops_v1.json`).
+- Example:
+  [
+    {"op":"load","path":"assets/models/cube.obj","name":"Hero","transform":{"position":[0,0,-4]}},
+    {"op":"add_light","type":"point","position":[3,2,2],"intensity":1.2},
+    {"op":"set_camera","position":[0,1,6],"target":[0,1,0],"fov_deg":45}
+  ]
+- Headless render:
+  `Project1.exe --ops Project1/assets/samples/recipes/three-point-lighting.json --render renders/out.png --w 1280 --h 720`
 
-## Highlights
+Examples
+- Project1/assets/samples/recipes/three-point-lighting.json: key/fill/rim lights and camera.
+- Project1/assets/samples/recipes/turntable-cli.json: base scene for scripted turntable.
+  - Windows (PowerShell):
+    `for ($i=0; $i -lt 120; $i++) { $ang = [int](360*$i/120); $ops = @(
+      @{ op='load'; path='assets/models/cube.obj'; name='Hero'; transform=@{ position=@(0,0,0) }}
+      @{ op='add_light'; type='point'; position=@(4,6,4); intensity=1.0 }
+      @{ op='set_camera'; position=@(0,1,6); target=@(0,1,0); fov_deg=45 }
+      @{ op='transform'; target='Hero'; mode='set'; transform=@{ rotation_deg=@(0,$ang,0) }}
+      @{ op='render'; target='image'; path=("renders/frame_{0:D4}.png" -f $i); width=1280; height=720 }
+    ) | ConvertTo-Json -Depth 5; Set-Content -Path out.turn.json -Value $ops; .\x64\Release\Project1.exe --ops out.turn.json }`
+  - Bash:
+    `for i in $(seq 0 119); do ang=$(( 360*i/120 )); cat > out.turn.json <<JSON
+[
+ {"op":"load","path":"assets/models/cube.obj","name":"Hero","transform":{"position":[0,0,0]}},
+ {"op":"add_light","type":"point","position":[4,6,4],"intensity":1.0},
+ {"op":"set_camera","position":[0,1,6],"target":[0,1,0],"fov_deg":45},
+ {"op":"transform","target":"Hero","mode":"set","transform":{"rotation_deg":[0,$ang,0]}},
+ {"op":"render","target":"image","path":"renders/frame_$(printf %04d $i).png","width":1280,"height":720}
+]
+JSON
+ ./Project1.exe --ops out.turn.json; done`
 
-- Native OBJ loader; optional unified loader (glTF/GLB/FBX/DAE/PLY) via Assimp.
-- PBR shader: BaseColor, Normal, Metallic/Roughness; Standard shader with flat/Gouraud.
-- Texture cache deduplicates loads; per‑object shader choice (Standard vs PBR).
-- CPU raytracer with BVH; shows the result on a full‑screen quad; optional denoise.
-- Shareable scene state (JSON Ops v1) + headless render CLI.
+Key features
+- Importers: plugin interface with OBJ builtin and optional Assimp for glTF/FBX/DAE/PLY.
+- Materials: simple PBR struct; raster PBR shader; raytracer approximates from PBR for parity.
+- Diagnostics: "Why is it black?" quick fixes; Perf HUD with VRAM estimate.
+- Headless CLI: apply JSON and render to PNG.
+- Web: WebGL2 build; optional KTX2 textures with fallback to PNG/JPG.
 
----
+Troubleshooting
+- Black frame: add a light, or run the "Why is it black?" panel.
+- PBR looking off: avoid double-gamma; disable FB sRGB if needed.
+- Paths: run from repo root; use `assets/...` and `shaders/...`.
 
-## New Tools (MVPs)
-
-1) Explain‑my‑render: “Why is it black?”
-- Detects and offers one‑click fixes:
-  - Missing normals → Recompute angle‑weighted normals
-  - Bad winding (mostly backfacing) → Flip triangle order + invert normals
-  - No lights / tone‑mapped black → Add a neutral key light
-  - sRGB mismatch (PBR gamma + sRGB FB) → Toggle framebuffer sRGB
-- Open via the menubar button “Why is it black?”.
-
-2) Perf Coach HUD
-- Overlay shows: draw calls, total triangles, materials, textures, texture MB, geometry MB, VRAM estimate.
-- Suggestions:
-  - “X meshes share material Y → instancing candidate.”
-  - High draw calls → merge static meshes or instance
-  - High triangle count → consider LOD/decimation
-- Toggle under View → “Perf HUD”.
-- Optional “Ask AI for perf tips” button when AI is enabled.
-
----
-
-## Controls
-
-- RMB + WASD/E/Q/Space/Ctrl: fly camera; RMB drag to orbit
-- Gizmo: Shift+Q/W/E → Translate/Rotate/Scale; X/Y/Z pick axis; L toggles Local/World; N toggles snapping
-- F11: fullscreen
-- Delete: delete selection
-
----
-
-## Menubar
-
-- File → Load Cube / Load Plane, Copy Share Link, Toggle Settings Panel
-- View → Point/Wire/Solid/Raytrace, Fullscreen, Perf HUD
-- Gizmo → Mode, Axis, Local/Snap
-- Samples → Prebuilt recipes (see `assets/samples/recipes/`)
-- Toolbar quick buttons: Mode, Gizmo, Add Light, Denoise, Why is it black?
-
----
-
-## “Talk & AI” Panel
-
-- Send natural language or JSON Ops v1 lines.
-- Enable “Use AI” and configure endpoint/model to let the planner generate a plan from your request.
-- Scene snapshots can be copied as JSON.
-
-Docs: `docs/json_ops_v1.md` (schema in `schemas/json_ops_v1.json`).
-
----
-
-## Headless + Scripting (CLI)
-
-Apply JSON Ops v1 and render to PNG without a window:
-
-- `--ops <file>`: apply JSON Ops v1 from file
-- `--render <out.png>`: render to PNG (optionally with `--w`/`--h`)
-- `--w <int> --h <int>`: output resolution
-- `--denoise`: enable denoiser (if compiled with OIDN)
-
-Example:
-```
-Project1.exe --ops recipe.json --render out.png --w 1024 --h 768
-```
-
----
-
-## Troubleshooting
-
-- Black frame (raster):
-  - Use “Why is it black?” panel.
-  - Add at least one light; check intensities are > 0.
-  - For PBR, if colors look crushed, disable framebuffer sRGB in the panel.
-  - Recompute angle‑weighted normals if the model lacks normals.
-  - Flip winding if the object is mostly backfacing.
-
-- Dark/washed PBR:
-  - Avoid double‑gamma: PBR shader outputs gamma‑corrected color; disable FB sRGB.
-
-- Headless asset paths:
-  - Run from repo root or provide absolute paths so `assets/` resolves.
-
----
-
-## Build Notes
-
+Build notes
 - Toolchain: Visual Studio 2022, C++17, x64.
-- Third‑party: GLFW, ImGui, stb, GLM under `Libraries/`.
+- Third-party: GLFW, ImGui, stb, GLM under `Libraries/`.
 - Optional: Assimp via vcpkg (`USE_ASSIMP`) for non-OBJ formats.
-  - Include/Lib dirs and DLL steps are typical for vcpkg.
+- Optional: KTX2 via `ENABLE_KTX2` if libktx is available.
 
----
-
-## Texture Compression (KTX2/Basis)
-
-- Runtime prefers `.ktx2` next to requested PNG/JPG; if present, it loads `.ktx2`. Otherwise it falls back to STB PNG/JPG.
-- KTX2 loading is optional and compiled when `ENABLE_KTX2=ON` in CMake and `libktx` is available. Without it, `.ktx2` is ignored and PNG/JPG are used.
-- Offline conversion scripts:
-  - Windows PowerShell: `tools/texc.ps1` (requires `toktx` in PATH)
-    - Example: `powershell -ExecutionPolicy Bypass -File tools/texc.ps1 -Root Project1/assets -Mode etc1s`
-  - Bash: `tools/texc.sh` (requires `toktx` in PATH)
-    - Example: `bash tools/texc.sh -r Project1/assets -m etc1s -j 4`
-- Recommended modes:
-  - `etc1s`: smallest (good default for web, color/albedo)
-  - `uastc`: higher quality (use for normals/roughness if banding appears)
-- Web build: assets folder is preloaded; `.ktx2` files next to images are automatically available.
-
----
-
-## Repo Layout
-
-- `Project1/src` – rendering, UI, loaders, raytracer
-- `Project1/include` – headers
-- `Project1/shaders` – GLSL
-- `Project1/assets` – sample models, textures, recipes
-- `docs/json_ops_v1.md`, `schemas/json_ops_v1.json` – scripting docs/schema
-
----
-
-## Samples
-
-Use the Samples menu or load recipes manually:
-- `assets/samples/recipes/three-point-lighting.json`
-- `assets/samples/recipes/isometric-hero.json`
-
----
-
-## License
-
-See repository license if present. Third‑party components retain their respective licenses.
+Release
+- See `RELEASE.md` for tagging v0.3.0, bundling desktop/web artifacts, and GitHub Pages.
