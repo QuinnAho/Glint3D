@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glad/glad.h>
+#include "gl_platform.h"
 
 #ifndef GL_COMPUTE_SHADER
 #define GL_COMPUTE_SHADER 0x91B9
@@ -25,4 +25,3 @@ extern PFNGLMEMORYBARRIERPROC    pglMemoryBarrier;
 
 // Load the above pointers using wglGetProcAddress / opengl32.dll
 bool LoadGL43ComputeFunctions();
-

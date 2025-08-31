@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
 
 Shader::Shader() : m_programID(0) {}
 
@@ -82,7 +83,39 @@ std::string Shader::loadShaderFromFile(const std::string& path)
 GLuint Shader::compileShader(const std::string& source, GLenum type)
 {
     GLuint shader = glCreateShader(type);
+#if defined(__EMSCRIPTEN__)
+    auto patchGLSLForWeb = [&](const std::string& in)->std::string {
+        std::string out = in;
+        // Normalize line endings
+        // Ensure correct version directive for WebGL2
+        size_t pos = out.find("#version");
+        if (pos != std::string::npos) {
+            // Replace common desktop versions with 300 es
+            size_t line_end = out.find('\n', pos);
+            if (line_end == std::string::npos) line_end = out.size();
+            std::string ver = out.substr(pos, line_end - pos);
+            if (ver.find("330") != std::string::npos || ver.find("410") != std::string::npos || ver.find("420") != std::string::npos || ver.find("430") != std::string::npos)
+            {
+                out.replace(pos, line_end - pos, "#version 300 es");
+            }
+        } else {
+            out = std::string("#version 300 es\n") + out;
+        }
+        // Add precision qualifiers (fragment shader requires default float precision in ES)
+        if (type == GL_FRAGMENT_SHADER) {
+            // Insert after the version line
+            size_t vpos = out.find("#version");
+            size_t insert_at = (vpos == std::string::npos) ? 0 : out.find('\n', vpos) + 1;
+            std::string precisions = "precision highp float;\nprecision highp int;\n";
+            out.insert(insert_at, precisions);
+        }
+        return out;
+    };
+    std::string ems_src = patchGLSLForWeb(source);
+    const char* src = ems_src.c_str();
+#else
     const char* src = source.c_str();
+#endif
 
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);

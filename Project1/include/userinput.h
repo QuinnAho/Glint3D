@@ -2,7 +2,7 @@
 #define USERINPUT_H
 
 
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <glm/glm.hpp>
 #include <limits>
 #include <vector>

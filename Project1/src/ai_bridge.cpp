@@ -1,4 +1,7 @@
 #include "ai_bridge.h"
+
+#if !defined(__EMSCRIPTEN__)
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -238,3 +241,24 @@ bool AIPlanner::plan(const std::string& natural,
     outPlan = modelOut;
     return true;
 }
+
+#else // __EMSCRIPTEN__
+
+#include <string>
+
+bool NLToJSONBridge::translate(const std::string& natural, std::string& outJson, std::string& error) {
+    (void)natural; (void)outJson;
+    error = "AI bridge networking is disabled on Web builds.";
+    return false;
+}
+
+bool AIPlanner::plan(const std::string& natural,
+                     const std::string& sceneJson,
+                     std::string& outPlan,
+                     std::string& error) {
+    (void)natural; (void)sceneJson; (void)outPlan;
+    error = "AI planner is not available on Web builds.";
+    return false;
+}
+
+#endif // __EMSCRIPTEN__

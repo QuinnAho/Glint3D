@@ -2,7 +2,7 @@
 #define RAY_H
 
 
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <glm/glm.hpp>
 
 class Ray {

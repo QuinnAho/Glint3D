@@ -1,5 +1,5 @@
 #include "Material.h"
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <glm/gtc/type_ptr.hpp>
 
 

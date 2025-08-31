@@ -1,5 +1,5 @@
 #include "Grid.h"
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>

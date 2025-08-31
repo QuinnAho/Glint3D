@@ -1,7 +1,7 @@
 #ifndef AXIS_RENDERER_H
 #define AXIS_RENDERER_H
 
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>

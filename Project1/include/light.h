@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
-#include <glad/glad.h>
+#include "gl_platform.h"
 
 struct LightSource {
     glm::vec3 position;

@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <glad/glad.h>
+#include "gl_platform.h"
 
 class ComputeShader
 {
@@ -22,4 +22,3 @@ private:
     std::string loadFile(const std::string& path);
     GLuint compile(GLenum type, const std::string& src);
 };
-

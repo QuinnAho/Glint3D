@@ -108,7 +108,12 @@ bool Application::initGLFW(const std::string& windowTitle, int width, int height
 
 bool Application::initGLAD()
 {
+#ifdef __EMSCRIPTEN__
+    // WebGL2 doesn't use GLAD; context is ready when created
+    return true;
+#else
     return gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+#endif
 }
 
 void Application::initImGui()
@@ -119,13 +124,22 @@ void Application::initImGui()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init("#version 330");
+#endif
 }
 
 void Application::setupOpenGL()
 {
+#ifdef __EMSCRIPTEN__
+    if (!m_cowTexture.loadFromFile("assets/cow-tex-fin.jpg"))
+        std::cerr << "Failed to load cow texture.\n";
+#else
     if (!m_cowTexture.loadFromFile("cow-tex-fin.jpg"))
         std::cerr << "Failed to load cow texture.\n";
+#endif
 
     createScreenQuad();  // allocates rayTexID (RGB32F)
 
@@ -205,10 +219,16 @@ void Application::setupOpenGL()
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+#ifdef __EMSCRIPTEN__
+    // WebGL2: no CLAMP_TO_BORDER; use EDGE and avoid border color
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#else
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowDepthTexture, 0);
@@ -411,8 +431,23 @@ void Application::renderScene()
 
     if (m_renderMode == 3 && m_raytracer)
     {
+        // Raytrace execution
+#ifdef __EMSCRIPTEN__
+        if (!m_traceDone)
+        {
+            // Run synchronously (single-threaded)
+            std::cout << "[Trace] Tracing on main thread (Web) ...\n";
+            m_framebuffer.resize(size_t(m_windowWidth) * m_windowHeight);
+            m_raytracer->renderImage(m_framebuffer, m_windowWidth, m_windowHeight, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
+            glBindTexture(GL_TEXTURE_2D, rayTexID);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                m_windowWidth, m_windowHeight,
+                GL_RGB, GL_FLOAT, m_framebuffer.data());
+            m_traceDone = true;
+        }
+#else
         // --- Start the raytrace ONCE ---
-        if (!m_traceJob.valid() && !m_traceDone)  // <=== ADD THIS !!
+        if (!m_traceJob.valid() && !m_traceDone)
         {
             std::cout << "[TraceJob] Starting new raytrace...\n";
 
@@ -440,6 +475,7 @@ void Application::renderScene()
                 m_windowWidth, m_windowHeight,
                 GL_RGB, GL_FLOAT, m_framebuffer.data());
         }
+#endif
 
         // --- Always draw the last available raytrace result ---
         m_rayScreenShader->use();
@@ -466,12 +502,14 @@ void Application::renderScene()
         m_traceDone = false;
     }
 
+#ifndef __EMSCRIPTEN__
     switch (m_renderMode)
     {
     case 0: glPolygonMode(GL_FRONT_AND_BACK, GL_POINT); break;
     case 1: glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  break;
     default:glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  break;
     }
+#endif
 
     m_grid.render(m_viewMatrix, m_projectionMatrix);
 

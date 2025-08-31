@@ -1,7 +1,7 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
-#include <glad/glad.h>
+#include "gl_platform.h"
 #include <string>
 
 class Texture
@@ -18,4 +18,3 @@ private:
 };
 
 #endif // TEXTURE_H
-
