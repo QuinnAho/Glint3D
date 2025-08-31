@@ -1,8 +1,2 @@
-﻿  BVHNode.cpp
-  application.cpp
-  main.cpp
-  userinput.cpp
-D:\class\OpenGLOBJViewer\Project1\src\userinput.cpp(105,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-D:\class\OpenGLOBJViewer\Project1\src\userinput.cpp(106,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-  Generating Code...
+﻿  application.cpp
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe

@@ -1,8 +1,9 @@
-﻿#include "application.h"
+#include "application.h"
 #include <iostream>
 #include <sstream>
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -122,7 +123,7 @@ void Application::setupOpenGL()
 
     createScreenQuad();  // allocates rayTexID (RGB32F)
 
-    // Clear the ray-texture once so the first frame isn’t pure black
+    // Clear the ray-texture once so the first frame isnâ€™t pure black
     {
         std::vector<float> grey(m_windowWidth * m_windowHeight * 3, 0.1f);
         glBindTexture(GL_TEXTURE_2D, rayTexID);
@@ -149,19 +150,6 @@ void Application::setupOpenGL()
     }
     m_rayScreenShader->use();
     m_rayScreenShader->setInt("rayTex", 0);
-
-    // ---- Add scene objects ----
-    addObject("Cow Left", "cow.obj", glm::vec3(-6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
-    addObject("Cow Right", "cow.obj", glm::vec3(6.0f, 2.0f, 5.0f), "cow-tex-fin.jpg", glm::vec3(1.0f), false, glm::vec3(1.0f));
-
-    addObject("Wall1", "cube.obj", glm::vec3(0.0f, 2.0f, -3.0f), "", glm::vec3(16.0f, 6.0f, 0.5f), true, glm::vec3(1.0f, 0.5f, 0.5f));
-    addObject("Wall2", "cube.obj", glm::vec3(0.0f, -4.0f, 5.0f), "", glm::vec3(16.0f, 0.5f, 8.0f), true, glm::vec3(0.5f, 1.0f, 0.5f));
-    addObject("Wall3", "cube.obj", glm::vec3(-16.0f, 2.0f, 5.0f), "", glm::vec3(0.5f, 6.0f, 8.0f), true, glm::vec3(0.5f, 0.5f, 1.0f));
-    addObject("Wall4", "cube.obj", glm::vec3(16.0f, 2.0f, 5.0f), "", glm::vec3(0.5f, 6.0f, 8.0f), true, glm::vec3(1.0f, 1.0f, 0.5f));
-
-    // ---- Add lights ----
-    m_lights.addLight(glm::vec3(-6.0f, 7.0f, 8.0f), glm::vec3(1.0f, 0.5f, 0.5f), 1.2f);
-    m_lights.addLight(glm::vec3(6.0f, 7.0f, 8.0f), glm::vec3(0.5f, 0.5f, 1.0f), 1.2f);
 
     // ---- Setup raytracer now that sceneObjects exist ----
     m_raytracer = std::make_unique<Raytracer>();
@@ -220,6 +208,11 @@ void Application::setupOpenGL()
     m_shadowShader = new Shader();
     if (!m_shadowShader->load("shaders/shadow_depth.vert", "shaders/shadow_depth.frag"))
         std::cerr << "Failed to load shadow shader.\n";
+
+    // Load outline shader for selected-object highlighting
+    m_outlineShader = new Shader();
+    if (!m_outlineShader->load("shaders/outline.vert", "shaders/outline.frag"))
+        std::cerr << "Failed to load outline shader.\n";
 }
 
 
@@ -260,6 +253,12 @@ void Application::cleanup()
         delete m_gridShader;
         m_gridShader = nullptr;
     }
+
+    if (m_outlineShader)
+    {
+        delete m_outlineShader;
+        m_outlineShader = nullptr;
+    }
 }
 
 void Application::run()
@@ -295,6 +294,15 @@ void Application::processInput()
         m_cameraPos -= speed * m_cameraUp;
     if (glfwGetKey(m_window, GLFW_KEY_E) == GLFW_PRESS)
         m_cameraPos += speed * m_cameraUp;
+
+    // F11 fullscreen toggle (edge-triggered)
+    if (glfwGetKey(m_window, GLFW_KEY_F11) == GLFW_PRESS) {
+        if (!m_f11Held) { toggleFullscreen(); }
+        m_f11Held = true;
+    }
+    if (glfwGetKey(m_window, GLFW_KEY_F11) == GLFW_RELEASE) {
+        m_f11Held = false;
+    }
 }
 
 
@@ -433,6 +441,24 @@ void Application::renderScene()
         glBindVertexArray(0);
     }
 
+    // Thin outline for selected object (if any)
+    if (m_outlineShader && m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
+    {
+        const auto& obj = m_sceneObjects[m_selectedObjectIndex];
+        glm::mat4 modelScaled = obj.modelMatrix * glm::scale(glm::mat4(1.0f), glm::vec3(1.03f));
+        m_outlineShader->use();
+        m_outlineShader->setMat4("model", modelScaled);
+        m_outlineShader->setMat4("view", m_viewMatrix);
+        m_outlineShader->setMat4("projection", m_projectionMatrix);
+        m_outlineShader->setVec3("outlineColor", glm::vec3(1.0f, 0.9f, 0.1f));
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        glBindVertexArray(obj.VAO);
+        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+        glCullFace(GL_BACK);
+    }
+
     renderAxisIndicator();
     renderGUI();
     m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix);
@@ -550,10 +576,100 @@ void Application::renderGUI()
         }
     }
 
-    ImGui::End();
+    // --- Talk & AI (combined UI) ---
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Talk & AI", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::Checkbox("Preview only (no-op)", &m_previewOnly);
+        ImGui::SameLine();
+        ImGui::Checkbox("Use AI", &m_useAI);
+        if (m_useAI)
+        {
+            char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
+            char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
+            if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
+                m_aiConfig.endpoint = endpointBuf;
+                m_ai.setConfig(m_aiConfig);
+            }
+            if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
+                m_aiConfig.model = modelBuf;
+                m_ai.setConfig(m_aiConfig);
+            }
+        }
 
-    // Right-side Talk panel (chat-style command input)
-    renderChatPanel();
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
+        ImGui::Text("Enter a command (natural language):");
+        ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 120.0f), flags);
+
+        if (!m_aiBusy && ImGui::Button("Submit"))
+        {
+            std::string input(m_chatInput);
+            if (!input.empty()) {
+                if (m_useAI) {
+                    // Kick off async AI planning
+                    std::string scene = sceneToJson();
+                    m_aiBusy = true;
+                    m_aiFuture = std::async(std::launch::async, [this, input, scene]() {
+                        std::string plan, err; (void)err;
+                        std::string e;
+                        bool ok = m_ai.plan(input, scene, plan, e);
+                        if (ok) return std::make_pair(plan, std::string());
+                        return std::make_pair(std::string(), e);
+                    });
+                } else {
+                    std::vector<std::string> logs;
+                    bool ok = m_nl.execute(input, logs);
+                    for (auto& l : logs) m_chatScrollback.push_back(l);
+                    if (!ok) m_chatScrollback.push_back("(no changes)");
+                }
+            }
+            m_chatInput[0] = '\0';
+        }
+
+        if (m_aiBusy)
+            ImGui::TextColored(ImVec4(1,1,0,1), "AI planning...");
+
+        // Collect AI plan if ready
+        if (m_aiFuture.valid() && m_aiFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        {
+            auto pr = m_aiFuture.get();
+            m_aiBusy = false;
+            if (!pr.second.empty()) {
+                m_chatScrollback.push_back(std::string("AI error: ") + pr.second);
+            } else {
+                m_chatScrollback.push_back(std::string("AI plan:\n") + pr.first);
+                std::istringstream is(pr.first);
+                std::string line;
+                while (std::getline(is, line)) {
+                    if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+                    std::vector<std::string> logs;
+                    bool ok = m_nl.execute(line, logs);
+                    for (auto& l : logs) m_chatScrollback.push_back(l);
+                    if (!ok) m_chatScrollback.push_back("(no changes)");
+                }
+            }
+        }
+
+        if (ImGui::Button("Copy Scene JSON")) {
+            auto json = sceneToJson();
+            ImGui::SetClipboardText(json.c_str());
+            m_chatScrollback.push_back("Scene JSON copied to clipboard.");
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Output:");
+        if (ImGui::BeginChild("##scrollback", ImVec2(0,160), true, ImGuiWindowFlags_HorizontalScrollbar))
+        {
+            for (const auto& line : m_chatScrollback) {
+                ImGui::TextUnformatted(line.c_str());
+                ImGui::Separator();
+            }
+        }
+        ImGui::EndChild();
+    }
+
+    ImGui::End();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -561,161 +677,7 @@ void Application::renderGUI()
 
 void Application::renderChatPanel()
 {
-    const float panelWidth = 420.0f;
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - panelWidth - 10.0f, 10.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelWidth, ImGui::GetIO().DisplaySize.y - 20.0f), ImGuiCond_Always);
-    ImGui::Begin("Talk", nullptr, ImGuiWindowFlags_NoCollapse);
-
-    ImGui::Checkbox("Preview only", &m_previewOnly);
-    ImGui::SameLine();
-    ImGui::Checkbox("Use AI", &m_useAI);
-    if (m_useAI)
-    {
-        char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
-        char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
-        if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
-            m_aiConfig.endpoint = endpointBuf;
-            m_ai.setConfig(m_aiConfig);
-        }
-        if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
-            m_aiConfig.model = modelBuf;
-            m_ai.setConfig(m_aiConfig);
-        }
-    }
-    ImGui::Separator();
-
-    ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
-    ImGui::Text("Enter JSON-like command(s):");
-    ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 140.0f), flags);
-    if (ImGui::Button("Submit"))
-    {
-        std::string input(m_chatInput);
-        if (!input.empty()) {
-            std::string jsonToRun;
-            if (m_useAI) {
-                std::string err;
-                if (!m_ai.translate(input, jsonToRun, err)) {
-                    m_chatScrollback.push_back(std::string("AI error: ") + err);
-                    m_chatInput[0] = '\0';
-                    // keep window open; do not early-return out of UI
-                }
-                m_chatScrollback.push_back(std::string("AI JSON:\n") + jsonToRun);
-            } else {
-                jsonToRun = input;
-            }
-
-            CommandBatch batch; std::string perr;
-            if (ParseCommandBatch(jsonToRun, batch, perr)) {
-                m_pendingPretty = ToJson(batch);
-                m_chatScrollback.push_back(std::string("Parsed OK:\n") + m_pendingPretty);
-                m_pendingBatch = batch;
-                m_confirmOpen = true;
-                ImGui::OpenPopup("Apply Commands?");
-            } else {
-                m_chatScrollback.push_back(std::string("Parse error: ") + perr);
-            }
-        }
-        m_chatInput[0] = '\0';
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Output:");
-    if (ImGui::BeginChild("##scrollback", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar))
-    {
-        for (const auto& line : m_chatScrollback) {
-            ImGui::TextUnformatted(line.c_str());
-            ImGui::Separator();
-        }
-    }
-    ImGui::EndChild();
-
-    // Confirmation modal for current batch
-    if (ImGui::BeginPopupModal("Apply Commands?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::TextWrapped("About to apply the following commands:");
-        ImGui::Separator();
-        ImGui::BeginChild("##pending_pretty", ImVec2(400, 220), true, ImGuiWindowFlags_HorizontalScrollbar);
-        ImGui::TextUnformatted(m_pendingPretty.c_str());
-        ImGui::EndChild();
-        ImGui::Separator();
-        if (ImGui::Button("Apply")) {
-            executeCommands(m_pendingBatch, false);
-            m_confirmOpen = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            m_confirmOpen = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    ImGui::End();
-}
-
-void Application::executeCommands(const CommandBatch& batch, bool previewOnly)
-{
-    for (const auto& cmd : batch.commands) {
-        switch (cmd.op) {
-        case CommandOp::LoadModel: {
-            std::ostringstream os; os << "Will load_model: path='" << cmd.loadModel.path << "'";
-            if (cmd.loadModel.name) os << ", name='" << *cmd.loadModel.name << "'";
-            if (cmd.loadModel.transform.position) os << ", pos=(" << cmd.loadModel.transform.position->x << "," << cmd.loadModel.transform.position->y << "," << cmd.loadModel.transform.position->z << ")";
-            if (cmd.loadModel.transform.scale)    os << ", scale=(" << cmd.loadModel.transform.scale->x    << "," << cmd.loadModel.transform.scale->y    << "," << cmd.loadModel.transform.scale->z    << ")";
-            m_chatScrollback.push_back(os.str());
-            if (!previewOnly) {
-                glm::vec3 pos = cmd.loadModel.transform.position.value_or(glm::vec3(0.0f));
-                glm::vec3 scl = cmd.loadModel.transform.scale.value_or(glm::vec3(1.0f));
-                addObject(cmd.loadModel.name.value_or(""), cmd.loadModel.path, pos, "", scl, false, glm::vec3(1.0f));
-                if (m_raytracer && !m_sceneObjects.empty()) {
-                    const SceneObject& newObj = m_sceneObjects.back();
-                    m_raytracer->loadModel(newObj.objLoader, newObj.modelMatrix, 0.05f, newObj.material);
-                }
-            }
-            break; }
-        case CommandOp::Duplicate: {
-            std::ostringstream os; os << "Will duplicate: source='" << cmd.duplicate.source << "'";
-            if (cmd.duplicate.name) os << ", name='" << *cmd.duplicate.name << "'";
-            if (cmd.duplicate.transform.position) os << ", deltaPos=(" << cmd.duplicate.transform.position->x << "," << cmd.duplicate.transform.position->y << "," << cmd.duplicate.transform.position->z << ")";
-            m_chatScrollback.push_back(os.str());
-            if (!previewOnly) {
-                auto it = std::find_if(m_sceneObjects.begin(), m_sceneObjects.end(), [&](const SceneObject& o){ return o.name == cmd.duplicate.source; });
-                if (it != m_sceneObjects.end()) {
-                    SceneObject copy = *it;
-                    if (cmd.duplicate.name) copy.name = *cmd.duplicate.name; else copy.name += "_copy";
-                    if (cmd.duplicate.transform.position) {
-                        copy.modelMatrix = glm::translate(copy.modelMatrix, *cmd.duplicate.transform.position);
-                    }
-                    if (cmd.duplicate.transform.scale) {
-                        copy.modelMatrix = copy.modelMatrix * glm::scale(glm::mat4(1.0f), *cmd.duplicate.transform.scale);
-                    }
-                    m_sceneObjects.push_back(copy);
-                    if (m_raytracer && !m_sceneObjects.empty()) {
-                        const SceneObject& newObj = m_sceneObjects.back();
-                        m_raytracer->loadModel(newObj.objLoader, newObj.modelMatrix, 0.05f, newObj.material);
-                    }
-                } else {
-                    m_chatScrollback.push_back("Duplicate error: source not found");
-                }
-            }
-            break; }
-        case CommandOp::AddLight: {
-            std::ostringstream os; os << "Will add_light: type='" << cmd.addLight.type << "'";
-            if (cmd.addLight.position)  os << ", pos=(" << cmd.addLight.position->x  << "," << cmd.addLight.position->y  << "," << cmd.addLight.position->z  << ")";
-            if (cmd.addLight.direction) os << ", dir=(" << cmd.addLight.direction->x << "," << cmd.addLight.direction->y << "," << cmd.addLight.direction->z << ")";
-            if (cmd.addLight.intensity) os << ", I=" << *cmd.addLight.intensity;
-            m_chatScrollback.push_back(os.str());
-            if (!previewOnly) {
-                glm::vec3 c = cmd.addLight.color.value_or(glm::vec3(1.0f));
-                float I = cmd.addLight.intensity.value_or(1.0f);
-                glm::vec3 p = cmd.addLight.position.value_or(glm::vec3(0.0f));
-                m_lights.addLight(p, c, I);
-                m_lights.initIndicator();
-            }
-            break; }
-        }
-    }
+    renderChatPanelNL();
 }
 
 void Application::renderAxisIndicator()
@@ -961,4 +923,254 @@ bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, co
             return false;
     }
     return true;
+}
+
+// New natural-language chat panel
+void Application::renderChatPanelNL()
+{
+    const float panelWidth = 420.0f;
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - panelWidth - 10.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, ImGui::GetIO().DisplaySize.y - 20.0f), ImGuiCond_Always);
+    ImGui::Begin("Talk", nullptr, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::Checkbox("Preview only (no-op)", &m_previewOnly);
+    ImGui::SameLine();
+    ImGui::Checkbox("Use AI", &m_useAI);
+    if (m_useAI)
+    {
+        char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
+        char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
+        if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
+            m_aiConfig.endpoint = endpointBuf;
+            m_ai.setConfig(m_aiConfig);
+        }
+        if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
+            m_aiConfig.model = modelBuf;
+            m_ai.setConfig(m_aiConfig);
+        }
+    }
+    ImGui::Separator();
+
+    ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine;
+    ImGui::Text("Enter a command (natural language):");
+    ImGui::InputTextMultiline("##chat_input", m_chatInput, IM_ARRAYSIZE(m_chatInput), ImVec2(-1.0f, 140.0f), flags);
+    if (ImGui::Button("Submit"))
+    {
+        std::string input(m_chatInput);
+        if (!input.empty()) {
+            if (m_useAI) {
+                std::string plan, err;
+                std::string scene = sceneToJson();
+                if (!m_ai.plan(input, scene, plan, err)) {
+                    m_chatScrollback.push_back(std::string("AI error: ") + err);
+                } else {
+                    m_chatScrollback.push_back(std::string("AI plan:\n") + plan);
+                    // Execute each non-empty line
+                    std::istringstream is(plan);
+                    std::string line;
+                    while (std::getline(is, line)) {
+                        if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+                        std::vector<std::string> logs;
+                        bool ok = m_nl.execute(line, logs);
+                        for (auto& l : logs) m_chatScrollback.push_back(l);
+                        if (!ok) m_chatScrollback.push_back("(no changes)");
+                    }
+                }
+            } else {
+                std::vector<std::string> logs;
+                bool ok = m_nl.execute(input, logs);
+                for (auto& l : logs) m_chatScrollback.push_back(l);
+                if (!ok) m_chatScrollback.push_back("(no changes)");
+            }
+        }
+        m_chatInput[0] = '\0';
+    }
+
+    if (ImGui::Button("Copy Scene JSON")) {
+        auto json = sceneToJson();
+        ImGui::SetClipboardText(json.c_str());
+        m_chatScrollback.push_back("Scene JSON copied to clipboard.");
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Output:");
+    if (ImGui::BeginChild("##scrollback", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        for (const auto& line : m_chatScrollback) {
+            ImGui::TextUnformatted(line.c_str());
+            ImGui::Separator();
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+// ---- Runtime scene API used by NL executor ----
+bool Application::loadObjAt(const std::string& name,
+                             const std::string& path,
+                             const glm::vec3& position,
+                             const glm::vec3& scale)
+{
+    namespace fs = std::filesystem;
+    auto hasExt = [](const std::string& s){ return s.find('.') != std::string::npos; };
+    auto toLower = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return (char)std::tolower(c); }); return s; };
+    auto stripTrailingDigits = [](std::string s){ while(!s.empty() && std::isdigit((unsigned char)s.back())) s.pop_back(); return s; };
+
+    std::vector<std::string> baseCandidates;
+    baseCandidates.push_back(path);
+    if (!hasExt(path)) baseCandidates.push_back(path + ".obj");
+    // Lowercase variants
+    auto low = toLower(path);
+    if (low != path) {
+        baseCandidates.push_back(low);
+        if (!hasExt(low)) baseCandidates.push_back(low + ".obj");
+    }
+    // Strip trailing digits (e.g., "Cow1" -> "Cow") then lowercase
+    auto noDigits = stripTrailingDigits(path);
+    if (noDigits != path) {
+        auto ndLow = toLower(noDigits);
+        baseCandidates.push_back(ndLow);
+        if (!hasExt(ndLow)) baseCandidates.push_back(ndLow + ".obj");
+    }
+
+    std::vector<std::string> prefixes = { "", "objs/", "assets/models/" };
+
+    for (const auto& base : baseCandidates) {
+        for (const auto& pref : prefixes) {
+            std::string candidate = pref + base;
+            std::error_code ec;
+            if (fs::exists(candidate, ec)) {
+                addObject(name, candidate, position, "", scale, false, glm::vec3(1.0f));
+                if (m_raytracer && !m_sceneObjects.empty()) {
+                    const SceneObject& newObj = m_sceneObjects.back();
+                    m_raytracer->loadModel(newObj.objLoader, newObj.modelMatrix, 0.05f, newObj.material);
+                }
+                return true;
+            }
+        }
+    }
+    // Not found: log to chat scrollback for visibility
+    std::ostringstream os; os << "Model not found for '" << path << "'. Tried candidates in ['', 'objs/', 'assets/models/'] with .obj and lowercase variants.";
+    m_chatScrollback.push_back(os.str());
+    return false;
+}
+
+bool Application::loadObjInFrontOfCamera(const std::string& name,
+                                          const std::string& path,
+                                          float metersForward,
+                                          const glm::vec3& scale)
+{
+    glm::vec3 pos = m_cameraPos + glm::normalize(m_cameraFront) * metersForward;
+    return loadObjAt(name, path, pos, scale);
+}
+
+bool Application::addPointLightAt(const glm::vec3& position,
+                                  const glm::vec3& color,
+                                  float intensity)
+{
+    m_lights.addLight(position, color, intensity);
+    m_lights.initIndicator();
+    return true;
+}
+
+bool Application::createMaterialNamed(const std::string& name, const Material& m)
+{
+    m_namedMaterials[name] = m;
+    return true;
+}
+
+bool Application::assignMaterialToObject(const std::string& objectName, const std::string& materialName)
+{
+    auto itM = m_namedMaterials.find(materialName);
+    if (itM == m_namedMaterials.end()) return false;
+    for (auto& o : m_sceneObjects) {
+        if (o.name == objectName) { o.material = itM->second; return true; }
+    }
+    return false;
+}
+
+std::string Application::sceneToJson() const
+{
+    std::ostringstream os;
+    os << "{\n";
+    os << "  \"camera\": { \"position\": [" << m_cameraPos.x << ", " << m_cameraPos.y << ", " << m_cameraPos.z << "], \"front\": [" << m_cameraFront.x << ", " << m_cameraFront.y << ", " << m_cameraFront.z << "] },\n";
+    os << "  \"selected\": ";
+    if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size()) os << "\"" << m_sceneObjects[m_selectedObjectIndex].name << "\""; else os << "null";
+    os << ",\n";
+    os << "  \"objects\": [\n";
+    for (size_t i=0;i<m_sceneObjects.size();++i){
+        const auto& o = m_sceneObjects[i];
+        os << "    { \"name\": \"" << o.name << "\", \"material\": {"
+              " \"diffuse\": [" << o.material.diffuse.x << ", " << o.material.diffuse.y << ", " << o.material.diffuse.z << "],"
+              " \"specular\": [" << o.material.specular.x << ", " << o.material.specular.y << ", " << o.material.specular.z << "],"
+              " \"ambient\": [" << o.material.ambient.x << ", " << o.material.ambient.y << ", " << o.material.ambient.z << "],"
+              " \"shininess\": " << o.material.shininess << ", \"roughness\": " << o.material.roughness << ", \"metallic\": " << o.material.metallic << " } }";
+        if (i+1<m_sceneObjects.size()) os << ",";
+        os << "\n";
+    }
+    os << "  ],\n";
+    os << "  \"lights\": [\n";
+    for (size_t i=0;i<m_lights.m_lights.size();++i){
+        const auto& L = m_lights.m_lights[i];
+        os << "    { \"position\": [" << L.position.x << ", " << L.position.y << ", " << L.position.z << "],"
+              " \"color\": [" << L.color.x << ", " << L.color.y << ", " << L.color.z << "], \"intensity\": " << L.intensity << " }";
+        if (i+1<m_lights.m_lights.size()) os << ",";
+        os << "\n";
+    }
+    os << "  ]\n";
+    os << "}\n";
+    return os.str();
+}
+
+void Application::toggleFullscreen()
+{
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (!m_fullscreen) {
+        // save windowed pos/size
+        glfwGetWindowPos(m_window, &m_windowPosX, &m_windowPosY);
+        glfwGetWindowSize(m_window, &m_windowedWidth, &m_windowedHeight);
+        glfwSetWindowMonitor(m_window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        m_fullscreen = true;
+    } else {
+        glfwSetWindowMonitor(m_window, nullptr, m_windowPosX, m_windowPosY, m_windowedWidth, m_windowedHeight, 0);
+        m_fullscreen = false;
+    }
+}
+
+std::string Application::getSelectedObjectName() const
+{
+    if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
+        return m_sceneObjects[m_selectedObjectIndex].name;
+    return std::string();
+}
+
+bool Application::moveObjectByName(const std::string& name, const glm::vec3& delta)
+{
+    for (auto& o : m_sceneObjects) {
+        if (o.name == name) {
+            o.modelMatrix = glm::translate(o.modelMatrix, delta);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Application::removeObjectByName(const std::string& name)
+{
+    for (size_t i=0;i<m_sceneObjects.size();++i){
+        if (m_sceneObjects[i].name == name) {
+            auto& obj = m_sceneObjects[i];
+            if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
+            if (obj.VBO_positions) glDeleteBuffers(1, &obj.VBO_positions);
+            if (obj.VBO_normals) glDeleteBuffers(1, &obj.VBO_normals);
+            if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
+            m_sceneObjects.erase(m_sceneObjects.begin() + i);
+            if (m_selectedObjectIndex == (int)i) m_selectedObjectIndex = -1;
+            else if (m_selectedObjectIndex > (int)i) m_selectedObjectIndex--;
+            return true;
+        }
+    }
+    return false;
 }

@@ -3,6 +3,8 @@
 #include <vector>
 #include <memory>
 #include <future>                   
+#include <unordered_map>
+#include <utility>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -18,7 +20,7 @@
 #include "UserInput.h"
 #include "Shader.h"
 #include "Grid.h"
-#include "commands.h"
+#include "nl_executor.h"
 #include "ai_bridge.h"
 
 struct SceneObject
@@ -52,8 +54,30 @@ public:
     glm::mat4   getProjectionMatrix() const { return m_projectionMatrix; }
     glm::mat4   getViewMatrix()       const { return m_viewMatrix; }
     glm::vec3   getCameraPosition()   const { return m_cameraPos; }
+    glm::vec3   getCameraFront()      const { return m_cameraFront; }
+    glm::vec3   getCameraUp()         const { return m_cameraUp; }
     float       getYaw()              const { return m_yaw; }
     float       getPitch()            const { return m_pitch; }
+
+    // Scene/runtime API for NL executor
+    bool        loadObjAt(const std::string& name,
+                          const std::string& path,
+                          const glm::vec3& position,
+                          const glm::vec3& scale = glm::vec3(1.0f));
+    bool        loadObjInFrontOfCamera(const std::string& name,
+                                       const std::string& path,
+                                       float metersForward = 2.0f,
+                                       const glm::vec3& scale = glm::vec3(1.0f));
+    bool        addPointLightAt(const glm::vec3& position,
+                                const glm::vec3& color = glm::vec3(1.0f),
+                                float intensity = 1.0f);
+    bool        createMaterialNamed(const std::string& name, const Material& m);
+    bool        assignMaterialToObject(const std::string& objectName, const std::string& materialName);
+    std::string sceneToJson() const; // camera, lights, objects, materials snapshot
+    void        toggleFullscreen();   // public so NL executor can call
+    std::string getSelectedObjectName() const;
+    bool        moveObjectByName(const std::string& name, const glm::vec3& delta);
+    bool        removeObjectByName(const std::string& name);
 
     bool  isLeftMousePressed()  const { return m_leftMousePressed; }
     bool  isRightMousePressed() const { return m_rightMousePressed; }
@@ -86,7 +110,8 @@ private:
     void processInput();
     void renderScene();                  
     void renderGUI();
-    void renderChatPanel();
+    void renderChatPanelNL();
+    void renderChatPanel(); // wrapper calling NL version (keeps old callsites valid)
     void renderAxisIndicator();
     void createScreenQuad();
 
@@ -117,7 +142,7 @@ private:
     glm::mat4 m_modelMatrix{ 1 }, m_viewMatrix{ 1 }, m_projectionMatrix{ 1 };
 
     ObjLoader m_objLoader;
-    Shader* m_standardShader = nullptr, * m_gridShader = nullptr, * m_rayScreenShader = nullptr;
+    Shader* m_standardShader = nullptr, * m_gridShader = nullptr, * m_rayScreenShader = nullptr, * m_outlineShader = nullptr;
     GLuint  m_VAO = 0, m_VBO = 0, m_EBO = 0;
     Grid    m_grid;
     AxisRenderer m_axisRenderer;
@@ -143,20 +168,25 @@ private:
 
     glm::mat4 m_lightSpaceMatrix;
 
-    // Chat UI state + command plumbing
+    // Named materials repository
+    std::unordered_map<std::string, Material> m_namedMaterials;
+
+    // Chat UI state + NL command plumbing
     char m_chatInput[2048] = {0};
     std::vector<std::string> m_chatScrollback; // parsed outputs and errors
-    bool m_previewOnly = true; // if true, only preview JSON and log; if false, execute
-    bool m_useAI = false;      // if true, treat input as natural language and call AI
-    AIConfig m_aiConfig{};     // endpoint + model
-    NLToJSONBridge m_ai{ m_aiConfig };
+    bool m_previewOnly = false; // preview no-op for NL text (kept for UI parity)
+    bool m_useAI = false;      // when true, send scene JSON + instruction to AI planner
+    nl::Executor m_nl{ *this };
+    AIConfig m_aiConfig{};
+    AIPlanner m_ai{ m_aiConfig };
+    // Async AI planning
+    std::future<std::pair<std::string, std::string>> m_aiFuture; // (plan, error)
+    bool m_aiBusy = false;
 
-    // Per-batch confirmation modal state
-    bool m_confirmOpen = false;
-    CommandBatch m_pendingBatch;
-    std::string m_pendingPretty;
-
-    // Interpreter entry (v0: add-only; can be stubbed to preview)
-    void executeCommands(const CommandBatch& batch, bool previewOnly);
+    // Fullscreen toggle state
+    bool m_fullscreen = false;
+    bool m_f11Held = false;
+    int  m_windowPosX = 100, m_windowPosY = 100;
+    int  m_windowedWidth = 800, m_windowedHeight = 600;
 
 };
