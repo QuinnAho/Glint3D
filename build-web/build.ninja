@@ -51,7 +51,7 @@ build cmake_object_order_depends_target_objviewer: phony || .
 
 build CMakeFiles/objviewer.dir/Project1/src/main.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/main.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\main.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -60,7 +60,7 @@ build CMakeFiles/objviewer.dir/Project1/src/main.cpp.o: CXX_COMPILER__objviewer_
 
 build CMakeFiles/objviewer.dir/Project1/src/application.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/application.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\application.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -69,7 +69,7 @@ build CMakeFiles/objviewer.dir/Project1/src/application.cpp.o: CXX_COMPILER__obj
 
 build CMakeFiles/objviewer.dir/Project1/src/ai_instructions.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/ai_instructions.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\ai_instructions.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -78,7 +78,7 @@ build CMakeFiles/objviewer.dir/Project1/src/ai_instructions.cpp.o: CXX_COMPILER_
 
 build CMakeFiles/objviewer.dir/Project1/src/json_ops_v1.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/json_ops_v1.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\json_ops_v1.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -87,7 +87,7 @@ build CMakeFiles/objviewer.dir/Project1/src/json_ops_v1.cpp.o: CXX_COMPILER__obj
 
 build CMakeFiles/objviewer.dir/Project1/src/shader.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/shader.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\shader.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -96,7 +96,7 @@ build CMakeFiles/objviewer.dir/Project1/src/shader.cpp.o: CXX_COMPILER__objviewe
 
 build CMakeFiles/objviewer.dir/Project1/src/texture.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/texture.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\texture.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -105,7 +105,7 @@ build CMakeFiles/objviewer.dir/Project1/src/texture.cpp.o: CXX_COMPILER__objview
 
 build CMakeFiles/objviewer.dir/Project1/src/texture_cache.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/texture_cache.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\texture_cache.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -114,7 +114,7 @@ build CMakeFiles/objviewer.dir/Project1/src/texture_cache.cpp.o: CXX_COMPILER__o
 
 build CMakeFiles/objviewer.dir/Project1/src/grid.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/grid.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\grid.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -123,7 +123,7 @@ build CMakeFiles/objviewer.dir/Project1/src/grid.cpp.o: CXX_COMPILER__objviewer_
 
 build CMakeFiles/objviewer.dir/Project1/src/axisrenderer.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/axisrenderer.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\axisrenderer.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -132,7 +132,7 @@ build CMakeFiles/objviewer.dir/Project1/src/axisrenderer.cpp.o: CXX_COMPILER__ob
 
 build CMakeFiles/objviewer.dir/Project1/src/gizmo.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/gizmo.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\gizmo.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -141,7 +141,7 @@ build CMakeFiles/objviewer.dir/Project1/src/gizmo.cpp.o: CXX_COMPILER__objviewer
 
 build CMakeFiles/objviewer.dir/Project1/src/objloader.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/objloader.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\objloader.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -150,16 +150,43 @@ build CMakeFiles/objviewer.dir/Project1/src/objloader.cpp.o: CXX_COMPILER__objvi
 
 build CMakeFiles/objviewer.dir/Project1/src/mesh_loader.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/mesh_loader.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\mesh_loader.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
   OBJECT_DIR = CMakeFiles\objviewer.dir
   OBJECT_FILE_DIR = CMakeFiles\objviewer.dir\Project1\src
 
+build CMakeFiles/objviewer.dir/Project1/src/importer_registry.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/importer_registry.cpp || cmake_object_order_depends_target_objviewer
+  CONFIG = Release
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
+  DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\importer_registry.cpp.o.d
+  FLAGS = -O3 -DNDEBUG -std=gnu++17
+  INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
+  OBJECT_DIR = CMakeFiles\objviewer.dir
+  OBJECT_FILE_DIR = CMakeFiles\objviewer.dir\Project1\src
+
+build CMakeFiles/objviewer.dir/Project1/src/importers/obj_importer.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/importers/obj_importer.cpp || cmake_object_order_depends_target_objviewer
+  CONFIG = Release
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
+  DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\importers\obj_importer.cpp.o.d
+  FLAGS = -O3 -DNDEBUG -std=gnu++17
+  INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
+  OBJECT_DIR = CMakeFiles\objviewer.dir
+  OBJECT_FILE_DIR = CMakeFiles\objviewer.dir\Project1\src\importers
+
+build CMakeFiles/objviewer.dir/Project1/src/importers/assimp_importer.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/importers/assimp_importer.cpp || cmake_object_order_depends_target_objviewer
+  CONFIG = Release
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
+  DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\importers\assimp_importer.cpp.o.d
+  FLAGS = -O3 -DNDEBUG -std=gnu++17
+  INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
+  OBJECT_DIR = CMakeFiles\objviewer.dir
+  OBJECT_FILE_DIR = CMakeFiles\objviewer.dir\Project1\src\importers
+
 build CMakeFiles/objviewer.dir/Project1/src/material.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/material.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\material.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -168,7 +195,7 @@ build CMakeFiles/objviewer.dir/Project1/src/material.cpp.o: CXX_COMPILER__objvie
 
 build CMakeFiles/objviewer.dir/Project1/src/light.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/light.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\light.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -177,7 +204,7 @@ build CMakeFiles/objviewer.dir/Project1/src/light.cpp.o: CXX_COMPILER__objviewer
 
 build CMakeFiles/objviewer.dir/Project1/src/InputHandler.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/InputHandler.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\InputHandler.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -186,7 +213,7 @@ build CMakeFiles/objviewer.dir/Project1/src/InputHandler.cpp.o: CXX_COMPILER__ob
 
 build CMakeFiles/objviewer.dir/Project1/src/RayUtils.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/RayUtils.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\RayUtils.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -195,7 +222,7 @@ build CMakeFiles/objviewer.dir/Project1/src/RayUtils.cpp.o: CXX_COMPILER__objvie
 
 build CMakeFiles/objviewer.dir/Project1/src/BVHNode.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/BVHNode.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\BVHNode.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -204,7 +231,7 @@ build CMakeFiles/objviewer.dir/Project1/src/BVHNode.cpp.o: CXX_COMPILER__objview
 
 build CMakeFiles/objviewer.dir/Project1/src/raytracer.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/raytracer.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\raytracer.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -213,7 +240,7 @@ build CMakeFiles/objviewer.dir/Project1/src/raytracer.cpp.o: CXX_COMPILER__objvi
 
 build CMakeFiles/objviewer.dir/Project1/src/commands.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/commands.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\commands.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -222,7 +249,7 @@ build CMakeFiles/objviewer.dir/Project1/src/commands.cpp.o: CXX_COMPILER__objvie
 
 build CMakeFiles/objviewer.dir/Project1/src/nl_executor.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/nl_executor.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\nl_executor.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -231,7 +258,7 @@ build CMakeFiles/objviewer.dir/Project1/src/nl_executor.cpp.o: CXX_COMPILER__obj
 
 build CMakeFiles/objviewer.dir/Project1/src/ai_bridge.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/ai_bridge.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\ai_bridge.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -240,7 +267,7 @@ build CMakeFiles/objviewer.dir/Project1/src/ai_bridge.cpp.o: CXX_COMPILER__objvi
 
 build CMakeFiles/objviewer.dir/Project1/src/assimp_loader.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/assimp_loader.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\assimp_loader.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -249,7 +276,7 @@ build CMakeFiles/objviewer.dir/Project1/src/assimp_loader.cpp.o: CXX_COMPILER__o
 
 build CMakeFiles/objviewer.dir/Project1/src/userinput.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/userinput.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\userinput.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -258,7 +285,7 @@ build CMakeFiles/objviewer.dir/Project1/src/userinput.cpp.o: CXX_COMPILER__objvi
 
 build CMakeFiles/objviewer.dir/Project1/src/triangle.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/src/triangle.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\src\triangle.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -267,7 +294,7 @@ build CMakeFiles/objviewer.dir/Project1/src/triangle.cpp.o: CXX_COMPILER__objvie
 
 build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/imgui.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\Libraries\include\imgui\imgui.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -276,7 +303,7 @@ build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui.cpp.o: CXX
 
 build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_draw.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/imgui_draw.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\Libraries\include\imgui\imgui_draw.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -285,7 +312,7 @@ build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_draw.cpp.o
 
 build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_tables.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/imgui_tables.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\Libraries\include\imgui\imgui_tables.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -294,7 +321,7 @@ build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_tables.cpp
 
 build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_widgets.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/imgui_widgets.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\Libraries\include\imgui\imgui_widgets.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -303,7 +330,7 @@ build CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_widgets.cp
 
 build CMakeFiles/objviewer.dir/Project1/imgui_impl_glfw.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/imgui_impl_glfw.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\imgui_impl_glfw.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -312,7 +339,7 @@ build CMakeFiles/objviewer.dir/Project1/imgui_impl_glfw.cpp.o: CXX_COMPILER__obj
 
 build CMakeFiles/objviewer.dir/Project1/imgui_impl_opengl3.cpp.o: CXX_COMPILER__objviewer_unscanned_Release D$:/class/OpenGLOBJViewer/Project1/imgui_impl_opengl3.cpp || cmake_object_order_depends_target_objviewer
   CONFIG = Release
-  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -D__EMSCRIPTEN__
+  DEFINES = -DIMGUI_IMPL_OPENGL_ES3 -DWEB_USE_HTML_UI=1 -D__EMSCRIPTEN__
   DEP_FILE = CMakeFiles\objviewer.dir\Project1\imgui_impl_opengl3.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17
   INCLUDES = -ID:/class/OpenGLOBJViewer/Project1/include -ID:/class/OpenGLOBJViewer/Project1 -ID:/class/OpenGLOBJViewer/Project1/Libraries/include -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/stb -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui -ID:/class/OpenGLOBJViewer/Project1/Libraries/include/imgui/backends
@@ -327,10 +354,10 @@ build CMakeFiles/objviewer.dir/Project1/imgui_impl_opengl3.cpp.o: CXX_COMPILER__
 #############################################
 # Link the executable objviewer.html
 
-build objviewer.html: CXX_EXECUTABLE_LINKER__objviewer_Release CMakeFiles/objviewer.dir/Project1/src/main.cpp.o CMakeFiles/objviewer.dir/Project1/src/application.cpp.o CMakeFiles/objviewer.dir/Project1/src/ai_instructions.cpp.o CMakeFiles/objviewer.dir/Project1/src/json_ops_v1.cpp.o CMakeFiles/objviewer.dir/Project1/src/shader.cpp.o CMakeFiles/objviewer.dir/Project1/src/texture.cpp.o CMakeFiles/objviewer.dir/Project1/src/texture_cache.cpp.o CMakeFiles/objviewer.dir/Project1/src/grid.cpp.o CMakeFiles/objviewer.dir/Project1/src/axisrenderer.cpp.o CMakeFiles/objviewer.dir/Project1/src/gizmo.cpp.o CMakeFiles/objviewer.dir/Project1/src/objloader.cpp.o CMakeFiles/objviewer.dir/Project1/src/mesh_loader.cpp.o CMakeFiles/objviewer.dir/Project1/src/material.cpp.o CMakeFiles/objviewer.dir/Project1/src/light.cpp.o CMakeFiles/objviewer.dir/Project1/src/InputHandler.cpp.o CMakeFiles/objviewer.dir/Project1/src/RayUtils.cpp.o CMakeFiles/objviewer.dir/Project1/src/BVHNode.cpp.o CMakeFiles/objviewer.dir/Project1/src/raytracer.cpp.o CMakeFiles/objviewer.dir/Project1/src/commands.cpp.o CMakeFiles/objviewer.dir/Project1/src/nl_executor.cpp.o CMakeFiles/objviewer.dir/Project1/src/ai_bridge.cpp.o CMakeFiles/objviewer.dir/Project1/src/assimp_loader.cpp.o CMakeFiles/objviewer.dir/Project1/src/userinput.cpp.o CMakeFiles/objviewer.dir/Project1/src/triangle.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_draw.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_tables.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_widgets.cpp.o CMakeFiles/objviewer.dir/Project1/imgui_impl_glfw.cpp.o CMakeFiles/objviewer.dir/Project1/imgui_impl_opengl3.cpp.o
+build objviewer.html: CXX_EXECUTABLE_LINKER__objviewer_Release CMakeFiles/objviewer.dir/Project1/src/main.cpp.o CMakeFiles/objviewer.dir/Project1/src/application.cpp.o CMakeFiles/objviewer.dir/Project1/src/ai_instructions.cpp.o CMakeFiles/objviewer.dir/Project1/src/json_ops_v1.cpp.o CMakeFiles/objviewer.dir/Project1/src/shader.cpp.o CMakeFiles/objviewer.dir/Project1/src/texture.cpp.o CMakeFiles/objviewer.dir/Project1/src/texture_cache.cpp.o CMakeFiles/objviewer.dir/Project1/src/grid.cpp.o CMakeFiles/objviewer.dir/Project1/src/axisrenderer.cpp.o CMakeFiles/objviewer.dir/Project1/src/gizmo.cpp.o CMakeFiles/objviewer.dir/Project1/src/objloader.cpp.o CMakeFiles/objviewer.dir/Project1/src/mesh_loader.cpp.o CMakeFiles/objviewer.dir/Project1/src/importer_registry.cpp.o CMakeFiles/objviewer.dir/Project1/src/importers/obj_importer.cpp.o CMakeFiles/objviewer.dir/Project1/src/importers/assimp_importer.cpp.o CMakeFiles/objviewer.dir/Project1/src/material.cpp.o CMakeFiles/objviewer.dir/Project1/src/light.cpp.o CMakeFiles/objviewer.dir/Project1/src/InputHandler.cpp.o CMakeFiles/objviewer.dir/Project1/src/RayUtils.cpp.o CMakeFiles/objviewer.dir/Project1/src/BVHNode.cpp.o CMakeFiles/objviewer.dir/Project1/src/raytracer.cpp.o CMakeFiles/objviewer.dir/Project1/src/commands.cpp.o CMakeFiles/objviewer.dir/Project1/src/nl_executor.cpp.o CMakeFiles/objviewer.dir/Project1/src/ai_bridge.cpp.o CMakeFiles/objviewer.dir/Project1/src/assimp_loader.cpp.o CMakeFiles/objviewer.dir/Project1/src/userinput.cpp.o CMakeFiles/objviewer.dir/Project1/src/triangle.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_draw.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_tables.cpp.o CMakeFiles/objviewer.dir/Project1/Libraries/include/imgui/imgui_widgets.cpp.o CMakeFiles/objviewer.dir/Project1/imgui_impl_glfw.cpp.o CMakeFiles/objviewer.dir/Project1/imgui_impl_opengl3.cpp.o
   CONFIG = Release
   FLAGS = -O3 -DNDEBUG
-  LINK_FLAGS = -sUSE_GLFW=3 -sFULL_ES3=1 -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sFORCE_FILESYSTEM=1 "-sEXPORTED_FUNCTIONS=['_main']" "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']" --preload-file D:/class/OpenGLOBJViewer/Project1/assets@/assets --preload-file D:/class/OpenGLOBJViewer/Project1/shaders@/shaders --preload-file D:/class/OpenGLOBJViewer/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg
+  LINK_FLAGS = -sUSE_GLFW=3 -sFULL_ES3=1 -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sFORCE_FILESYSTEM=1 "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link']" "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']" --preload-file D:/class/OpenGLOBJViewer/Project1/assets@/assets --preload-file D:/class/OpenGLOBJViewer/Project1/shaders@/shaders --preload-file D:/class/OpenGLOBJViewer/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg
   OBJECT_DIR = CMakeFiles\objviewer.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
@@ -383,14 +410,14 @@ build all: phony objviewer.html
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja D$:/class/OpenGLOBJViewer/build-web/cmake_install.cmake: RERUN_CMAKE | C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCommonLanguageInclude.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeGenericSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeInitializeConfigs.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeLanguageInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInitialize.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-C.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-CXX.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/GNU.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.0.0-rc2/CMakeCCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeCXXCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeSystem.cmake D$:/Graphics/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake D$:/class/OpenGLOBJViewer/CMakeLists.txt
+build build.ninja D$:/class/OpenGLOBJViewer/build-web/cmake_install.cmake: RERUN_CMAKE | C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCCompiler.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXCompiler.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCommonLanguageInclude.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCXXCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeFindBinUtils.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeGenericSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeInitializeConfigs.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeLanguageInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystem.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInitialize.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeTestCCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeTestCXXCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-C.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-CXX.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-FindBinUtils.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/GNU.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.0.0-rc2/CMakeCCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeCXXCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeSystem.cmake D$:/Graphics/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake D$:/class/OpenGLOBJViewer/CMakeLists.txt
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCommonLanguageInclude.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeGenericSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeInitializeConfigs.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeLanguageInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInitialize.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-C.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-CXX.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/GNU.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.0.0-rc2/CMakeCCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeCXXCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeSystem.cmake D$:/Graphics/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake D$:/class/OpenGLOBJViewer/CMakeLists.txt: phony
+build C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCCompiler.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXCompiler.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCXXInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeCommonLanguageInclude.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCXXCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeDetermineSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeFindBinUtils.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeGenericSystem.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeInitializeConfigs.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeLanguageInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystem.cmake.in C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeSystemSpecificInitialize.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeTestCCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/CMakeTestCXXCompiler.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-C.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-CXX.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang-FindBinUtils.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/Clang.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Compiler/GNU.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Program$ Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.0.0-rc2/CMakeCCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeCXXCompiler.cmake CMakeFiles/4.0.0-rc2/CMakeSystem.cmake D$:/Graphics/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake D$:/class/OpenGLOBJViewer/CMakeLists.txt: phony
 
 
 #############################################

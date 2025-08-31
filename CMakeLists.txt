@@ -14,6 +14,8 @@ set(IMGUI_DIR Project1)
 set(APP_SOURCES
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/application.cpp
+    ${SRC_DIR}/scene_io.cpp
+    ${SRC_DIR}/render_offscreen.cpp
     ${SRC_DIR}/ai_instructions.cpp
     ${SRC_DIR}/json_ops_v1.cpp
     ${SRC_DIR}/shader.cpp
@@ -53,6 +55,12 @@ set(IMGUI_SOURCES
 # Web (Emscripten) build
 if (EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
+    # Use HTML/JS UI on web instead of Dear ImGui overlay
+    # This disables ImGui calls in application code while still compiling backends if needed
+    # so that desktop builds remain unaffected.
+    # Define a macro consumed by application.cpp to skip ImGui rendering on web.
+    # (Keeps code paths clear and avoids pulling ImGui UI on the web.)
+    
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
 
     add_executable(objviewer
@@ -93,15 +101,15 @@ if (EMSCRIPTEN)
         -sMIN_WEBGL_VERSION=2
         -sMAX_WEBGL_VERSION=2
         -sFORCE_FILESYSTEM=1
-        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json']"
+        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets@/assets"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/shaders@/shaders"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg"
     )
 
-    # ImGui ES3 path
-    target_compile_definitions(objviewer PRIVATE IMGUI_IMPL_OPENGL_ES3)
+    # ImGui ES3 path (compiled but HTML UI disables usage at runtime)
+    target_compile_definitions(objviewer PRIVATE IMGUI_IMPL_OPENGL_ES3 WEB_USE_HTML_UI=1)
 
 # Desktop build
 else()
@@ -125,7 +133,7 @@ else()
     # OpenGL
     find_package(OpenGL REQUIRED)
 
-    # GLFW (prefer config, fallback to module)
+    # GLFW (prefer config, fallback to module, then vendored/vcpkg paths)
     find_package(glfw3 CONFIG QUIET)
     if (NOT glfw3_FOUND)
         find_package(glfw3 QUIET)
@@ -138,8 +146,26 @@ else()
             target_link_libraries(objviewer PRIVATE glfw3 OpenGL::GL)
         endif()
     else()
-        message(WARNING "glfw3 not found. Attempting to link by name.")
-        target_link_libraries(objviewer PRIVATE OpenGL::GL glfw)
+        message(WARNING "glfw3 not found via CMake packages. Trying manual locate (vcpkg and vendored lib).")
+        # Best-effort manual lookup: vcpkg + vendored lib under Project1/Libraries/lib
+        find_library(GLFW3_LIB NAMES glfw3 glfw
+            HINTS
+                "$ENV{VCPKG_ROOT}/installed/x64-windows/lib"
+                "$ENV{VCPKG_ROOT}/installed/x64-windows-static/lib"
+                "${CMAKE_SOURCE_DIR}/Project1/Libraries/lib"
+        )
+        if (GLFW3_LIB)
+            target_link_libraries(objviewer PRIVATE OpenGL::GL ${GLFW3_LIB})
+            # Include dirs for either vcpkg or vendored headers
+            if (DEFINED ENV{VCPKG_ROOT})
+                target_include_directories(objviewer PRIVATE "$ENV{VCPKG_ROOT}/installed/x64-windows/include")
+            endif()
+            if (EXISTS "${CMAKE_SOURCE_DIR}/Project1/Libraries/include")
+                target_include_directories(objviewer PRIVATE "${CMAKE_SOURCE_DIR}/Project1/Libraries/include")
+            endif()
+        else()
+            message(FATAL_ERROR "glfw3 not found. Install via vcpkg and pass -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake or provide GLFW3 to CMake.")
+        endif()
     endif()
 
     if (WIN32)

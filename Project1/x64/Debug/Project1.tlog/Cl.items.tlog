@@ -30,3 +30,6 @@ D:\class\OpenGLOBJViewer\Project1\src\triangle.cpp;D:\class\OpenGLOBJViewer\Proj
 D:\class\OpenGLOBJViewer\Project1\src\InputHandler.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\InputHandler.obj
 D:\class\OpenGLOBJViewer\Project1\src\commands.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\commands.obj
 D:\class\OpenGLOBJViewer\Project1\src\ai_bridge.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\ai_bridge.obj
+D:\class\OpenGLOBJViewer\Project1\src\json_ops_v1.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\json_ops_v1.obj
+D:\class\OpenGLOBJViewer\Project1\src\scene_io.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\scene_io.obj
+D:\class\OpenGLOBJViewer\Project1\src\render_offscreen.cpp;D:\class\OpenGLOBJViewer\Project1\x64\Debug\render_offscreen.obj

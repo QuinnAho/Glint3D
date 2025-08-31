@@ -22,6 +22,15 @@ extern "C" {
         }
         return ok ? 1 : 0;
     }
+
+    EMSCRIPTEN_KEEPALIVE
+    const char* app_share_link()
+    {
+        static std::string last;
+        if (!g_app) return "";
+        last = g_app->buildShareLink();
+        return last.c_str();
+    }
 }
 #endif
 

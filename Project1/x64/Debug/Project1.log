@@ -1,6 +1,6 @@
-﻿  importer_registry.cpp
-  obj_importer.cpp
-  assimp_importer.cpp
+﻿  json_ops_v1.cpp
+  scene_io.cpp
+  render_offscreen.cpp
   Generating Code...
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,
