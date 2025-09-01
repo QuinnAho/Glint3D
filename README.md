@@ -108,7 +108,10 @@ Suggestions:
 - Meshes share a material → instancing candidate  
 - High draw calls → merge static meshes or instance  
 - High triangle count → consider LOD/decimation  
-- Optional: **“Ask AI for perf tips”** when AI is enabled  
+- Optional: **“Ask AI for perf tips”** when AI is enabled
+
+<img width="201" height="199" alt="image" src="https://github.com/user-attachments/assets/6a1b1211-e3af-4097-82f2-8a225e9a97c6" />
+
 
 ---
 
