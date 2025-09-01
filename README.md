@@ -10,6 +10,8 @@ Key features:
 - **Performance Coach HUD** with actionable suggestions  
 - Shareable scene state (JSON Ops v1) + headless CLI renderer  
 
+<img width="1893" height="1015" alt="image" src="https://github.com/user-attachments/assets/5642caaf-f48f-44dd-8f71-e3a90433a2d0" />
+
 ---
 
 ## Quick Start
