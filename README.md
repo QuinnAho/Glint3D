@@ -28,7 +28,9 @@ cmake --build build-web -j
 
 Open `build-web/objviewer.html` with a local web server. Assets under `Project1/assets` and `Project1/shaders` are preloaded.
 
-## New Web UI (React + Tailwind)
+## New Web UI (React + Tailwind) IN DEVELOPMENT
+
+<img width="1040" height="900" alt="image" src="https://github.com/user-attachments/assets/20997c6d-c1c6-44b5-942a-4bb1d666f7a9" />
 
 Located in `ui/`. This is a modern, product‑ready interface that hosts the engine (WASM) in the same page.
 
