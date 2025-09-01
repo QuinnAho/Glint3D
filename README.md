@@ -2,6 +2,9 @@
 
 Modern OBJ/GLTF viewer and scene tool. Desktop build uses GLFW/OpenGL (with ImGui), and Web build targets WebGL2 via Emscripten. A new React/Tailwind web UI lives under `ui/` and talks to the engine over a small JSON Ops bridge.
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7a8be068-5b2f-4e3f-acb6-247f201fedd9" />
+
+
 ## Builds
 
 ### Desktop (CMake)
