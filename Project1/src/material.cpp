@@ -1,4 +1,4 @@
-#include "Material.h"
+#include "material.h"
 #include "gl_platform.h"
 #include <glm/gtc/type_ptr.hpp>
 

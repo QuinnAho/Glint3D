@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ray.h"
+#include "ray.h"
 #include <glm/glm.hpp>
 
 // Ray vs AABB intersection test

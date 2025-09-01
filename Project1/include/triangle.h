@@ -3,7 +3,7 @@
 
 #include <glm/glm.hpp>
 #include "ray.h"                
-#include "Material.h"          
+#include "material.h"          
 
 
 class Triangle

@@ -1,5 +1,74 @@
 # OpenGLOBJViewer
 
+Modern OBJ/GLTF viewer and scene tool. Desktop build uses GLFW/OpenGL (with ImGui), and Web build targets WebGL2 via Emscripten. A new React/Tailwind web UI lives under `ui/` and talks to the engine over a small JSON Ops bridge.
+
+## Builds
+
+### Desktop (CMake)
+
+- Windows/macOS/Linux with OpenGL and GLFW
+- Optional extras: Assimp, OpenImageDenoise
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+Run `objviewer` from `build/`.
+
+### Web (Emscripten)
+
+```
+emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release
+cmake --build build-web -j
+```
+
+Open `build-web/objviewer.html` with a local web server. Assets under `Project1/assets` and `Project1/shaders` are preloaded.
+
+## New Web UI (React + Tailwind)
+
+Located in `ui/`. This is a modern, product‑ready interface that hosts the engine (WASM) in the same page.
+
+1) Build the web engine (see above). Copy outputs to:
+
+- `ui/public/engine/objviewer.js`
+- `ui/public/engine/objviewer.wasm`
+- `ui/public/engine/objviewer.data` (if generated)
+
+2) Start the UI:
+
+```
+cd ui
+npm install
+npm run dev
+```
+
+Open the printed URL. Drag & drop `.obj/.ply/.glb` onto the canvas to load. Use the Console to run JSON Ops.
+
+## JSON Ops v1 (Bridge)
+
+The engine exposes a simple JSON operation API, used by both the ImGui and Web UIs.
+
+- Load model: `{ op: "load", path: "/uploads/model.obj", name: "Model" }`
+- Set render mode: `{ op: "set_render_mode", mode: "solid" }` (point|wire|solid|raytrace)
+- Add light: `{ op: "add_light", type: "point", position: [2,2,2], intensity: 1.0 }`
+- Transform, materials, camera, duplicate, etc.
+
+Exports available to JS (Emscripten):
+
+- `app_apply_ops_json(json)` — apply a single op or array
+- `app_share_link()` — export a shareable state link
+- `app_scene_to_json()` — get current scene snapshot
+
+See `ui/src/sdk/viewer.ts` for the small JS wrapper.
+
+## Roadmap
+
+- Flesh out the `ui/` Inspector (objects/lights/materials) with edit actions
+- AI planner (web) to translate natural language → ops and apply
+- Package desktop UI with Tauri so product UX matches web
+
+
 Problem → Simple viewers rarely scale from quick lookdev to shareable outputs, and they don’t run identically on desktop and web.
 
 Solution → A compact OpenGL viewer + CPU raytracer with JSON scripting and a web build. Drop in a model, tweak lighting/materials, and share or render — same ops on both platforms.

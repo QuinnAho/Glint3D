@@ -1,4 +1,4 @@
-#include "Light.h"
+#include "light.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <sstream>

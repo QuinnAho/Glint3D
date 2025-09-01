@@ -1,5 +1,5 @@
 #include "importer.h"
-#include "ObjLoader.h"
+#include "objloader.h"
 #include <algorithm>
 #include <cctype>
 
@@ -49,4 +49,3 @@ public:
 }
 
 std::unique_ptr<IImporter> CreateOBJImporter(){ return std::make_unique<OBJImporter>(); }
-

@@ -1,11 +1,11 @@
 ﻿#pragma once
 #include <vector>
-#include "Triangle.h"
-#include "Ray.h"
-#include "ObjLoader.h"
+#include "triangle.h"
+#include "ray.h"
+#include "objloader.h"
 #include "material.h"
 #include "BVHNode.h"
-#include "Light.h"  
+#include "light.h"  
 #include <glm/glm.hpp>
 
 class Raytracer

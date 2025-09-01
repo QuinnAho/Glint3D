@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+.app-grid {
+  display: grid;
+  grid-template-rows: 1fr 240px; /* main + console */
+  grid-template-columns: 1fr 360px; /* canvas + inspector */
+  grid-template-areas:
+    "canvas inspector"
+    "console inspector";
+  height: 100%;
+}
+.area-canvas { grid-area: canvas; }
+.area-console { grid-area: console; }
+.area-inspector { grid-area: inspector; }
+

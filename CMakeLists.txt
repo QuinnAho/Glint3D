@@ -101,12 +101,18 @@ if (EMSCRIPTEN)
         -sMIN_WEBGL_VERSION=2
         -sMAX_WEBGL_VERSION=2
         -sFORCE_FILESYSTEM=1
-        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link']"
+        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link','_app_scene_to_json']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets@/assets"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/shaders@/shaders"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg"
     )
+
+    # Optionally preload cow texture if it exists (path may vary)
+    if (EXISTS "${CMAKE_SOURCE_DIR}/Project1/assets/cow-tex-fin.jpg")
+        target_link_options(objviewer PRIVATE "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg")
+    elseif (EXISTS "${CMAKE_SOURCE_DIR}/Project1/cow-tex-fin.jpg")
+        target_link_options(objviewer PRIVATE "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg")
+    endif()
 
     # ImGui ES3 path (compiled but HTML UI disables usage at runtime)
     target_compile_definitions(objviewer PRIVATE IMGUI_IMPL_OPENGL_ES3 WEB_USE_HTML_UI=1)

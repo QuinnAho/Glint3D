@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
-#include "Triangle.h"
-#include "Ray.h"
+#include "triangle.h"
+#include "ray.h"
 #include <glm/glm.hpp>
 
 class BVHNode

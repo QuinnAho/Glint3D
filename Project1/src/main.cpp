@@ -31,6 +31,15 @@ extern "C" {
         last = g_app->buildShareLink();
         return last.c_str();
     }
+
+    EMSCRIPTEN_KEEPALIVE
+    const char* app_scene_to_json()
+    {
+        static std::string last;
+        if (!g_app) return "";
+        last = g_app->sceneToJson();
+        return last.c_str();
+    }
 }
 #endif
 

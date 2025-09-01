@@ -14,7 +14,7 @@
 #include "pbr_material.h"
 #include "texture_cache.h"
 #include "mesh_loader.h"
-#include "Material.h"
+#include "material.h"
 #include <unordered_set>
 #ifndef __EMSCRIPTEN__
 #ifdef OIDN_ENABLED
@@ -1613,6 +1613,7 @@ bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, co
 }
 
 // New natural-language chat panel
+#ifndef WEB_USE_HTML_UI
 void Application::renderChatPanelNL()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -1732,6 +1733,9 @@ void Application::renderChatPanelNL()
 
     ImGui::End();
 }
+#else
+void Application::renderChatPanelNL() {}
+#endif
 
 // ---- Runtime scene API used by NL executor ----
 bool Application::loadObjAt(const std::string& name,
