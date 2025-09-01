@@ -141,6 +141,52 @@ bool Application::applyJsonOpsV1(const std::string& json, std::string& error)
             if (hp && ht) setCameraTarget(pos, target, up); else if (hp && hf) setCameraFrontUp(pos, front, up);
             setCameraLens(fov, nz, fz);
         }
+        else if (op == "select") {
+            std::string type; findString(obj, "type", type);
+            if (type == "light") {
+                float idxF = -1.0f; if (!findNumber(obj, "index", idxF)) idxF = -1.0f;
+                int idx = (int)idxF;
+                if (idx >= 0 && idx < (int)m_lights.m_lights.size()) {
+                    setSelectedLightIndex(idx);
+                }
+            } else { // object by name
+                std::string name; if (findString(obj, "target", name)) {
+                    int found = -1;
+                    for (int i = 0; i < (int)m_sceneObjects.size(); ++i) if (m_sceneObjects[i].name == name) { found = i; break; }
+                    if (found >= 0) { setSelectedObjectIndex(found); setSelectedLightIndex(-1); }
+                }
+            }
+        }
+        else if (op == "remove") {
+            std::string type; findString(obj, "type", type);
+            bool ok = false;
+            if (type == "light") {
+                float idxF = -1.0f; if (findNumber(obj, "index", idxF)) ok = removeLightAtIndex((int)idxF);
+                else if (m_selectedLightIndex >= 0) ok = removeLightAtIndex(m_selectedLightIndex);
+            } else { // object
+                std::string name; if (findString(obj, "target", name)) ok = removeObjectByName(name);
+                else if (m_selectedObjectIndex >= 0) ok = removeObjectByName(m_sceneObjects[(size_t)m_selectedObjectIndex].name);
+            }
+            if (!ok) { error = "remove failed"; return false; }
+        }
+        else if (op == "set_light") {
+            // target light by index (or selected)
+            int idx = m_selectedLightIndex;
+            float idxF= -1.0f; if (findNumber(obj, "index", idxF)) idx = (int)idxF;
+            if (idx < 0 || idx >= (int)m_lights.m_lights.size()) { error = "set_light: invalid index"; return false; }
+            auto& L = m_lights.m_lights[(size_t)idx];
+            bool b=false; if (findBool(obj, "enabled", b)) L.enabled = b;
+            glm::vec3 c; if (findVec3(obj, "color", c)) L.color = c;
+            float I=0; if (findNumber(obj, "intensity", I)) L.intensity = I;
+            glm::vec3 p; if (findVec3(obj, "position", p)) L.position = p;
+        }
+        else if (op == "duplicate_light") {
+            int idx = m_selectedLightIndex;
+            float idxF=-1.0f; if (findNumber(obj, "index", idxF)) idx = (int)idxF;
+            if (idx < 0 || idx >= (int)m_lights.m_lights.size()) { error = "duplicate_light: invalid index"; return false; }
+            auto L = m_lights.m_lights[(size_t)idx];
+            addPointLightAt(L.position + glm::vec3(0.2f,0,0), L.color, L.intensity);
+        }
         else if (op == "set_render_mode") {
             int mode = -1; float mnum = -1.0f; if (findNumber(obj, "mode", mnum)) mode = int(mnum + 0.5f);
             if (mode < 0) {
@@ -183,4 +229,3 @@ bool Application::applyJsonOpsV1(const std::string& json, std::string& error)
     }
     return true;
 }
-

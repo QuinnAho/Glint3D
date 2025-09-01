@@ -1,17 +1,6 @@
-﻿  BVHNode.cpp
-  RayUtils.cpp
-  application.cpp
-  grid.cpp
-  obj_importer.cpp
-  json_ops_v1.cpp
-  light.cpp
+﻿  json_ops_v1.cpp
   main.cpp
-  material.cpp
-  nl_executor.cpp
-  raytracer.cpp
-  render_offscreen.cpp
   scene_io.cpp
-  userinput.cpp
   Generating Code...
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,

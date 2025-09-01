@@ -40,6 +40,12 @@ extern "C" {
         last = g_app->sceneToJson();
         return last.c_str();
     }
+
+    EMSCRIPTEN_KEEPALIVE
+    int app_is_ready()
+    {
+        return g_app ? 1 : 0;
+    }
 }
 #endif
 

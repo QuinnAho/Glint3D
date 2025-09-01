@@ -101,7 +101,7 @@ if (EMSCRIPTEN)
         -sMIN_WEBGL_VERSION=2
         -sMAX_WEBGL_VERSION=2
         -sFORCE_FILESYSTEM=1
-        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link','_app_scene_to_json']"
+        "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link','_app_scene_to_json','_app_is_ready']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/assets@/assets"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Project1/shaders@/shaders"

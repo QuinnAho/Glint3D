@@ -1,10 +1,23 @@
 // Minimal viewer SDK wrapping Emscripten Module calls
 
-declare global {
-  interface Window { Module: any }
+declare global { interface Window { Module: any } }
+
+let engineScriptLoading: Promise<void> | null = null
+
+export function loadEngine(scriptPath = '/engine/objviewer.js'): Promise<void> {
+  if (engineScriptLoading) return engineScriptLoading
+  engineScriptLoading = new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = scriptPath
+    s.async = true
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error('Failed to load engine script'))
+    document.head.appendChild(s)
+  })
+  return engineScriptLoading
 }
 
-function waitForModuleReady(timeoutMs = 10000): Promise<void> {
+function waitForModuleReady(timeoutMs = 15000): Promise<void> {
   const start = Date.now()
   return new Promise((resolve, reject) => {
     const tick = () => {
@@ -18,10 +31,20 @@ function waitForModuleReady(timeoutMs = 10000): Promise<void> {
 }
 
 export async function init(canvas: HTMLCanvasElement) {
-  // Bind canvas for Emscripten GL
-  ;(window as any).Module = (window as any).Module || {}
+  // Prepare Module before loading engine
+  (window as any).Module = (window as any).Module || {}
   window.Module.canvas = canvas
+  await loadEngine()
   await waitForModuleReady()
+  // Wait for app to be ready (g_app set)
+  try {
+    const isReady = window.Module.cwrap ? window.Module.cwrap('app_is_ready', 'number', []) : null
+    const start = Date.now()
+    while (isReady && isReady() !== 1) {
+      if (Date.now() - start > 15000) throw new Error('Engine app not ready')
+      await new Promise(r => setTimeout(r, 50))
+    }
+  } catch {}
 }
 
 export function applyOps(ops: any | any[]): boolean {
@@ -70,4 +93,37 @@ export function getScene(): SceneSnapshot | null {
   const s = getJson()
   if (!s) return null
   try { return JSON.parse(s) } catch { return null }
+}
+
+export function mountBytesAndLoad(name: string, bytes: Uint8Array, onLog?: (s: string)=>void) {
+  const M = window.Module
+  if (!M || !M.FS_createDataFile) { onLog?.('Module FS not ready'); return false }
+  try {
+    const dst = '/uploads/' + name
+    try { M.FS_createPath('/', 'uploads', true, true) } catch {}
+    M.FS_createDataFile(dst, null, bytes, true, true, true)
+    const base = name.replace(/\.[^.]+$/, '')
+    return applyOps({ op: 'load', path: dst, name: base })
+  } catch (e: any) {
+    onLog?.('mountBytesAndLoad error: ' + (e?.message || e))
+    return false
+  }
+}
+
+// Tauri helper: open native dialog, read bytes, mount and load
+export async function openModelViaTauri(onLog?: (s: string)=>void) {
+  const anyWin = window as any
+  if (!anyWin.__TAURI__) { onLog?.('Open is available in the desktop app'); return }
+  const { open } = await import(/* @vite-ignore */ '@tauri-apps/api/dialog')
+  const { readBinaryFile } = await import(/* @vite-ignore */ '@tauri-apps/api/fs')
+  const selected = await open({ multiple: false, filters: [
+    { name: 'Models', extensions: ['obj','ply','glb','gltf','fbx','dae'] }
+  ]})
+  if (!selected || Array.isArray(selected)) return
+  const path = selected as string
+  const parts = path.replace(/\\/g,'/').split('/')
+  const name = parts[parts.length-1]
+  const bytes = await readBinaryFile(path)
+  const ok = mountBytesAndLoad(name, new Uint8Array(bytes), onLog)
+  onLog?.(ok ? `Loaded ${name}` : `Load failed: ${name}`)
 }

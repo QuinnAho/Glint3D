@@ -19,6 +19,7 @@ std::string Application::sceneToJson() const
     else
         os << "null";
     os << ",\n";
+    os << "  \"selectedLightIndex\": " << m_selectedLightIndex << ",\n";
 
     os << "  \"objects\": [\n";
     for (size_t i = 0; i < m_sceneObjects.size(); ++i) {
@@ -96,4 +97,3 @@ std::string Application::buildShareLink() const
     return std::string("?state=") + payload;
 #endif
 }
-
