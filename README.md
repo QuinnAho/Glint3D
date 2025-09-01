@@ -1,4 +1,4 @@
-# OpenGLOBJViewer
+# Open GL AI Viewer
 
 Modern OBJ/GLTF viewer and scene tool. Desktop build uses GLFW/OpenGL (with ImGui), and Web build targets WebGL2 via Emscripten. A new React/Tailwind web UI lives under `ui/` and talks to the engine over a small JSON Ops bridge.
 
