@@ -96,8 +96,11 @@ Docs: `docs/json_ops_v1.md` (schema in `schemas/json_ops_v1.json`).
 Detects and offers one-click fixes:
 - Missing normals → Recompute angle-weighted normals  
 - Bad winding (mostly backfacing) → Flip triangle order + invert normals  
-- No lights / tone-mapped black → Add a neutral key light  
-- sRGB mismatch → Toggle framebuffer sRGB  
+- No lights / tone-mapped black → Add a neutral key light
+- sRGB mismatch → Toggle framebuffer sRGB
+
+<img width="1127" height="587" alt="image" src="https://github.com/user-attachments/assets/669093b7-9620-46cb-89d5-0b5803c967eb" />
+
 
 ### 2) Perf Coach HUD
 Overlay shows: draw calls, total triangles, materials, textures, VRAM estimate.  
