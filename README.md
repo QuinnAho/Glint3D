@@ -179,9 +179,3 @@ Options:
 Use the Samples menu or load recipes manually:
 - `assets/samples/recipes/three-point-lighting.json`  
 - `assets/samples/recipes/isometric-hero.json`  
-
----
-
-## License
-
-See repository license if present. Third-party components retain their respective licenses.
