@@ -1,4 +1,4 @@
-#include "application.h"
+#include "application_core.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -9,7 +9,7 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 // Global application pointer for JS bridge
-static Application* g_app = nullptr;
+static ApplicationCore* g_app = nullptr;
 extern "C" {
     EMSCRIPTEN_KEEPALIVE
     int app_apply_ops_json(const char* json)
@@ -72,7 +72,7 @@ int main(int argc, char** argv)
     int H = args.intOr("--h", 1024);
     bool denoiseFlag = args.has("--denoise");
 
-    auto* app = new Application();
+    auto* app = new ApplicationCore();
     if (!app->init("OBJ Viewer", wantHeadless ? W : 800, wantHeadless ? H : 600, wantHeadless))
         return -1;
     if (denoiseFlag) app->setDenoiseEnabled(true);
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
             }
         }
     }
-    emscripten_set_main_loop_arg([](void* p){ static_cast<Application*>(p)->frame(); }, app, 0, true);
+    emscripten_set_main_loop_arg([](void* p){ static_cast<ApplicationCore*>(p)->frame(); }, app, 0, true);
 #else
     if (wantHeadless) {
         // Apply ops if provided
