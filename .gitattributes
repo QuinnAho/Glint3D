@@ -1,0 +1,2 @@
+*.rlib filter=lfs diff=lfs merge=lfs -text
+*.rmeta filter=lfs diff=lfs merge=lfs -text
