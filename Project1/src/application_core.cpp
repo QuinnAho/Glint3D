@@ -7,8 +7,14 @@
 #include "light.h"
 #include "ui_bridge.h"
 #include "imgui_ui_layer.h"
+#include "RayUtils.h"
+#ifndef WEB_USE_HTML_UI
+#include "imgui.h"
+#endif
 #include <iostream>
 #include <memory>
+#include <limits>
+#include <cmath>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -54,6 +60,17 @@ bool ApplicationCore::init(const std::string& windowTitle, int width, int height
         std::cerr << "Failed to initialize render system\n";
         return false;
     }
+    // Initialize gizmo defaults on renderer
+    m_renderer->setGizmoMode(m_gizmoMode);
+    m_renderer->setGizmoAxis(m_gizmoAxis);
+    m_renderer->setGizmoLocalSpace(m_gizmoLocal);
+    // Initialize light indicator visuals (shader + geometry)
+    if (m_lights) {
+        m_lights->initIndicator();
+        if (!m_lights->initIndicatorShader()) {
+            std::cerr << "Failed to initialize light indicator shader\n";
+        }
+    }
     
     // Set up callbacks
     initCallbacks();
@@ -88,9 +105,34 @@ void ApplicationCore::run()
 void ApplicationCore::frame()
 {
     glfwPollEvents();
+    // Delta time
+    double now = glfwGetTime();
+    if (m_lastFrameTime == 0.0) m_lastFrameTime = now;
+    float dt = static_cast<float>(now - m_lastFrameTime);
+    m_lastFrameTime = now;
     
+    // Pull UI settings
+    if (m_uiBridge) {
+        m_requireRMBToMove = m_uiBridge->getRequireRMBToMove();
+    }
     // Update camera
-    m_camera->update(0.016f); // Assume ~60fps for now
+    m_camera->update(dt);
+    
+    // Per-frame movement polling (smooth hold-to-move)
+    if (m_rightMousePressed || !m_requireRMBToMove) {
+        float speed = m_camera->getSpeed() * dt * 5.0f; // base speed
+        if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
+            speed *= 2.5f; // sprint
+        }
+        if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) m_camera->moveForward(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS) m_camera->moveBackward(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS) m_camera->moveLeft(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS) m_camera->moveRight(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) m_camera->moveUp(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_camera->moveDown(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_E) == GLFW_PRESS) m_camera->moveUp(speed);
+        if (glfwGetKey(m_window, GLFW_KEY_Q) == GLFW_PRESS) m_camera->moveDown(speed);
+    }
     
     // Update render system camera
     m_renderer->setCamera(m_camera->getCameraState());
@@ -179,9 +221,52 @@ void ApplicationCore::handleMouseMove(double xpos, double ypos)
     m_lastMouseX = xpos;
     m_lastMouseY = ypos;
     
-    // Only handle camera movement when right mouse is pressed
-    if (m_rightMousePressed) {
-        m_camera->rotate(deltaX * m_camera->getSensitivity(), deltaY * m_camera->getSensitivity());
+    // Gizmo drag updates
+    if (m_gizmoDragging) {
+        // Build ray and compute new s along drag axis using closest-approach on lines
+        auto makeRay = [&](double mx, double my){
+            float xNDC = static_cast<float>(2.0 * mx / m_windowWidth - 1.0);
+            float yNDC = static_cast<float>(1.0 - 2.0 * my / m_windowHeight);
+            glm::vec4 rayClip(xNDC, yNDC, -1.0f, 1.0f);
+            glm::mat4 invProj = glm::inverse(m_renderer->getProjectionMatrix());
+            glm::vec4 rayEye = invProj * rayClip; rayEye.z = -1.0f; rayEye.w = 0.0f;
+            glm::mat4 invView = glm::inverse(m_renderer->getViewMatrix());
+            glm::vec3 dir = glm::normalize(glm::vec3(invView * rayEye));
+            return Ray(m_camera->getCameraState().position, dir);
+        };
+        auto closestParams = [](const glm::vec3& r0, const glm::vec3& rd, const glm::vec3& s0, const glm::vec3& sd, float& t, float& s)->bool{
+            const float a = glm::dot(rd, rd);
+            const float b = glm::dot(rd, sd);
+            const float c = glm::dot(sd, sd);
+            const glm::vec3 w0 = r0 - s0;
+            const float d = glm::dot(rd, w0);
+            const float e = glm::dot(sd, w0);
+            const float denom = a*c - b*b; if (fabsf(denom) < 1e-6f) return false; t = (b*e - c*d) / denom; s = (a*e - b*d) / denom; return true; };
+        Ray ray = makeRay(xpos, ypos);
+        float tParam = 0.0f, sNow = m_axisStartS;
+        if (closestParams(ray.origin, ray.direction, m_dragOriginWorld, m_dragAxisDir, tParam, sNow)) {
+            sNow = glm::max(0.0f, sNow);
+            float deltaS = sNow - m_axisStartS;
+            if (m_gizmoMode == GizmoMode::Translate) {
+                glm::vec3 delta = m_dragAxisDir * deltaS;
+                if (m_dragObjectIndex >= 0) {
+                    auto& obj = m_scene->getObjects()[m_dragObjectIndex];
+                    obj.modelMatrix = glm::translate(glm::mat4(1.0f), delta) * m_modelStart;
+                } else if (m_dragLightIndex >= 0 && m_dragLightIndex < (int)m_lights->m_lights.size()) {
+                    m_lights->m_lights[(size_t)m_dragLightIndex].position = m_dragOriginWorld + delta;
+                }
+            }
+        }
+        return;
+    }
+
+    // Handle camera rotation when RMB is pressed or RMB not required
+    if (m_rightMousePressed || !m_requireRMBToMove) {
+        // Respect ImGui capture unless RMB is held
+#ifndef WEB_USE_HTML_UI
+        if (!m_rightMousePressed && ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) return;
+#endif
+        m_camera->rotate((float)deltaX * m_camera->getSensitivity(), (float)deltaY * m_camera->getSensitivity());
     }
 }
 
@@ -189,6 +274,114 @@ void ApplicationCore::handleMouseButton(int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         m_leftMousePressed = (action == GLFW_PRESS);
+        if (action == GLFW_PRESS) {
+#ifndef WEB_USE_HTML_UI
+            // Skip scene picking if UI wants the mouse
+            if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
+                return;
+            }
+#endif
+            // Gizmo axis grab has priority
+            int selObj = m_scene->getSelectedObjectIndex();
+            bool grabbed = false;
+            if (selObj >= 0 || m_selectedLightIndex >= 0) {
+                glm::vec3 center(0.0f);
+                glm::mat3 R(1.0f);
+                if (selObj >= 0) {
+                    const auto& obj = m_scene->getObjects()[selObj];
+                    center = glm::vec3(obj.modelMatrix[3]);
+                    if (m_gizmoLocal) {
+                        glm::mat3 M3(obj.modelMatrix);
+                        R[0] = glm::normalize(glm::vec3(M3[0]));
+                        R[1] = glm::normalize(glm::vec3(M3[1]));
+                        R[2] = glm::normalize(glm::vec3(M3[2]));
+                    }
+                } else {
+                    center = m_lights->m_lights[(size_t)m_selectedLightIndex].position;
+                }
+                double mx, my; glfwGetCursorPos(m_window, &mx, &my);
+                float xNDC = static_cast<float>(2.0 * mx / m_windowWidth - 1.0);
+                float yNDC = static_cast<float>(1.0 - 2.0 * my / m_windowHeight);
+                glm::vec4 rayClip(xNDC, yNDC, -1.0f, 1.0f);
+                glm::mat4 invProj = glm::inverse(m_renderer->getProjectionMatrix());
+                glm::vec4 rayEye = invProj * rayClip; rayEye.z = -1.0f; rayEye.w = 0.0f;
+                glm::mat4 invView = glm::inverse(m_renderer->getViewMatrix());
+                glm::vec3 dir = glm::normalize(glm::vec3(invView * rayEye));
+                Ray ray(m_camera->getCameraState().position, dir);
+                float dist = glm::length(m_camera->getCameraState().position - center);
+                float gscale = glm::clamp(dist * 0.15f, 0.5f, 10.0f);
+                GizmoAxis ax; float s0; glm::vec3 axisDir;
+                if (m_renderer->getGizmo() && m_renderer->getGizmo()->pickAxis(ray, center, R, gscale, ax, s0, axisDir)) {
+                    m_gizmoAxis = ax; m_renderer->setGizmoAxis(ax);
+                    m_axisStartS = s0; m_dragOriginWorld = center; m_dragAxisDir = axisDir;
+                    m_dragObjectIndex = (selObj >= 0) ? selObj : -1;
+                    m_dragLightIndex = (selObj < 0) ? m_selectedLightIndex : -1;
+                    if (m_dragObjectIndex >= 0) {
+                        m_modelStart = m_scene->getObjects()[m_dragObjectIndex].modelMatrix;
+                    }
+                    m_gizmoDragging = true; grabbed = true;
+                }
+            }
+            if (grabbed) return;
+
+            // Basic picking: select the closest object's AABB under cursor
+            // Build ray from screen coordinates
+            auto makeRay = [&](double mx, double my){
+                float xNDC = static_cast<float>(2.0 * mx / m_windowWidth - 1.0);
+                float yNDC = static_cast<float>(1.0 - 2.0 * my / m_windowHeight);
+                glm::vec4 rayClip(xNDC, yNDC, -1.0f, 1.0f);
+                glm::mat4 invProj = glm::inverse(m_renderer->getProjectionMatrix());
+                glm::vec4 rayEye = invProj * rayClip; rayEye.z = -1.0f; rayEye.w = 0.0f;
+                glm::mat4 invView = glm::inverse(m_renderer->getViewMatrix());
+                glm::vec3 dir = glm::normalize(glm::vec3(invView * rayEye));
+                return Ray(m_camera->getCameraState().position, dir);
+            };
+
+            double mx = 0.0, my = 0.0;
+            glfwGetCursorPos(m_window, &mx, &my);
+            Ray ray = makeRay(mx, my);
+
+            const auto& objects = m_scene->getObjects();
+            int picked = -1; int pickedLight = -1; float closestT = std::numeric_limits<float>::max();
+            for (size_t i = 0; i < objects.size(); ++i) {
+                const auto& obj = objects[i];
+                if (obj.objLoader.getVertCount() == 0) continue;
+                glm::vec3 aabbMin = obj.objLoader.getMinBounds();
+                glm::vec3 aabbMax = obj.objLoader.getMaxBounds();
+                // Transform AABB corners to world to compute world-space AABB
+                glm::vec3 worldMin(std::numeric_limits<float>::max());
+                glm::vec3 worldMax(std::numeric_limits<float>::lowest());
+                for (int j=0;j<8;++j) {
+                    glm::vec3 v((j&1)?aabbMax.x:aabbMin.x,
+                                 (j&2)?aabbMax.y:aabbMin.y,
+                                 (j&4)?aabbMax.z:aabbMin.z);
+                    glm::vec3 w = glm::vec3(obj.modelMatrix * glm::vec4(v,1.0f));
+                    worldMin = glm::min(worldMin, w);
+                    worldMax = glm::max(worldMax, w);
+                }
+                float t;
+                if (rayIntersectsAABB(ray, worldMin, worldMax, t)) {
+                    if (t < closestT) { closestT = t; picked = static_cast<int>(i); pickedLight = -1; }
+                }
+            }
+            // Lights pick test
+            for (size_t i = 0; i < m_lights->m_lights.size(); ++i) {
+                glm::vec3 pos = m_lights->m_lights[i].position;
+                glm::vec3 he(0.12f);
+                glm::vec3 mn = pos - he;
+                glm::vec3 mx = pos + he;
+                float t;
+                if (rayIntersectsAABB(ray, mn, mx, t)) {
+                    if (t < closestT) { closestT = t; pickedLight = (int)i; picked = -1; }
+                }
+            }
+            m_scene->setSelectedObjectIndex(picked);
+            m_selectedLightIndex = pickedLight;
+            m_renderer->setSelectedLightIndex(pickedLight);
+            if (m_uiBridge) m_uiBridge->setSelectedLightIndex(pickedLight);
+        } else if (action == GLFW_RELEASE) {
+            m_gizmoDragging = false;
+        }
     }
     else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
         m_rightMousePressed = (action == GLFW_PRESS);
@@ -199,6 +392,8 @@ void ApplicationCore::handleMouseButton(int button, int action, int mods)
         } else {
             // Re-enable cursor
             glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            // End any gizmo drag on release of RMB
+            m_gizmoDragging = false;
         }
     }
 }
@@ -218,53 +413,22 @@ void ApplicationCore::handleFramebufferResize(int width, int height)
 
 void ApplicationCore::handleKey(int key, int scancode, int action, int mods)
 {
-    if (!m_rightMousePressed) return; // Only handle movement when camera is active
-    
-    const float speed = m_camera->getSpeed();
-    
-    // WASD movement
-    if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveForward(speed);
+    // Movement only when camera is active (RMB) or RMB not required
+    if (m_rightMousePressed || !m_requireRMBToMove) {
+        const float step = m_camera->getSpeed();
+        if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveForward(step);
+        if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveBackward(step);
+        if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveLeft(step);
+        if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveRight(step);
+        if (key == GLFW_KEY_SPACE && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveUp(step);
+        if (key == GLFW_KEY_LEFT_CONTROL && (action == GLFW_PRESS || action == GLFW_REPEAT)) m_camera->moveDown(step);
     }
-    if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveBackward(speed);
-    }
-    if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveLeft(speed);
-    }
-    if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveRight(speed);
-    }
-    
-    // Vertical movement
-    if (key == GLFW_KEY_SPACE && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveUp(speed);
-    }
-    if (key == GLFW_KEY_LEFT_CONTROL && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        m_camera->moveDown(speed);
-    }
-    
-    // Quick gizmo mode switching
-    if (mods & GLFW_MOD_SHIFT) {
-        if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-            // Set translate mode via UI command
-            UICommandData cmd;
-            cmd.command = UICommand::SetGizmoMode;
-            cmd.intParam = (int)GizmoMode::Translate;
-            m_uiBridge->handleUICommand(cmd);
-        }
-        else if (key == GLFW_KEY_W && action == GLFW_PRESS) {
-            UICommandData cmd;
-            cmd.command = UICommand::SetGizmoMode;
-            cmd.intParam = (int)GizmoMode::Rotate;
-            m_uiBridge->handleUICommand(cmd);
-        }
-        else if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-            UICommandData cmd;
-            cmd.command = UICommand::SetGizmoMode;
-            cmd.intParam = (int)GizmoMode::Scale;
-            m_uiBridge->handleUICommand(cmd);
-        }
+
+    // Quick gizmo mode switching while holding Shift
+    if ((mods & GLFW_MOD_SHIFT) && action == GLFW_PRESS) {
+        if (key == GLFW_KEY_Q) { m_gizmoMode = GizmoMode::Translate; m_renderer->setGizmoMode(m_gizmoMode); }
+        else if (key == GLFW_KEY_W) { m_gizmoMode = GizmoMode::Rotate; m_renderer->setGizmoMode(m_gizmoMode); }
+        else if (key == GLFW_KEY_E) { m_gizmoMode = GizmoMode::Scale; m_renderer->setGizmoMode(m_gizmoMode); }
     }
 }
 
@@ -339,6 +503,10 @@ void ApplicationCore::createDefaultScene()
     defaultCam.front = glm::vec3(0.0f, 0.0f, -1.0f);
     defaultCam.up = glm::vec3(0.0f, 1.0f, 0.0f);
     m_camera->setCameraState(defaultCam);
+
+    // Load a default object so the viewport isn't empty
+    // Note: path is relative to runtime working directory containing the assets folder
+    m_scene->loadObject("Cube", "assets/models/cube.obj", glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(1.0f));
 }
 
 void ApplicationCore::cleanupGL()

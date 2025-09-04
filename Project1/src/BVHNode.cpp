@@ -1,5 +1,4 @@
 #include "BVHNode.h"
-#include "application.h"
 #include "RayUtils.h"
 #include <algorithm>
 

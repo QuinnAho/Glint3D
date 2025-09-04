@@ -34,7 +34,16 @@
       "Bash(git rm:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git filter-branch:*)"
+      "Bash(git filter-branch:*)",
+      "Bash(git push:*)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\src/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\src/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\src/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\src/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\src/**)"
     ],
     "deny": [],
     "ask": []

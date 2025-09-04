@@ -143,6 +143,9 @@ int main(int argc, char** argv)
     emscripten_set_main_loop_arg([](void* p){ static_cast<ApplicationCore*>(p)->frame(); }, app, 0, true);
 #else
     if (wantHeadless) {
+        // TODO: Wire JSON Ops and headless render to ApplicationCore/RenderSystem implementations.
+        // - UIBridge::applyJsonOps should apply ops to the core scene.
+        // - RenderSystem::renderToPNG should render offscreen and write the image.
         // Apply ops if provided
         if (args.has("--ops")) {
             std::string ops = loadTextFile(args.value("--ops"));

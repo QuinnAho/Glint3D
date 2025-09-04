@@ -12,6 +12,8 @@ UIBridge::UIBridge(SceneManager& scene, RenderSystem& renderer,
     , m_camera(camera)
     , m_lights(lights)
 {
+    // Default AI endpoint for local Ollama
+    m_aiEndpoint = "http://127.0.0.1:11434";
 }
 
 bool UIBridge::initUI(int windowWidth, int windowHeight)
@@ -68,6 +70,7 @@ UIState UIBridge::buildUIState() const
     state.denoiseEnabled = m_renderer.isDenoiseEnabled();
     state.showGrid = m_renderer.isShowGrid();
     state.showAxes = m_renderer.isShowAxes();
+    state.requireRMBToMove = m_requireRMBToMove;
     
     // Scene state
     state.selectedObjectIndex = m_scene.getSelectedObjectIndex();
@@ -76,12 +79,17 @@ UIState UIBridge::buildUIState() const
     
     // Light state  
     state.lightCount = (int)m_lights.getLightCount();
+    state.selectedLightIndex = m_selectedLightIndex;
     
     // Statistics
     state.renderStats = m_renderer.getLastFrameStats();
     
     // Console log
     state.consoleLog = m_consoleLog;
+    
+    // AI
+    state.useAI = m_useAI;
+    state.aiEndpoint = m_aiEndpoint;
     
     return state;
 }
@@ -133,7 +141,16 @@ void UIBridge::handleUICommand(const UICommandData& command)
                 }
             }
             break;
-            
+        case UICommand::SetUseAI:
+            m_useAI = command.boolParam;
+            break;
+        case UICommand::SetAIEndpoint:
+            m_aiEndpoint = command.stringParam;
+            break;
+        case UICommand::SetRequireRMBToMove:
+            m_requireRMBToMove = command.boolParam;
+            break;
+
         default:
             addConsoleMessage("Unknown UI command");
             break;
@@ -176,9 +193,22 @@ void UIBridge::handleCameraSettings(const UICommandData& cmd)
 
 void UIBridge::handleGizmoSettings(const UICommandData& cmd)
 {
-    // Gizmo functionality would be implemented here
-    // For now, just log the command
-    addConsoleMessage("Gizmo command received");
+    switch (cmd.command) {
+        case UICommand::SetGizmoMode:
+            m_renderer.setGizmoMode(static_cast<GizmoMode>(cmd.intParam));
+            addConsoleMessage("Gizmo mode changed");
+            break;
+        case UICommand::ToggleGizmoSpace:
+            m_renderer.setGizmoLocalSpace(!m_renderer.gizmoLocalSpace());
+            addConsoleMessage("Gizmo space toggled");
+            break;
+        case UICommand::ToggleSnap:
+            m_renderer.setSnapEnabled(!m_renderer.snapEnabled());
+            addConsoleMessage("Gizmo snap toggled");
+            break;
+        default:
+            break;
+    }
 }
 
 void UIBridge::handleConsoleCommand(const UICommandData& cmd)
@@ -224,8 +254,9 @@ void UIBridge::clearConsoleLog()
 
 bool UIBridge::applyJsonOps(const std::string& json, std::string& error)
 {
-    // This would integrate with the existing JSON Ops system
-    // For now, return a placeholder implementation
+    // TODO: Implement JSON Ops v1 replayer directly against SceneManager/RenderSystem/CameraController/Light.
+    // - Parse ops (RapidJSON or tolerant parser) and map to scene/load/duplicate/remove/select/set_camera/render actions.
+    // - Keep this independent from any UI specifics so it can be used headless.
     error = "JSON Ops integration not implemented in UI bridge yet";
     return false;
 }

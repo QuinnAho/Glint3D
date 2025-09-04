@@ -29,6 +29,7 @@ struct UIState {
     CameraState camera;
     float cameraSpeed = 0.5f;
     float sensitivity = 0.1f;
+    bool requireRMBToMove = true;
     
     // Selection
     int selectedObjectIndex = -1;
@@ -51,6 +52,10 @@ struct UIState {
     
     // Console/log
     std::vector<std::string> consoleLog;
+
+    // AI controls
+    bool useAI = true;
+    std::string aiEndpoint; // e.g. http://127.0.0.1:11434
 };
 
 // Command interface for UI actions
@@ -70,7 +75,10 @@ enum class UICommand {
     ToggleSnap,
     ExecuteConsoleCommand,
     ApplyJsonOps,
-    RenderToPNG
+    RenderToPNG,
+    SetUseAI,
+    SetAIEndpoint,
+    SetRequireRMBToMove
 };
 
 struct UICommandData {
@@ -117,6 +125,13 @@ public:
     // Console/logging
     void addConsoleMessage(const std::string& message);
     void clearConsoleLog();
+
+    // Light selection for UI state
+    void setSelectedLightIndex(int idx) { m_selectedLightIndex = idx; }
+    int  getSelectedLightIndex() const { return m_selectedLightIndex; }
+
+    // Settings queried by core
+    bool getRequireRMBToMove() const { return m_requireRMBToMove; }
     
     // JSON Ops integration
     bool applyJsonOps(const std::string& json, std::string& error);
@@ -137,6 +152,9 @@ private:
     std::vector<std::string> m_consoleLog;
     bool m_previewOnly = false;
     bool m_useAI = true;
+    std::string m_aiEndpoint;
+    bool m_requireRMBToMove = true;
+    int  m_selectedLightIndex = -1;
     
     // Command handlers
     void handleLoadObject(const UICommandData& cmd);

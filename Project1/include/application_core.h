@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <glm/glm.hpp>
+#include "gizmo.h"
 
 // Forward declarations
 struct GLFWwindow;
@@ -73,6 +74,23 @@ private:
     double m_lastMouseX = 0.0;
     double m_lastMouseY = 0.0;
     bool m_firstMouse = true;
+    double m_lastFrameTime = 0.0;
+    bool   m_requireRMBToMove = true;
+
+    // Selection
+    int m_selectedLightIndex = -1;
+
+    // Gizmo state
+    GizmoMode m_gizmoMode = GizmoMode::Translate;
+    GizmoAxis m_gizmoAxis = GizmoAxis::None;
+    bool m_gizmoLocal = true;
+    bool m_gizmoDragging = false;
+    glm::vec3 m_dragOriginWorld{0.0f};
+    glm::vec3 m_dragAxisDir{0.0f};
+    float m_axisStartS = 0.0f;
+    int   m_dragObjectIndex = -1;
+    int   m_dragLightIndex = -1;
+    glm::mat4 m_modelStart{1.0f};
     
     // Initialization
     bool initGLFW(const std::string& windowTitle, int width, int height);

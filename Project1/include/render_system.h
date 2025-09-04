@@ -4,6 +4,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "gl_platform.h"
+#include "gizmo.h"
 
 // Forward declarations
 class SceneManager;
@@ -110,6 +111,18 @@ public:
     // Gizmo support - forward declared, implemented in cpp
     class Gizmo* getGizmo() { return m_gizmo.get(); }
     const class Gizmo* getGizmo() const { return m_gizmo.get(); }
+    
+    // Gizmo/selection configuration
+    void setGizmoMode(GizmoMode mode) { m_gizmoMode = mode; }
+    void setGizmoAxis(GizmoAxis axis) { m_gizmoAxis = axis; }
+    void setGizmoLocalSpace(bool local) { m_gizmoLocal = local; }
+    void setSnapEnabled(bool enabled) { m_snapEnabled = enabled; }
+    void setSelectedLightIndex(int idx) { m_selectedLightIndex = idx; }
+    GizmoMode gizmoMode() const { return m_gizmoMode; }
+    GizmoAxis gizmoAxis() const { return m_gizmoAxis; }
+    bool gizmoLocalSpace() const { return m_gizmoLocal; }
+    bool snapEnabled() const { return m_snapEnabled; }
+    int selectedLightIndex() const { return m_selectedLightIndex; }
 
 private:
     // Core rendering state
@@ -137,6 +150,10 @@ private:
     // Shaders
     std::unique_ptr<Shader> m_basicShader;
     std::unique_ptr<Shader> m_pbrShader;
+    std::unique_ptr<Shader> m_gridShader;
+    
+    // Fallback shadow map to satisfy shaders that sample shadowMap
+    GLuint m_dummyShadowTex = 0;
     
     // Statistics
     RenderStats m_stats;
@@ -146,4 +163,11 @@ private:
     void renderRaytraced(const SceneManager& scene, const Light& lights);
     void renderObject(const SceneObject& obj, const Light& lights);
     void updateRenderStats(const SceneManager& scene);
+
+    // Gizmo state
+    GizmoMode m_gizmoMode = GizmoMode::Translate;
+    GizmoAxis m_gizmoAxis = GizmoAxis::None;
+    bool m_gizmoLocal = true;
+    bool m_snapEnabled = false;
+    int  m_selectedLightIndex = -1;
 };

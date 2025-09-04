@@ -220,7 +220,12 @@ void ImGuiUILayer::renderSettingsPanel(const UIState& state)
         }
         
         ImGui::Separator();
-        
+        // Controls
+        bool requireRMB = state.requireRMBToMove;
+        if (ImGui::Checkbox("Hold RMB to move", &requireRMB)) {
+            UICommandData cmd; cmd.command = UICommand::SetRequireRMBToMove; cmd.boolParam = requireRMB; if (onCommand) onCommand(cmd);
+        }
+
         // Scene info
         ImGui::Text("Scene");
         ImGui::Text("Objects: %d", state.objectCount);
@@ -269,6 +274,24 @@ void ImGuiUILayer::renderConsole(const UIState& state)
     
     if (ImGui::Begin("Console", nullptr, 
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+        // AI controls row (top of console)
+        bool useAI = state.useAI;
+        if (ImGui::Checkbox("Use AI", &useAI)) {
+            UICommandData cmd; cmd.command = UICommand::SetUseAI; cmd.boolParam = useAI; if (onCommand) onCommand(cmd);
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Endpoint:");
+        ImGui::SameLine();
+        static char endpointBuf[256] = "";
+        // Sync buffer if different
+        if (endpointBuf[0] == '\0' || std::string(endpointBuf) != state.aiEndpoint) {
+            std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", state.aiEndpoint.empty() ? "http://127.0.0.1:11434" : state.aiEndpoint.c_str());
+        }
+        ImGui::SetNextItemWidth(300.0f);
+        if (ImGui::InputText("##ai_endpoint", endpointBuf, sizeof(endpointBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            UICommandData cmd; cmd.command = UICommand::SetAIEndpoint; cmd.stringParam = std::string(endpointBuf); if (onCommand) onCommand(cmd);
+        }
+        ImGui::Separator();
         // Console output
         if (ImGui::BeginChild("##console_scrollback", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true)) {
             for (const auto& line : state.consoleLog) {

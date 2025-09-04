@@ -13,17 +13,14 @@ set(IMGUI_DIR Project1)
 
 set(APP_SOURCES
     ${SRC_DIR}/main.cpp
-    ${SRC_DIR}/application.cpp
     ${SRC_DIR}/application_core.cpp
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
     ${SRC_DIR}/camera_controller.cpp
     ${SRC_DIR}/ui_bridge.cpp
     ${SRC_DIR}/imgui_ui_layer.cpp
-    ${SRC_DIR}/scene_io.cpp
-    ${SRC_DIR}/render_offscreen.cpp
+    # ${SRC_DIR}/render_offscreen.cpp  # legacy (Application-based); excluded from build
     ${SRC_DIR}/ai_instructions.cpp
-    ${SRC_DIR}/json_ops_v1.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
@@ -37,15 +34,11 @@ set(APP_SOURCES
     ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
-    ${SRC_DIR}/InputHandler.cpp
     ${SRC_DIR}/RayUtils.cpp
     ${SRC_DIR}/BVHNode.cpp
     ${SRC_DIR}/raytracer.cpp
-    ${SRC_DIR}/commands.cpp
-    ${SRC_DIR}/nl_executor.cpp
     ${SRC_DIR}/ai_bridge.cpp
     ${SRC_DIR}/assimp_loader.cpp
-    ${SRC_DIR}/userinput.cpp
     ${SRC_DIR}/triangle.cpp
 )
 
@@ -129,8 +122,6 @@ else()
         ${APP_SOURCES}
         ${IMGUI_SOURCES}
         ${SRC_DIR}/glad.c
-        ${SRC_DIR}/gl43_compat.cpp
-        ${SRC_DIR}/compute_shader.cpp
     )
 
     target_include_directories(objviewer PRIVATE
