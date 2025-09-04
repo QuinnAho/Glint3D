@@ -29,7 +29,11 @@
       "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)",
       "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)",
       "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)",
-      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)"
+      "Read(/D:\\class\\OpenGLOBJViewer\\Project1\\include/**)",
+      "Read(/D:\\class\\OpenGLOBJViewer/**)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

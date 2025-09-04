@@ -51,4 +51,49 @@ out/
 *.VC.db
 *.ipch
 
+# Tauri build artifacts
+ui/src-tauri/target/
+ui/src-tauri/Cargo.lock
+
+# Node.js dependencies and build artifacts
+ui/node_modules/
+ui/dist/
+ui/build/
+ui/.next/
+ui/.nuxt/
+ui/.output/
+ui/.vite/
+ui/.turbo/
+
+# Package manager files
+ui/package-lock.json
+ui/yarn.lock
+ui/pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Large binary files that shouldn't be tracked
+*.rlib
+*.rmeta
+*.dll
+*.dylib
+*.so
+*.a
+
+# CMake temp build directories
+build-temp/
+build-web/
+
 # ... any other build or large files you don't want ...
