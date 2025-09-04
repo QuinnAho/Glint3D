@@ -33,7 +33,8 @@
       "Read(/D:\\class\\OpenGLOBJViewer/**)",
       "Bash(git rm:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git filter-branch:*)"
     ],
     "deny": [],
     "ask": []
