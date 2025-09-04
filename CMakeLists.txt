@@ -14,6 +14,12 @@ set(IMGUI_DIR Project1)
 set(APP_SOURCES
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/application.cpp
+    ${SRC_DIR}/application_core.cpp
+    ${SRC_DIR}/scene_manager.cpp
+    ${SRC_DIR}/render_system.cpp
+    ${SRC_DIR}/camera_controller.cpp
+    ${SRC_DIR}/ui_bridge.cpp
+    ${SRC_DIR}/imgui_ui_layer.cpp
     ${SRC_DIR}/scene_io.cpp
     ${SRC_DIR}/render_offscreen.cpp
     ${SRC_DIR}/ai_instructions.cpp

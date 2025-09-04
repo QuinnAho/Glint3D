@@ -1,7 +1,21 @@
-﻿  json_ops_v1.cpp
-  main.cpp
-  scene_io.cpp
-  Generating Code...
+﻿  application.cpp
+assimp_loader.obj : warning LNK4099: PDB '' was not found with 'assimp_loader.obj' or at ''; linking object as if no debug info
+importer_registry.obj : warning LNK4099: PDB '' was not found with 'importer_registry.obj' or at ''; linking object as if no debug info
+obj_importer.obj : warning LNK4099: PDB '' was not found with 'obj_importer.obj' or at ''; linking object as if no debug info
+assimp_importer.obj : warning LNK4099: PDB '' was not found with 'assimp_importer.obj' or at ''; linking object as if no debug info
+mesh_loader.obj : warning LNK4099: PDB '' was not found with 'mesh_loader.obj' or at ''; linking object as if no debug info
+texture_cache.obj : warning LNK4099: PDB '' was not found with 'texture_cache.obj' or at ''; linking object as if no debug info
+gizmo.obj : warning LNK4099: PDB '' was not found with 'gizmo.obj' or at ''; linking object as if no debug info
+grid.obj : warning LNK4099: PDB '' was not found with 'grid.obj' or at ''; linking object as if no debug info
+light.obj : warning LNK4099: PDB '' was not found with 'light.obj' or at ''; linking object as if no debug info
+material.obj : warning LNK4099: PDB '' was not found with 'material.obj' or at ''; linking object as if no debug info
+raytracer.obj : warning LNK4099: PDB '' was not found with 'raytracer.obj' or at ''; linking object as if no debug info
+RayUtils.obj : warning LNK4099: PDB '' was not found with 'RayUtils.obj' or at ''; linking object as if no debug info
+shader.obj : warning LNK4099: PDB '' was not found with 'shader.obj' or at ''; linking object as if no debug info
+texture.obj : warning LNK4099: PDB '' was not found with 'texture.obj' or at ''; linking object as if no debug info
+triangle.obj : warning LNK4099: PDB '' was not found with 'triangle.obj' or at ''; linking object as if no debug info
+commands.obj : warning LNK4099: PDB '' was not found with 'commands.obj' or at ''; linking object as if no debug info
+ai_bridge.obj : warning LNK4099: PDB '' was not found with 'ai_bridge.obj' or at ''; linking object as if no debug info
   Project1.vcxproj -> D:\class\OpenGLOBJViewer\x64\Debug\Project1.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.

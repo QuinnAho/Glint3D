@@ -6,11 +6,10 @@
 #include <fstream>
 #include <filesystem>
 
-#ifndef WEB_USE_HTML_UI
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#endif
+#include "imgui_layer.h"
+#include "app_state.h"
+#include "app_commands.h"
+
 #include "pbr_material.h"
 #include "texture_cache.h"
 #include "mesh_loader.h"
@@ -26,6 +25,10 @@
 #endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION  
+#define IMGUI_IMPL_OPENGL_LOADER_GLAD
+#include <imgui.h>
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
 #include "stb_image_write.h"
 
 Application::Application()
@@ -103,10 +106,7 @@ bool Application::init(const std::string& windowTitle, int width, int height, bo
         return false;
     }
 
-    // Init ImGui (skip for web HTML UI)
-#ifndef WEB_USE_HTML_UI
     initImGui();
-#endif
 
     // Setup our OpenGL resources (compile shaders, load model, etc.)
     setupOpenGL();
@@ -171,10 +171,9 @@ bool Application::initGLAD()
 #endif
 }
 
-void Application::initImGui()
-{
-    #ifndef WEB_USE_HTML_UI
-    if (m_headless) return; // no UI in headless
+void Application::initImGui() {
+#ifndef WEB_USE_HTML_UI
+    if (m_headless) return;
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -183,26 +182,23 @@ void Application::initImGui()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 #endif
-
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    #ifdef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
     ImGui_ImplOpenGL3_Init("#version 300 es");
-    #else
+#else
     ImGui_ImplOpenGL3_Init("#version 330");
-    #endif
-
+#endif
     // Modern dark theme tweaks
     ImGuiStyle& style = ImGui::GetStyle();
 #ifdef IMGUI_HAS_DOCKING
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         style.WindowRounding = 6.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 #endif
     style.FrameRounding = 6.0f;
-    style.GrabRounding = 6.0f;
-    style.TabRounding = 6.0f;
+    style.GrabRounding  = 6.0f;
+    style.TabRounding   = 6.0f;
     auto& c = style.Colors;
     c[ImGuiCol_WindowBg]        = ImVec4(0.10f, 0.11f, 0.12f, 1.00f);
     c[ImGuiCol_Header]          = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
@@ -219,7 +215,7 @@ void Application::initImGui()
     c[ImGuiCol_FrameBg]         = ImVec4(0.14f, 0.15f, 0.17f, 1.00f);
     c[ImGuiCol_FrameBgHovered]  = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
     c[ImGuiCol_FrameBgActive]   = ImVec4(0.18f, 0.20f, 0.22f, 1.00f);
-    #endif
+#endif
 }
 
 void Application::setupOpenGL()
@@ -239,6 +235,7 @@ void Application::setupOpenGL()
         std::vector<float> grey(m_windowWidth * m_windowHeight * 3, 0.1f);
         glBindTexture(GL_TEXTURE_2D, rayTexID);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_windowWidth, m_windowHeight, GL_RGB, GL_FLOAT, grey.data());
+        m_traceDone = true;
     }
 
     // Load shaders
@@ -328,9 +325,8 @@ void Application::setupOpenGL()
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowDepthTexture, 0);
 #ifdef __EMSCRIPTEN__
-    // WebGL2/GLES3: use glDrawBuffers with zero buffers, skip glReadBuffer
-    glDrawBuffers(0, nullptr);
-#else
+    // FIX: WebGL2—do not call glDrawBuffers(0, nullptr); simply leave defaults.
+#else  
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
 #endif
@@ -347,9 +343,16 @@ void Application::setupOpenGL()
         std::cerr << "Failed to load outline shader.\n";
 }
 
-
 void Application::cleanup()
 {
+    #ifndef WEB_USE_HTML_UI
+    if (ImGui::GetCurrentContext()) {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+    }
+    #endif
+
     // Cleanup axis
     m_axisRenderer.cleanup();
     m_gizmo.cleanup();
@@ -359,12 +362,7 @@ void Application::cleanup()
     glDeleteBuffers(1, &m_VBO);
     glDeleteBuffers(1, &m_EBO);
 
-    // Cleanup ImGui
-#ifndef WEB_USE_HTML_UI
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-#endif
+    // UI cleanup handled by ImGui shutdown above
 
     // Destroy window
     if (m_window)
@@ -394,6 +392,28 @@ void Application::cleanup()
         delete m_outlineShader;
         m_outlineShader = nullptr;
     }
+
+    // Ray screen quad
+    if (quadVAO) { glDeleteVertexArrays(1, &quadVAO); quadVAO = 0; }
+    if (quadVBO) { glDeleteBuffers(1, &quadVBO); quadVBO = 0; }
+    if (quadEBO) { glDeleteBuffers(1, &quadEBO); quadEBO = 0; }
+    if (rayTexID) { glDeleteTextures(1, &rayTexID); rayTexID = 0; }
+
+    // Shadow resources
+    if (m_shadowFBO) { glDeleteFramebuffers(1, &m_shadowFBO); m_shadowFBO = 0; }
+    if (m_shadowDepthTexture) { glDeleteTextures(1, &m_shadowDepthTexture); m_shadowDepthTexture = 0; }
+
+    // Shaders
+    auto del = [](Shader*& s){ if (s){ delete s; s=nullptr; } };
+    del(m_standardShader);
+    del(m_gridShader);
+    del(m_outlineShader);
+    del(m_pbrShader);
+    del(m_shadowShader);
+    del(m_rayScreenShader);
+
+    // User input
+    if (m_userInput) { delete m_userInput; m_userInput = nullptr; }
 }
 
 void Application::run()
@@ -505,12 +525,16 @@ void Application::processInput()
     if (glfwGetKey(m_window, GLFW_KEY_N) == GLFW_RELEASE) m_nHeld = false;
 }
 
-
 void Application::renderScene()
 {
     // ---- 1. Render shadow map first ----
     glViewport(0, 0, 1024, 1024);
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Shadow FBO incomplete: 0x" << std::hex << status << std::dec << "\n";
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_DEPTH_BUFFER_BIT);
 
     glm::vec3 lightDir = glm::normalize(glm::vec3(-6.0f, 7.0f, 8.0f));
@@ -574,7 +598,6 @@ void Application::renderScene()
                     m_raytracer->renderImage(m_framebuffer, W, H, m_cameraPos, m_cameraFront, m_cameraUp, m_fov, m_lights);
 
                     std::cout << "[TraceJob] Worker: finished tracing!\n";
-                    m_traceDone = true;
                 });
         }
 
@@ -611,7 +634,7 @@ void Application::renderScene()
 
         renderAxisIndicator();
         m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix, m_selectedLightIndex);
-        renderGUI();
+        renderGUI();            // GUI is centralized here
         glfwSwapBuffers(m_window);
         return;
     }
@@ -723,335 +746,290 @@ void Application::renderScene()
     }
 
     renderAxisIndicator();
-#ifndef WEB_USE_HTML_UI
     renderGUI();
-#endif
     m_lights.renderIndicators(m_viewMatrix, m_projectionMatrix, m_selectedLightIndex);
     glfwSwapBuffers(m_window);
 }
 
+void Application::renderGUI() {
+#ifndef WEB_USE_HTML_UI
+    if (m_headless) return;
 
-
-void Application::renderGUI()
-{
-#ifdef WEB_USE_HTML_UI
-    // Web HTML UI mode: no Dear ImGui UI
-    return;
-#else
+    // New ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // Global dockspace covering the main viewport (if docking supported)
 #ifdef IMGUI_HAS_DOCKING
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 #endif
 
-    // Main menu bar + toolbar buttons
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("File"))
-        {
+    // ==== Main menu bar ====
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Load Cube")) {
                 loadObjInFrontOfCamera("Cube", "assets/models/cube.obj", 2.0f, glm::vec3(1.0f));
             }
             if (ImGui::MenuItem("Load Plane")) {
                 loadObjInFrontOfCamera("Plane", "assets/samples/models/plane.obj", 2.0f, glm::vec3(1.0f));
             }
-            if (ImGui::MenuItem("Copy Share Link"))
-            {
+            if (ImGui::MenuItem("Copy Share Link")) {
                 std::string link = buildShareLink();
                 ImGui::SetClipboardText(link.c_str());
                 m_chatScrollback.push_back("Share link copied to clipboard.");
             }
-            if (ImGui::MenuItem("Toggle Settings Panel", nullptr, m_showSettingsPanel))
-            {
+            bool toggle = m_showSettingsPanel;
+            if (ImGui::MenuItem("Toggle Settings Panel", nullptr, toggle)) {
                 m_showSettingsPanel = !m_showSettingsPanel;
             }
             ImGui::EndMenu();
         }
-
-        if (ImGui::BeginMenu("View"))
-        {
-            bool selected = (m_renderMode == 0); if (ImGui::MenuItem("Point",   nullptr, selected)) m_renderMode = 0;
-            selected = (m_renderMode == 1);      if (ImGui::MenuItem("Wire",    nullptr, selected)) m_renderMode = 1;
-            selected = (m_renderMode == 2);      if (ImGui::MenuItem("Solid",   nullptr, selected)) m_renderMode = 2;
-            selected = (m_renderMode == 3);      if (ImGui::MenuItem("Raytrace",nullptr, selected)) m_renderMode = 3;
+        if (ImGui::BeginMenu("View")) {
+            bool selected = (m_renderMode == 0); if (ImGui::MenuItem("Point",    nullptr, selected)) m_renderMode = 0;
+            selected = (m_renderMode == 1);      if (ImGui::MenuItem("Wire",     nullptr, selected)) m_renderMode = 1;
+            selected = (m_renderMode == 2);      if (ImGui::MenuItem("Solid",    nullptr, selected)) m_renderMode = 2;
+            selected = (m_renderMode == 3);      if (ImGui::MenuItem("Raytrace", nullptr, selected)) m_renderMode = 3;
             ImGui::Separator();
-        if (ImGui::MenuItem("Fullscreen")) toggleFullscreen();
-        bool perfHud = m_showPerfHUD; if (ImGui::MenuItem("Perf HUD", nullptr, perfHud)) m_showPerfHUD = !m_showPerfHUD;
-        ImGui::EndMenu();
-    }
-
-        // Removed Gizmo and Samples menus; Gizmo options available via right-click popup
-
-
+            if (ImGui::MenuItem("Fullscreen")) toggleFullscreen();
+            bool perfHud = m_showPerfHUD; if (ImGui::MenuItem("Perf HUD", nullptr, perfHud)) m_showPerfHUD = !m_showPerfHUD;
+            ImGui::EndMenu();
+        }
         ImGui::EndMainMenuBar();
     }
 
+    // ==== Settings & Diagnostics panel ====
     if (m_showSettingsPanel) {
-    {
-    ImGuiIO& io = ImGui::GetIO();
-    float consoleH = io.DisplaySize.y * 0.25f;
-    float rightW = 420.0f;
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - rightW - 10.0f, 10.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(rightW, io.DisplaySize.y - consoleH - 20.0f), ImGuiCond_Always);
-    ImGui::Begin("Settings & Diagnostics");
-    }
-    // Usage tips moved to Console on startup
+        ImGuiIO& io = ImGui::GetIO();
+        float consoleH = io.DisplaySize.y * 0.25f;
+        float rightW   = 420.0f;
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - rightW - 10.0f, 10.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(rightW, io.DisplaySize.y - consoleH - 20.0f), ImGuiCond_Always);
+        if (ImGui::Begin("Settings & Diagnostics")) {
+            // Usage tips moved to Console on startup
 
-    ImGui::SliderFloat("Camera Speed", &m_cameraSpeed, 0.01f, 1.0f);
-    ImGui::SliderFloat("Mouse Sensitivity", &m_sensitivity, 0.01f, 1.0f);
-    ImGui::SliderFloat("Field of View", &m_fov, 30.0f, 120.0f);
-    ImGui::SliderFloat("Near Clip", &m_nearClip, 0.01f, 5.0f);
-    ImGui::SliderFloat("Far Clip", &m_farClip, 5.0f, 500.0f);
+            ImGui::SliderFloat("Camera Speed",       &m_cameraSpeed,   0.01f, 1.0f);
+            ImGui::SliderFloat("Mouse Sensitivity",  &m_sensitivity,   0.01f, 1.0f);
+            ImGui::SliderFloat("Field of View",      &m_fov,          30.0f, 120.0f);
+            ImGui::SliderFloat("Near Clip",          &m_nearClip,      0.01f, 5.0f);
+            ImGui::SliderFloat("Far Clip",           &m_farClip,       5.0f, 500.0f);
 
-    // Render Mode Buttons
-    if (ImGui::Button("Point Cloud Mode")) { m_renderMode = 0; }
-    ImGui::SameLine();
-    if (ImGui::Button("Wireframe Mode")) { m_renderMode = 1; }
-    ImGui::SameLine();
-    if (ImGui::Button("Solid Mode")) { m_renderMode = 2; }
-    ImGui::SameLine();
-    if (ImGui::Button("Raytrace"))   m_renderMode = 3;   // NEW
-
-    if (m_renderMode == 3)
-    {
-        if (m_traceJob.valid())
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Raytracing... please wait");
-        else if (m_traceDone)
-            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Raytracer Done!");
-    }
-
-    // Diagnostics (Explain-my-render) now integrated into Settings panel
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Diagnostics", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        int targetIdx = m_selectedObjectIndex;
-        if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
-        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
-
-        bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
-        bool noLights = (m_lights.m_lights.empty());
-        if (!noLights) {
-            bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
-            noLights = allZero;
-        }
-
-        bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
-
-        ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
-        if (hasTarget)
-        {
-            auto& obj = m_sceneObjects[targetIdx];
-            bool missingNormals = !obj.objLoader.hadNormalsFromSource();
-            bool backface = objectMostlyBackfacing(obj);
-
-            if (missingNormals) {
-                ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
-                if (ImGui::SmallButton("Recompute (angle-weighted)")) {
-                    recomputeAngleWeightedNormalsForObject(targetIdx);
-                }
-            } else {
-                ImGui::Text("Normals: OK (from source)");
-            }
-
-            if (backface) {
-                ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces)."); ImGui::SameLine();
-                if (ImGui::SmallButton("Flip Winding")) {
-                    obj.objLoader.flipWindingAndNormals();
-                    refreshIndexBuffer(obj);
-                    refreshNormalBuffer(obj);
-                }
-            } else {
-                ImGui::Text("Winding: OK (mostly front-facing)");
-            }
-        }
-
-        if (noLights) {
-            ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
-            if (ImGui::SmallButton("Add Neutral Key Light")) {
-                addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
-            }
-        } else {
-            ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
-        if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) { m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled; }
-        if (srgbMismatch) {
-            ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it."); ImGui::SameLine();
-            if (ImGui::SmallButton("Fix (disable FB sRGB)")) { m_framebufferSRGBEnabled = false; }
-        }
-    }
-
-    // Perf HUD overlay
-    if (m_showPerfHUD)
-    {
-        PerfStats stats{}; computePerfStats(stats);
-        ImGui::SetNextWindowPos(ImVec2(10, 30), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.35f);
-        ImGui::Begin("Perf HUD", &m_showPerfHUD, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Draw calls: %d", stats.drawCalls);
-        ImGui::Text("Triangles: %zu", stats.totalTriangles);
-        ImGui::Text("Materials: %d", stats.uniqueMaterialKeys);
-        ImGui::Text("Textures: %zu (%.2f MB)", stats.uniqueTextures, stats.texturesMB);
-        ImGui::Text("Geometry: %.2f MB", stats.geometryMB);
-        ImGui::Separator();
-        ImGui::Text("VRAM est: %.2f MB", stats.vramMB);
-        if (stats.topSharedCount >= 2)
-        {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.8f,1.0f,0.2f,1.0f), "%d meshes share material: %s", stats.topSharedCount, stats.topSharedKey.c_str());
+            // Render Mode Buttons
+            if (ImGui::Button("Point Cloud Mode")) { m_renderMode = 0; }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Instancing candidate")) {
-                m_chatScrollback.push_back("Perf coach: Consider instancing/batching meshes sharing material: " + stats.topSharedKey);
+            if (ImGui::Button("Wireframe Mode"))   { m_renderMode = 1; }
+            ImGui::SameLine();
+            if (ImGui::Button("Solid Mode"))       { m_renderMode = 2; }
+            ImGui::SameLine();
+            if (ImGui::Button("Raytrace"))         { m_renderMode = 3; } // NEW
+
+            if (m_renderMode == 3) {
+                if (m_traceJob.valid())
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Raytracing... please wait");
+                else if (m_traceDone)
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Raytracer Done!");
             }
-        }
-        else if (stats.drawCalls > 50)
-        {
+
+            // Diagnostics
+            ImGui::Spacing();
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High draw calls (%d): merge static meshes or instance.", stats.drawCalls);
-        }
-        else if (stats.totalTriangles > 50000)
-        {
+            if (ImGui::CollapsingHeader("Diagnostics", ImGuiTreeNodeFlags_DefaultOpen)) {
+                int  targetIdx  = m_selectedObjectIndex;
+                if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
+                bool hasTarget  = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
+
+                bool anyPBR = false;
+                for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
+                bool noLights = (m_lights.m_lights.empty());
+                if (!noLights) {
+                    bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
+                    noLights = allZero;
+                }
+
+                bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
+
+                ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
+                if (hasTarget) {
+                    auto& obj = m_sceneObjects[targetIdx];
+                    bool missingNormals = !obj.objLoader.hadNormalsFromSource();
+                    bool backface       = objectMostlyBackfacing(obj);
+
+                    if (missingNormals) {
+                        ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
+                        if (ImGui::SmallButton("Recompute (angle-weighted)")) {
+                            recomputeAngleWeightedNormalsForObject(targetIdx);
+                        }
+                    } else {
+                        ImGui::Text("Normals: OK (from source)");
+                    }
+
+                    if (backface) {
+                        ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces)."); ImGui::SameLine();
+                        if (ImGui::SmallButton("Flip Winding")) {
+                            obj.objLoader.flipWindingAndNormals();
+                            refreshIndexBuffer(obj);
+                            refreshNormalBuffer(obj);
+                        }
+                    } else {
+                        ImGui::Text("Winding: OK (mostly front-facing)");
+                    }
+                }
+
+                if (noLights) {
+                    ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
+                    if (ImGui::SmallButton("Add Neutral Key Light")) {
+                        addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
+                    }
+                } else {
+                    ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
+                }
+
+                ImGui::Separator();
+                ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled ? "ON" : "OFF"); ImGui::SameLine();
+                if (ImGui::SmallButton(m_framebufferSRGBEnabled ? "Disable" : "Enable")) { m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled; }
+                if (srgbMismatch) {
+                    ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it."); ImGui::SameLine();
+                    if (ImGui::SmallButton("Fix (disable FB sRGB)")) { m_framebufferSRGBEnabled = false; }
+                }
+            }
+
+            // Shading Mode
+            ImGui::Spacing();
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High triangle count (%.0fK): consider LOD or decimation.", stats.totalTriangles/1000.0);
-        }
-        // Optional AI suggestion
-        if (m_useAI)
-        {
-            if (ImGui::SmallButton("Ask AI for perf tips"))
-            {
-                std::ostringstream summary;
-                summary << "Scene perf: drawCalls=" << stats.drawCalls
-                        << ", tris=" << stats.totalTriangles
-                        << ", materials=" << stats.uniqueMaterialKeys
-                        << ", texMB=" << stats.texturesMB
-                        << ", geoMB=" << stats.geometryMB
-                        << ". TopShare='" << stats.topSharedKey << "' x" << stats.topSharedCount << ".";
-                std::string plan, err;
-                std::string scene = sceneToJson();
-                std::string prompt = std::string("Give one actionable performance suggestion for this scene (instancing, merging, texture atlases, LOD). Keep it to 1 sentence. ") + summary.str();
-                if (!m_ai.plan(prompt, scene, plan, err))
-                    m_chatScrollback.push_back(std::string("AI perf tip error: ") + err);
-                else
-                    m_chatScrollback.push_back(std::string("AI perf tip: ") + plan);
+            ImGui::Text("Shading Mode:");
+            const char* shadingModes[] = { "Flat", "Gouraud" };
+            if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
+                std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
+            }
+
+            // Lighting (show selected only)
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::ColorEdit4("Global Ambient", glm::value_ptr(m_lights.m_globalAmbient));
+                int sel = m_selectedLightIndex;
+                if (sel >= 0 && sel < (int)m_lights.m_lights.size()) {
+                    auto& light = m_lights.m_lights[(size_t)sel];
+                    ImGui::Checkbox("Enabled", &light.enabled);
+                    ImGui::ColorEdit3("Color", glm::value_ptr(light.color));
+                    ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 5.0f);
+                } else {
+                    ImGui::TextDisabled("No light selected.");
+                }
+            }
+
+            // Gizmo settings
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::CollapsingHeader("Gizmo", ImGuiTreeNodeFlags_DefaultOpen)) {
+                bool local = m_gizmoLocalSpace;
+                if (ImGui::Checkbox("Local space", &local)) m_gizmoLocalSpace = local;
+                ImGui::SameLine();
+                bool snap = m_snapEnabled;
+                if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap;
+                ImGui::DragFloat("Translate Snap",     &m_snapTranslate, 0.05f, 0.01f, 10.0f, "%.2f");
+                ImGui::DragFloat("Rotate Snap (deg)",  &m_snapRotateDeg, 1.0f,  1.0f,  90.0f, "%.0f");
+                ImGui::DragFloat("Scale Snap",         &m_snapScale,     0.01f, 0.01f, 10.0f, "%.2f");
+            }
+
+            // Materials (selected object only)
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::CollapsingHeader("Material (Selected)", ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size()) {
+                    SceneObject& obj = m_sceneObjects[(size_t)m_selectedObjectIndex];
+                    std::string displayName = obj.name.empty() ? std::string("Selected Object") : obj.name;
+                    ImGui::TextUnformatted(displayName.c_str());
+
+                    // Shader selection per object
+                    const char* shaderChoices[] = { "Standard", "PBR" };
+                    int shaderIdx = (obj.shader == m_pbrShader) ? 1 : 0;
+                    if (ImGui::Combo("Shader", &shaderIdx, shaderChoices, IM_ARRAYSIZE(shaderChoices))) {
+                        obj.shader = (shaderIdx == 1 && m_pbrShader) ? m_pbrShader : m_standardShader;
+                    }
+
+                    glm::vec4 specColor(obj.material.specular, 1.0f);
+                    if (ImGui::ColorEdit4("Specular", glm::value_ptr(specColor))) {
+                        obj.material.specular = glm::vec3(specColor);
+                    }
+
+                    ImGui::ColorEdit3("Diffuse", glm::value_ptr(obj.material.diffuse));
+                    ImGui::ColorEdit3("Ambient", glm::value_ptr(obj.material.ambient));
+                    ImGui::SliderFloat("Shininess", &obj.material.shininess, 1.0f, 128.0f);
+                    ImGui::SliderFloat("Roughness", &obj.material.roughness, 0.0f, 1.0f);
+                    ImGui::SliderFloat("Metallic",  &obj.material.metallic,  0.0f, 1.0f);
+
+                    if (obj.shader == m_pbrShader) {
+                        ImGui::Separator();
+                        ImGui::Text("PBR Factors");
+                        ImGui::ColorEdit4("BaseColor",      glm::value_ptr(obj.baseColorFactor));
+                        ImGui::SliderFloat("Metallic (PBR)",  &obj.metallicFactor,  0.0f, 1.0f);
+                        ImGui::SliderFloat("Roughness (PBR)", &obj.roughnessFactor, 0.04f, 1.0f);
+                        ImGui::Text("Maps: Base=%s Normal=%s MR=%s",
+                                    obj.baseColorTex ? "yes" : "no",
+                                    obj.normalTex    ? "yes" : "no",
+                                    obj.mrTex        ? "yes" : "no");
+                    }
+                } else {
+                    ImGui::TextDisabled("No object selected.");
+                }
             }
         }
         ImGui::End();
     }
 
-
-    // Shading Mode
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Text("Shading Mode:");
-    const char* shadingModes[] = { "Flat", "Gouraud" };
-    if (ImGui::Combo("##shadingMode", &m_shadingMode, shadingModes, IM_ARRAYSIZE(shadingModes))) {
-        std::cout << "Shading Mode Changed: " << m_shadingMode << std::endl;
-    }
-
-    // Samples section removed per request
-
-    // Lighting (show selected only)
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        ImGui::ColorEdit4("Global Ambient", glm::value_ptr(m_lights.m_globalAmbient));
-        int sel = m_selectedLightIndex;
-        if (sel >= 0 && sel < (int)m_lights.m_lights.size()) {
-            auto& light = m_lights.m_lights[(size_t)sel];
-            ImGui::Checkbox("Enabled", &light.enabled);
-            ImGui::ColorEdit3("Color", glm::value_ptr(light.color));
-            ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 5.0f);
-        } else {
-            ImGui::TextDisabled("No light selected.");
-        }
-    }
-
-    // Gizmo settings
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Gizmo", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        bool local = m_gizmoLocalSpace;
-        if (ImGui::Checkbox("Local space", &local)) m_gizmoLocalSpace = local;
-        ImGui::SameLine();
-        bool snap = m_snapEnabled;
-        if (ImGui::Checkbox("Snap", &snap)) m_snapEnabled = snap;
-        ImGui::DragFloat("Translate Snap", &m_snapTranslate, 0.05f, 0.01f, 10.0f, "%.2f");
-        ImGui::DragFloat("Rotate Snap (deg)", &m_snapRotateDeg, 1.0f, 1.0f, 90.0f, "%.0f");
-        ImGui::DragFloat("Scale Snap", &m_snapScale, 0.01f, 0.01f, 10.0f, "%.2f");
-    }
-
-    // Materials (selected object only)
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Material (Selected)", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        if (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size())
-        {
-            SceneObject& obj = m_sceneObjects[(size_t)m_selectedObjectIndex];
-            std::string displayName = obj.name.empty() ? std::string("Selected Object") : obj.name;
-            ImGui::TextUnformatted(displayName.c_str());
-
-            // Shader selection per object
-            const char* shaderChoices[] = { "Standard", "PBR" };
-            int shaderIdx = (obj.shader == m_pbrShader) ? 1 : 0;
-            if (ImGui::Combo("Shader", &shaderIdx, shaderChoices, IM_ARRAYSIZE(shaderChoices)))
-            {
-                obj.shader = (shaderIdx == 1 && m_pbrShader) ? m_pbrShader : m_standardShader;
-            }
-
-            glm::vec4 specColor(obj.material.specular, 1.0f);
-            if (ImGui::ColorEdit4("Specular", glm::value_ptr(specColor)))
-            {
-                obj.material.specular = glm::vec3(specColor);
-            }
-
-            ImGui::ColorEdit3("Diffuse", glm::value_ptr(obj.material.diffuse));
-            ImGui::ColorEdit3("Ambient", glm::value_ptr(obj.material.ambient));
-            ImGui::SliderFloat("Shininess", &obj.material.shininess, 1.0f, 128.0f);
-            ImGui::SliderFloat("Roughness", &obj.material.roughness, 0.0f, 1.0f);
-            ImGui::SliderFloat("Metallic", &obj.material.metallic, 0.0f, 1.0f);
-
-            if (obj.shader == m_pbrShader)
-            {
+    // ==== Perf HUD overlay ====
+    if (m_showPerfHUD) {
+        PerfStats stats{}; computePerfStats(stats);
+        ImGui::SetNextWindowPos(ImVec2(10, 30), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        if (ImGui::Begin("Perf HUD", &m_showPerfHUD, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Draw calls: %d", stats.drawCalls);
+            ImGui::Text("Triangles: %zu", stats.totalTriangles);
+            ImGui::Text("Materials: %d", stats.uniqueMaterialKeys);
+            ImGui::Text("Textures: %zu (%.2f MB)", stats.uniqueTextures, stats.texturesMB);
+            ImGui::Text("Geometry: %.2f MB", stats.geometryMB);
+            ImGui::Separator();
+            ImGui::Text("VRAM est: %.2f MB", stats.vramMB);
+            if (stats.topSharedCount >= 2) {
                 ImGui::Separator();
-                ImGui::Text("PBR Factors");
-                ImGui::ColorEdit4("BaseColor", glm::value_ptr(obj.baseColorFactor));
-                ImGui::SliderFloat("Metallic (PBR)", &obj.metallicFactor, 0.0f, 1.0f);
-                ImGui::SliderFloat("Roughness (PBR)", &obj.roughnessFactor, 0.04f, 1.0f);
-                ImGui::Text("Maps: Base=%s Normal=%s MR=%s",
-                    obj.baseColorTex?"yes":"no",
-                    obj.normalTex?"yes":"no",
-                    obj.mrTex?"yes":"no");
+                ImGui::TextColored(ImVec4(0.8f,1.0f,0.2f,1.0f), "%d meshes share material: %s", stats.topSharedCount, stats.topSharedKey.c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Instancing candidate")) {
+                    m_chatScrollback.push_back("Perf coach: Consider instancing/batching meshes sharing material: " + stats.topSharedKey);
+                }
+            } else if (stats.drawCalls > 50) {
+                ImGui::Separator();
+                ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High draw calls (%d): merge static meshes or instance.", stats.drawCalls);
+            } else if (stats.totalTriangles > 50000) {
+                ImGui::Separator();
+                ImGui::TextColored(ImVec4(1.0f,0.8f,0.2f,1.0f), "High triangle count (%.0fK): consider LOD or decimation.", stats.totalTriangles / 1000.0);
+            }
+            if (m_useAI) {
+                if (ImGui::SmallButton("Ask AI for perf tips")) {
+                    std::ostringstream summary;
+                    summary << "Scene perf: drawCalls=" << stats.drawCalls
+                            << ", tris=" << stats.totalTriangles
+                            << ", materials=" << stats.uniqueMaterialKeys
+                            << ", texMB=" << stats.texturesMB
+                            << ", geoMB=" << stats.geometryMB
+                            << ". TopShare='" << stats.topSharedKey << "' x" << stats.topSharedCount << ".";
+                    std::string plan, err;
+                    std::string scene = sceneToJson();
+                    std::string prompt = std::string("Give one actionable performance suggestion for this scene (instancing, merging, texture atlases, LOD). Keep it to 1 sentence. ") + summary.str();
+                    if (!m_ai.plan(prompt, scene, plan, err))
+                        m_chatScrollback.push_back(std::string("AI perf tip error: ") + err);
+                    else
+                        m_chatScrollback.push_back(std::string("AI perf tip: ") + plan);
+                }
             }
         }
-        else
-        {
-            ImGui::TextDisabled("No object selected.");
-        }
+        ImGui::End();
     }
 
-    // Removed Talk & AI from Settings; now its own window
-
-    ImGui::End();
-    }
-
-    // AI Assistant panel (separate window)
-    renderChatPanelNL();
-
-    // Scene context menu (right-click): gizmo + selection actions
-    // Open on RMB release without drag (so RMB-drag still orbits camera)
+    // ==== Scene context menu (right-click) ====
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsMouseDragging(ImGuiMouseButton_Right))
         ImGui::OpenPopup("SceneContext");
-    if (ImGui::BeginPopup("SceneContext"))
-    {
+    if (ImGui::BeginPopup("SceneContext")) {
         ImGui::TextUnformatted("Gizmo");
         ImGui::Separator();
         bool sel = (m_gizmoMode == GizmoMode::Translate); if (ImGui::MenuItem("Translate", nullptr, sel)) m_gizmoMode = GizmoMode::Translate;
@@ -1066,109 +1044,104 @@ void Application::renderGUI()
         if (ImGui::MenuItem("Axis Z", nullptr, m_gizmoAxis==GizmoAxis::Z)) m_gizmoAxis = GizmoAxis::Z;
         ImGui::Separator();
         // Selection ops
-        bool hasObj = (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size());
+        bool hasObj   = (m_selectedObjectIndex >= 0 && m_selectedObjectIndex < (int)m_sceneObjects.size());
         bool hasLight = (m_selectedLightIndex >= 0 && m_selectedLightIndex < (int)m_lights.m_lights.size());
-        if (ImGui::MenuItem("Delete Selected", nullptr, false, hasObj || hasLight))
-        {
+        if (ImGui::MenuItem("Delete Selected", nullptr, false, hasObj || hasLight)) {
             if (hasObj) {
                 std::string name = m_sceneObjects[(size_t)m_selectedObjectIndex].name;
-                if (removeObjectByName(name)) m_chatScrollback.push_back(std::string("Deleted object: ")+name);
+                if (removeObjectByName(name)) m_chatScrollback.push_back(std::string("Deleted object: ") + name);
             } else if (hasLight) {
                 if (removeLightAtIndex(m_selectedLightIndex)) m_chatScrollback.push_back("Deleted selected light.");
             }
         }
-        if (ImGui::MenuItem("Duplicate Selected", nullptr, false, hasObj || hasLight))
-        {
+        if (ImGui::MenuItem("Duplicate Selected", nullptr, false, hasObj || hasLight)) {
             if (hasObj) {
                 const auto& src = m_sceneObjects[(size_t)m_selectedObjectIndex];
                 std::string newName = src.name + std::string("_copy");
                 glm::vec3 dpos(0.2f, 0.0f, 0.0f);
                 if (duplicateObject(src.name, newName, &dpos, nullptr, nullptr))
-                    m_chatScrollback.push_back(std::string("Duplicated object as: ")+newName);
+                    m_chatScrollback.push_back(std::string("Duplicated object as: ") + newName);
             } else if (hasLight) {
                 auto L = m_lights.m_lights[(size_t)m_selectedLightIndex];
-                addPointLightAt(L.position + glm::vec3(0.2f,0,0), L.color, L.intensity);
+                addPointLightAt(L.position + glm::vec3(0.2f, 0, 0), L.color, L.intensity);
                 m_chatScrollback.push_back("Duplicated selected light.");
             }
         }
         ImGui::EndPopup();
     }
 
-    // Bottom console window (central output log)
+    // ==== Bottom console window ====
     {
         ImGuiIO& io = ImGui::GetIO();
         float H = io.DisplaySize.y * 0.25f;
         ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - H), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, H), ImGuiCond_Always);
-        ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-        if (ImGui::BeginChild("##console_scrollback", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_HorizontalScrollbar))
-        {
-            for (const auto& line : m_chatScrollback) {
-                ImGui::TextUnformatted(line.c_str());
-            }
-        }
-        ImGui::EndChild();
-        static char quick[256] = {0};
-        ImGui::SetNextItemWidth(-1);
-        if (ImGui::InputText("##console_input", quick, IM_ARRAYSIZE(quick), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            std::string cmd = quick; quick[0] = '\0';
-            // Handle yes/y suggestion to open diagnostics
-            bool handled = false;
-            if (m_aiSuggestOpenDiag && !cmd.empty()) {
-                std::string s = cmd; for (auto& c : s) c = (char)std::tolower((unsigned char)c);
-                if (s == "yes" || s == "y") {
-                    m_showSettingsPanel = true; m_aiSuggestOpenDiag = false; handled = true;
-                    m_chatScrollback.push_back("Opening settings + diagnostics panel.");
+        if (ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+            if (ImGui::BeginChild("##console_scrollback", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_HorizontalScrollbar)) {
+                for (const auto& line : m_chatScrollback) {
+                    ImGui::TextUnformatted(line.c_str());
                 }
             }
-            if (!handled && !cmd.empty()) {
-                if (m_useAI) {
-                    std::string plan, err;
-                    std::string scene = sceneToJson();
-                    if (!m_ai.plan(cmd, scene, plan, err)) {
-                        m_chatScrollback.push_back(std::string("AI error: ") + err);
-                    } else {
-                        m_chatScrollback.push_back(std::string("AI plan:\n") + plan);
-                        std::istringstream is(plan);
-                        std::string line;
-                        while (std::getline(is, line)) {
-                            if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
-                            std::vector<std::string> logs;
-                            bool ok = m_nl.execute(line, logs);
-                            for (auto& l : logs) m_chatScrollback.push_back(l);
-                            if (!ok) m_chatScrollback.push_back("(no changes)");
-                        }
+            ImGui::EndChild();
+
+            static char quick[256] = {0};
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::InputText("##console_input", quick, IM_ARRAYSIZE(quick), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                std::string cmd = quick; quick[0] = '\0';
+                // Handle yes/y suggestion to open diagnostics
+                bool handled = false;
+                if (m_aiSuggestOpenDiag && !cmd.empty()) {
+                    std::string s = cmd; for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+                    if (s == "yes" || s == "y") {
+                        m_showSettingsPanel = true; m_aiSuggestOpenDiag = false; handled = true;
+                        m_chatScrollback.push_back("Opening settings + diagnostics panel.");
                     }
-                } else {
-                    std::vector<std::string> logs;
-                    bool ok = m_nl.execute(cmd, logs);
-                    for (auto& l : logs) m_chatScrollback.push_back(l);
-                    if (!ok) m_chatScrollback.push_back("(no changes)");
+                }
+                if (!handled && !cmd.empty()) {
+                    if (m_useAI) {
+                        std::string plan, err;
+                        std::string scene = sceneToJson();
+                        if (!m_ai.plan(cmd, scene, plan, err)) {
+                            m_chatScrollback.push_back(std::string("AI error: ") + err);
+                        } else {
+                            m_chatScrollback.push_back(std::string("AI plan:\n") + plan);
+                            std::istringstream is(plan);
+                            std::string line;
+                            while (std::getline(is, line)) {
+                                if (line.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+                                std::vector<std::string> logs;
+                                bool ok = m_nl.execute(line, logs);
+                                for (auto& l : logs) m_chatScrollback.push_back(l);
+                                if (!ok) m_chatScrollback.push_back("(no changes)");
+                            }
+                        }
+                    } else {
+                        std::vector<std::string> logs;
+                        bool ok = m_nl.execute(cmd, logs);
+                        for (auto& l : logs) m_chatScrollback.push_back(l);
+                        if (!ok) m_chatScrollback.push_back("(no changes)");
+                    }
                 }
             }
         }
-        ImGui::End();
+        ImGui::End(); // Console window
     }
 
+    // Finalize ImGui
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    // Multi-viewport rendering for docking branch
 #ifdef IMGUI_HAS_DOCKING
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
-        GLFWwindow* backup = glfwGetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup);
+        ImGuiIO& io = ImGui::GetIO();
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            GLFWwindow* backup = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup);
+        }
     }
 #endif
-#endif
-}
-
-void Application::renderChatPanel()
-{
-    renderChatPanelNL();
+#endif // !WEB_USE_HTML_UI
 }
 
 void Application::renderAxisIndicator()
@@ -1474,7 +1447,6 @@ void Application::addObject(std::string name,
     m_sceneObjects.push_back(obj);
 }
 
-
 // Static callback - retrieve 'this' from the GLFW window user pointer
 Application* Application::getApplication(GLFWwindow* window)
 {
@@ -1563,6 +1535,11 @@ void Application::createScreenQuad()
 
     glGenTextures(1, &rayTexID);
     glBindTexture(GL_TEXTURE_2D, rayTexID);
+    #ifdef __EMSCRIPTEN__
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_windowWidth, m_windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+    #else
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_windowWidth, m_windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+    #endif
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F,
         m_windowWidth, m_windowHeight,
         0, GL_RGB, GL_FLOAT, nullptr);
@@ -1611,131 +1588,6 @@ bool Application::rayIntersectsAABB(const Ray& ray, const glm::vec3& aabbMin, co
     }
     return true;
 }
-
-// New natural-language chat panel
-#ifndef WEB_USE_HTML_UI
-void Application::renderChatPanelNL()
-{
-    ImGuiIO& io = ImGui::GetIO();
-    float consoleH = io.DisplaySize.y * 0.25f;
-    float aiH = 120.0f;
-    float rightW = 420.0f;
-    ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - consoleH - aiH - 4), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - rightW, aiH), ImGuiCond_Always);
-    ImGui::Begin("AI Assistant", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-
-    ImGui::Checkbox("Preview only (no-op)", &m_previewOnly);
-    ImGui::SameLine();
-    ImGui::Checkbox("Use AI", &m_useAI);
-    if (m_useAI)
-    {
-        char endpointBuf[256]; std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", m_aiConfig.endpoint.c_str());
-        char modelBuf[128];    std::snprintf(modelBuf,    sizeof(modelBuf),    "%s", m_aiConfig.model.c_str());
-        if (ImGui::InputText("Endpoint", endpointBuf, IM_ARRAYSIZE(endpointBuf))) {
-            m_aiConfig.endpoint = endpointBuf;
-            m_ai.setConfig(m_aiConfig);
-        }
-        if (ImGui::InputText("Model", modelBuf, IM_ARRAYSIZE(modelBuf))) {
-            m_aiConfig.model = modelBuf;
-            m_ai.setConfig(m_aiConfig);
-        }
-    }
-    ImGui::Separator();
-
-    ImGui::TextDisabled("Type commands in Console at the bottom.");
-
-    if (ImGui::Button("Copy Scene JSON")) {
-        auto json = sceneToJson();
-        ImGui::SetClipboardText(json.c_str());
-        m_chatScrollback.push_back("Scene JSON copied to clipboard.");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Diagnose Scene")) {
-        int targetIdx = m_selectedObjectIndex; if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
-        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
-        std::ostringstream prompt;
-        prompt << "Given this scene, explain why it might render black and propose one-click fixes. "
-               << "Selected object: " << (hasTarget?m_sceneObjects[targetIdx].name:std::string("<none>"))
-               << "; missingNormals=" << (hasTarget?(!m_sceneObjects[targetIdx].objLoader.hadNormalsFromSource()):false)
-               << "; backface=" << (hasTarget?objectMostlyBackfacing(m_sceneObjects[targetIdx]):false)
-               << "; lights=" << m_lights.m_lights.size()
-               << "; framebufferSRGB=" << (m_framebufferSRGBEnabled?"on":"off") << ".";
-        std::string plan, err; std::string scene = sceneToJson();
-        if (!m_ai.plan(prompt.str(), scene, plan, err)) m_chatScrollback.push_back(std::string("AI diag error: ")+err);
-        else {
-            m_chatScrollback.push_back(std::string("AI diag: ")+plan);
-            m_chatScrollback.push_back("Open render diagnostics? (type 'yes' in Console)");
-            m_aiSuggestOpenDiag = true;
-        }
-    }
-
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Diagnostics", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        int targetIdx = m_selectedObjectIndex;
-        if (targetIdx < 0 && !m_sceneObjects.empty()) targetIdx = 0;
-        bool hasTarget = (targetIdx >= 0 && targetIdx < (int)m_sceneObjects.size());
-
-        bool anyPBR = false; for (auto& o : m_sceneObjects) { if (o.shader == m_pbrShader) { anyPBR = true; break; } }
-        bool noLights = (m_lights.m_lights.empty());
-        if (!noLights) {
-            bool allZero = true; for (auto& L : m_lights.m_lights) { if (L.enabled && L.intensity > 0.0f) { allZero = false; break; } }
-            noLights = allZero;
-        }
-
-        bool srgbMismatch = anyPBR && m_framebufferSRGBEnabled; // PBR does gamma out; sRGB FB doubles it
-
-        ImGui::Text("Selected Object: %s", hasTarget ? m_sceneObjects[targetIdx].name.c_str() : "<none>");
-        if (hasTarget)
-        {
-            auto& obj = m_sceneObjects[targetIdx];
-            bool missingNormals = !obj.objLoader.hadNormalsFromSource();
-            bool backface = objectMostlyBackfacing(obj);
-
-            if (missingNormals) {
-                ImGui::TextColored(ImVec4(1,1,0,1), "Missing normals: will use flat/poor shading."); ImGui::SameLine();
-                if (ImGui::SmallButton("Recompute (angle-weighted)")) {
-                    recomputeAngleWeightedNormalsForObject(targetIdx);
-                }
-            } else {
-                ImGui::Text("Normals: OK (from source)");
-            }
-
-            if (backface) {
-                ImGui::TextColored(ImVec4(1,0.6f,0,1), "Bad winding: object faces away (backfaces)."); ImGui::SameLine();
-                if (ImGui::SmallButton("Flip Winding")) {
-                    obj.objLoader.flipWindingAndNormals();
-                    refreshIndexBuffer(obj);
-                    refreshNormalBuffer(obj);
-                }
-            } else {
-                ImGui::Text("Winding: OK (mostly front-facing)");
-            }
-        }
-
-        if (noLights) {
-            ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "No effective lights -> scene is black."); ImGui::SameLine();
-            if (ImGui::SmallButton("Add Neutral Key Light")) {
-                addPointLightAt(getCameraPosition() + glm::normalize(getCameraFront()) * 2.0f, glm::vec3(1.0f), 1.0f);
-            }
-        } else {
-            ImGui::Text("Lights: %d active", (int)m_lights.m_lights.size());
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Framebuffer sRGB: %s", m_framebufferSRGBEnabled?"ON":"OFF"); ImGui::SameLine();
-        if (ImGui::SmallButton(m_framebufferSRGBEnabled?"Disable":"Enable")) { m_framebufferSRGBEnabled = !m_framebufferSRGBEnabled; }
-        if (srgbMismatch) {
-            ImGui::TextColored(ImVec4(1,1,0,1), "sRGB mismatch: PBR already gamma-corrects; sRGB FB doubles it."); ImGui::SameLine();
-            if (ImGui::SmallButton("Fix (disable FB sRGB)")) { m_framebufferSRGBEnabled = false; }
-        }
-    }
-
-    ImGui::End();
-}
-#else
-void Application::renderChatPanelNL() {}
-#endif
 
 // ---- Runtime scene API used by NL executor ----
 bool Application::loadObjAt(const std::string& name,
@@ -1886,8 +1738,6 @@ std::string Application::getSelectedObjectName() const
     return std::string();
 }
 
-// renderToPNG moved to src/render_offscreen.cpp
-
 // ---- JSON Ops v1 apply (minimal tolerant parser) ----
 namespace {
     static inline std::string trim_copy(std::string s){
@@ -1925,10 +1775,6 @@ namespace {
         std::stringstream ss(inside); float x=0,y=0,z=0; char ch; if (!(ss>>x)) return false; ss>>ch; if (!(ss>>y)) return false; ss>>ch; if (!(ss>>z)) return false; out = glm::vec3(x,y,z); return true;
     }
 }
-
-// applyJsonOpsV1 moved to src/json_ops_v1.cpp
-
-// buildShareLink() moved to src/scene_io.cpp
 
 bool Application::denoise(std::vector<glm::vec3>& color,
                           const std::vector<glm::vec3>* normal,
@@ -2049,6 +1895,10 @@ bool Application::duplicateObject(const std::string& sourceName, const std::stri
         R = glm::rotate(R, glm::radians(deltaRotDeg->z), glm::vec3(0,0,1));
         obj.modelMatrix = obj.modelMatrix * R;
     }
+
+    if (m_raytracer) m_raytracer->loadModel(m_sceneObjects.back().objLoader,
+                                        m_sceneObjects.back().modelMatrix,
+                                        0.05f, m_sceneObjects.back().material);
 
     m_sceneObjects.push_back(std::move(obj));
     return true;
