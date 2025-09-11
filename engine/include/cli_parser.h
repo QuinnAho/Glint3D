@@ -40,6 +40,7 @@ struct CLIOptions {
     int outputWidth = 1024;
     int outputHeight = 1024;
     int reflectionSpp = 8; // Default reflection samples per pixel
+    int fixedTimestepMs = 0; // 0 = real-time clock
     
     // Render settings
     RenderSettings renderSettings;

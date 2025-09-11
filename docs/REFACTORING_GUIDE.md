@@ -269,7 +269,7 @@ public:
 ```
 engine/include/rhi/rhi.h                     RHI interface
 engine/include/rhi/rhi-types.h               Type definitions  
-engine/include/rhi/rhi-gl.h                  OpenGL backend header
+engine/include/rhi/rhi_gl.h                  OpenGL backend header
 engine/src/rhi/rhi-gl.cpp                    OpenGL implementation
 engine/include/material-core.h               Unified materials
 engine/src/material-core.cpp                 Material utilities

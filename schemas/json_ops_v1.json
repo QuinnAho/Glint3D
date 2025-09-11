@@ -2,6 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Glint JSON Ops v1.3",
   "type": ["object", "array"],
+  "properties": {
+    "render": {
+      "type": "object",
+      "properties": {
+        "seed": { "type": "integer", "default": 1337 },
+        "fixed_timestep_ms": { "type": "integer", "default": 16 }
+      }
+    }
+  },
   "definitions": {
     "vec3": {
       "type": "array",

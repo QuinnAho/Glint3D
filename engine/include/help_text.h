@@ -41,6 +41,7 @@ static inline void print_cli_help()
     std::printf("  --samples <int>       MSAA sample count for rendering (1 = off)\n");
     std::printf("  --mode <m>            Render mode: raster | ray | auto (default auto)\n");
     std::printf("  --refl-spp <int>      Reflection samples per pixel for glossy reflections (default 8)\n");
+    std::printf("  --fixed-timestep <ms> Use fixed timestep in milliseconds for deterministic updates\n");
     std::printf("  --denoise             Enable denoiser if available\n");
     std::printf("  --raytrace            (Deprecated) Force raytracing; use --mode ray\n");
     std::printf("  --strict-schema       Validate operations against schema strictly\n");

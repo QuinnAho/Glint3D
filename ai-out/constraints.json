@@ -1,0 +1,5 @@
+{
+  "allowed_changes": {
+    "scene_manager": "no GL/VK/WebGPU calls; only graph/state ops"
+  }
+}

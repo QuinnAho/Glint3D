@@ -69,6 +69,7 @@ CLIParseResult CLIParser::parse(int argc, char** argv)
     result.options.outputWidth = getIntValue("--w", 1024);
     result.options.outputHeight = getIntValue("--h", 1024);
     result.options.reflectionSpp = getIntValue("--refl-spp", 8);
+    result.options.fixedTimestepMs = getIntValue("--fixed-timestep", 0);
     // New: render mode (raster|ray|auto)
     {
         std::string modeStr = getValue("--mode", "auto");
@@ -344,6 +345,7 @@ std::vector<std::string> CLIParser::getValidFlags()
         "--mode",
         "--samples",
         "--refl-spp",
+        "--fixed-timestep",
         "--denoise",
         "--raytrace",
         "--strict-schema",

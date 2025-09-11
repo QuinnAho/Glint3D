@@ -1,4 +1,5 @@
 #include "application_core.h"
+#include "clock.h"
 #include "render_utils.h"
 #include "cli_parser.h"
 #include "render-mode-selector.h"
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <chrono>
+#include <memory>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -109,7 +111,13 @@ int main(int argc, char** argv)
     }
     
     // Initialize application
-    auto* app = new ApplicationCore();
+    std::unique_ptr<IClock> clock;
+    if (parseResult.options.fixedTimestepMs > 0) {
+        clock = std::make_unique<FixedTimestepClock>(parseResult.options.fixedTimestepMs);
+    } else {
+        clock = std::make_unique<SystemClock>();
+    }
+    auto* app = new ApplicationCore(std::move(clock));
     int windowWidth = parseResult.options.headlessMode ? parseResult.options.outputWidth : 800;
     int windowHeight = parseResult.options.headlessMode ? parseResult.options.outputHeight : 600;
     

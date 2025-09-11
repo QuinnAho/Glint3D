@@ -63,6 +63,9 @@ set(APP_SOURCES
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
+    ${SRC_DIR}/rhi/rhi_null.cpp
+    ${SRC_DIR}/rhi/scene_object_gl.cpp
+    ${SRC_DIR}/clock.cpp
 )
 
 # Core library: expose engine without the app entry
@@ -110,6 +113,9 @@ set(CORE_SOURCES
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
+    ${SRC_DIR}/rhi/rhi_null.cpp
+    ${SRC_DIR}/rhi/scene_object_gl.cpp
+    ${SRC_DIR}/clock.cpp
 )
 
 set(IMGUI_SOURCES

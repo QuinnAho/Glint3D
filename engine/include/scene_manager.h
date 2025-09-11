@@ -15,7 +15,7 @@
 struct SceneObject
 {
     std::string name;
-    GLuint   VAO = 0, VBO_positions = 0, VBO_normals = 0, VBO_uvs = 0, VBO_tangents = 0, EBO = 0;
+    unsigned int VAO = 0, VBO_positions = 0, VBO_normals = 0, VBO_uvs = 0, VBO_tangents = 0, EBO = 0;
     // RHI buffer handles (migration)
     BufferHandle rhiVboPositions = INVALID_HANDLE;
     BufferHandle rhiVboNormals = INVALID_HANDLE;

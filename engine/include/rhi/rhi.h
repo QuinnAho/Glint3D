@@ -64,7 +64,7 @@ public:
     virtual int getMaxSamples() const = 0;
     
     // Backend identification
-    enum class Backend { OpenGL, WebGL2, Vulkan, WebGPU };
+    enum class Backend { OpenGL, WebGL2, Vulkan, WebGPU, Null };
     virtual Backend getBackend() const = 0;
     virtual const char* getBackendName() const = 0;
 };

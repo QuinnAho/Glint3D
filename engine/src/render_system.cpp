@@ -12,7 +12,7 @@
 #include "material_binding.h"
 #include "rhi/rhi.h"
 #include "rhi/rhi-types.h"
-#include "rhi/rhi-gl.h"
+#include "rhi/rhi_gl.h"
 #include "gl_platform.h"
 #include <iostream>
 #include <vector>

@@ -114,7 +114,7 @@ glm::vec3 Raytracer::traceRay(const Ray& ray, const Light& lights, int depth) co
         // Mix in ray origin and direction for deterministic per-pixel seeds
         pixelSeed ^= std::hash<float>{}(hitPoint.x + hitPoint.y + hitPoint.z);
         pixelSeed ^= std::hash<float>{}(ray.direction.x + ray.direction.y + ray.direction.z);
-        microfacet::SeededRNG rng(pixelSeed);
+        SeededRng rng(pixelSeed);
         
         glm::vec3 reflectedColor = sampleGlossyReflection(
             hitPoint, viewDir, normal, mat, lights, depth, rng
@@ -224,7 +224,7 @@ glm::vec3 Raytracer::sampleGlossyReflection(
     const Material& material,
     const Light& lights,
     int depth,
-    microfacet::SeededRNG& rng) const
+        SeededRng& rng) const
 {
     // Check for perfect mirror fallback
     if (microfacet::shouldUsePerfectMirror(material.roughness))
