@@ -28,6 +28,8 @@ struct CLIOptions {
     bool enableDenoise = false;
     bool forceRaytrace = false;
     bool strictSchema = false;
+    // New unified render mode flag (raster|ray|auto). '--mode' overrides '--raytrace'
+    std::string mode = "auto";
     
     std::string opsFile;
     std::string outputFile;

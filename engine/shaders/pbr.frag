@@ -31,6 +31,13 @@ uniform vec4 baseColorFactor; // rgba
 uniform float metallicFactor;
 uniform float roughnessFactor;
 uniform float ior;            // Index of refraction for F0 computation
+// MaterialCore extensions
+uniform float transmission;           // [0,1]
+uniform float thickness;              // meters
+uniform float attenuationDistance;    // meters (Beer-Lambert)
+uniform vec3  attenuationColor;       // tint for attenuation (approx)
+uniform float clearcoat;              // [0,1]
+uniform float clearcoatRoughness;     // [0,1]
 uniform bool  hasBaseColorMap;
 uniform bool  hasNormalMap;
 uniform bool  hasMRMap;
@@ -98,6 +105,23 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float rough) {
     float ggx1 = GeometrySchlickGGX(NdotV, rough);
     float ggx2 = GeometrySchlickGGX(NdotL, rough);
     return ggx1 * ggx2;
+}
+
+// Clearcoat lobe (second specular layer)
+vec3 computeClearcoat(vec3 N, vec3 V, vec3 L, float cc, float ccRough) {
+    if (cc < 0.01) return vec3(0.0);
+    vec3 H = normalize(V + L);
+    float NDF = DistributionGGX(N, H, ccRough);
+    float G   = GeometrySmith(N, V, L, ccRough);
+    vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), vec3(0.04)); // fixed F0 for clearcoat
+    return (NDF * G) * F * cc;
+}
+
+// Simple Beer-Lambert attenuation using per-material thickness
+vec3 applyVolumeAttenuation(vec3 color, float distance, float attnDistance, vec3 attnColor) {
+    if (distance <= 0.0 || attnDistance <= 0.0) return color;
+    float attn = exp(-distance / attnDistance);
+    return mix(attnColor, color, attn);
 }
 
 // Tone mapping functions
@@ -215,11 +239,14 @@ void main() {
         float denom = 4.0 * max(dot(N,V),0.0) * max(dot(N,L),0.0) + 1e-4;
         vec3 specular = nominator / denom;
 
+        // Clearcoat secondary lobe
+        vec3 clearcoatSpec = computeClearcoat(N, V, L, clearcoat, clearcoatRoughness);
+
         vec3 kS = F;
         vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
         float NdotL = max(dot(N,L), 0.0);
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadow;
+        Lo += (kD * albedo / PI + specular + clearcoatSpec) * radiance * NdotL * shadow;
     }
 
     // IBL ambient lighting
@@ -241,6 +268,9 @@ void main() {
 
     vec3 ambient = (kD * diffuse + specular) * iblIntensity;
     vec3 color = ambient + Lo;
+
+    // Apply simple volumetric attenuation using material thickness
+    color = applyVolumeAttenuation(color, thickness, max(attenuationDistance, 1e-4), attenuationColor);
     
     // Apply tone mapping and exposure
     color = applyToneMapping(color);

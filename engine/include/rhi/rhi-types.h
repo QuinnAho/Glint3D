@@ -123,6 +123,7 @@ struct VertexBinding {
     uint32_t binding = 0;
     uint32_t stride = 0;
     bool perInstance = false;
+    BufferHandle buffer = 0; // RHI buffer bound to this binding
 };
 
 // Pipeline descriptor
@@ -134,6 +135,7 @@ struct PipelineDesc {
     bool depthTestEnable = true;
     bool depthWriteEnable = true;
     bool blendEnable = false;
+    BufferHandle indexBuffer = 0; // Optional index buffer bound to VAO
     std::string debugName;
 };
 

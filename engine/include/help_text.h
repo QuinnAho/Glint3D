@@ -39,9 +39,10 @@ static inline void print_cli_help()
     std::printf("  --w <int>             Output image width (default 1024)\n");
     std::printf("  --h <int>             Output image height (default 1024)\n");
     std::printf("  --samples <int>       MSAA sample count for rendering (1 = off)\n");
+    std::printf("  --mode <m>            Render mode: raster | ray | auto (default auto)\n");
     std::printf("  --refl-spp <int>      Reflection samples per pixel for glossy reflections (default 8)\n");
     std::printf("  --denoise             Enable denoiser if available\n");
-    std::printf("  --raytrace            Force raytracing mode for rendering\n");
+    std::printf("  --raytrace            (Deprecated) Force raytracing; use --mode ray\n");
     std::printf("  --strict-schema       Validate operations against schema strictly\n");
     std::printf("  --schema-version <v>  Schema version to validate against (default v1.3)\n");
     std::printf("  --log <level>         Set log level: quiet, warn, info, debug (default info)\n");

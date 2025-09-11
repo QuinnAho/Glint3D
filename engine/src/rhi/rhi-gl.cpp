@@ -78,43 +78,49 @@ void RhiGL::endFrame() {
 }
 
 void RhiGL::draw(const DrawDesc& desc) {
-    if (desc.pipeline != m_currentPipeline) {
-        bindPipeline(desc.pipeline);
+    // If a valid pipeline is provided, bind and use its VAO; otherwise, use currently bound VAO
+    GLuint vaoToUse = 0;
+    GLenum topology = GL_TRIANGLES;
+    if (desc.pipeline != INVALID_HANDLE) {
+        if (desc.pipeline != m_currentPipeline) {
+            bindPipeline(desc.pipeline);
+        }
+        auto pipelineIt = m_pipelines.find(desc.pipeline);
+        if (pipelineIt == m_pipelines.end()) {
+            std::cerr << "[RhiGL] Invalid pipeline handle in draw call\n";
+            return;
+        }
+        const auto& pipeline = pipelineIt->second;
+        vaoToUse = pipeline.vao;
+        topology = primitiveTopologyToGL(pipeline.desc.topology);
+    } else {
+        // Fallback: use GL_TRIANGLES and current VAO
+        topology = GL_TRIANGLES;
     }
-    
-    auto pipelineIt = m_pipelines.find(desc.pipeline);
-    if (pipelineIt == m_pipelines.end()) {
-        std::cerr << "[RhiGL] Invalid pipeline handle in draw call\n";
-        return;
-    }
-    
-    const auto& pipeline = pipelineIt->second;
-    glBindVertexArray(pipeline.vao);
-    
-    // Bind vertex buffer if specified
+
+    if (vaoToUse != 0) glBindVertexArray(vaoToUse);
+
+    // Optional VBO/IBO binding if provided
     if (desc.vertexBuffer != INVALID_HANDLE) {
         auto bufferIt = m_buffers.find(desc.vertexBuffer);
         if (bufferIt != m_buffers.end()) {
             glBindBuffer(GL_ARRAY_BUFFER, bufferIt->second.id);
         }
     }
-    
-    // Draw with or without index buffer
-    GLenum topology = primitiveTopologyToGL(pipeline.desc.topology);
-    
+
     if (desc.indexBuffer != INVALID_HANDLE && desc.indexCount > 0) {
         auto indexIt = m_buffers.find(desc.indexBuffer);
         if (indexIt != m_buffers.end()) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexIt->second.id);
-            glDrawElementsInstanced(topology, desc.indexCount, GL_UNSIGNED_INT, 
-                                   reinterpret_cast<void*>(static_cast<uintptr_t>(desc.firstIndex * sizeof(uint32_t))), 
-                                   desc.instanceCount);
+            glDrawElementsInstanced(topology, desc.indexCount, GL_UNSIGNED_INT,
+                                    reinterpret_cast<void*>(static_cast<uintptr_t>(desc.firstIndex * sizeof(uint32_t))),
+                                    desc.instanceCount);
         }
     } else if (desc.vertexCount > 0) {
         glDrawArraysInstanced(topology, desc.firstVertex, desc.vertexCount, desc.instanceCount);
     }
-    
-    glBindVertexArray(0);
+
+    if (vaoToUse != 0) glBindVertexArray(0);
 }
 
 void RhiGL::readback(const ReadbackDesc& desc) {
@@ -228,10 +234,13 @@ PipelineHandle RhiGL::createPipeline(const PipelineDesc& desc) {
     GLPipeline glPipeline;
     glPipeline.desc = desc;
     glPipeline.shader = desc.shader;
-    
-    // Create VAO
-    glGenVertexArrays(1, &glPipeline.vao);
-    setupVertexArray(glPipeline.vao, desc);
+    // Create VAO only if vertex attributes are provided
+    if (!desc.vertexAttributes.empty()) {
+        glGenVertexArrays(1, &glPipeline.vao);
+        setupVertexArray(glPipeline.vao, desc);
+    } else {
+        glPipeline.vao = 0;
+    }
     
     PipelineHandle handle = m_nextPipelineHandle++;
     m_pipelines[handle] = glPipeline;
@@ -509,25 +518,66 @@ void RhiGL::queryCapabilities() {
 void RhiGL::setupVertexArray(GLuint vao, const PipelineDesc& desc) {
     glBindVertexArray(vao);
     
-    // Configure vertex attributes
-    for (const auto& attr : desc.vertexAttributes) {
-        glEnableVertexAttribArray(attr.location);
-        
-        GLenum type = GL_FLOAT; // Simplified for now
-        GLint size = 3; // Simplified for now
-        GLboolean normalized = GL_FALSE;
-        
-        // Find the binding for this attribute
-        uint32_t stride = 0;
-        for (const auto& binding : desc.vertexBindings) {
-            if (binding.binding == attr.binding) {
-                stride = binding.stride;
-                break;
-            }
+    auto componentsFromFormat = [](TextureFormat fmt) -> GLint {
+        switch (fmt) {
+            case TextureFormat::R32F:
+            case TextureFormat::R16F:
+            case TextureFormat::R8: return 1;
+            case TextureFormat::RG32F:
+            case TextureFormat::RG16F:
+            case TextureFormat::RG8: return 2;
+            case TextureFormat::RGB32F:
+            case TextureFormat::RGB16F:
+            case TextureFormat::RGB8: return 3;
+            case TextureFormat::RGBA32F:
+            case TextureFormat::RGBA16F:
+            case TextureFormat::RGBA8: return 4;
+            default: return 3;
         }
-        
-        glVertexAttribPointer(attr.location, size, type, normalized, stride, 
-                             reinterpret_cast<void*>(static_cast<uintptr_t>(attr.offset)));
+    };
+    auto typeFromFormat = [](TextureFormat fmt) -> GLenum {
+        switch (fmt) {
+            case TextureFormat::RGBA8:
+            case TextureFormat::RGB8:
+            case TextureFormat::RG8:
+            case TextureFormat::R8: return GL_UNSIGNED_BYTE;
+            default: return GL_FLOAT;
+        }
+    };
+
+    // Configure vertex attributes with bound buffers per binding
+    for (const auto& attr : desc.vertexAttributes) {
+        // Find the binding parameters and buffer
+        const VertexBinding* vb = nullptr;
+        for (const auto& binding : desc.vertexBindings) {
+            if (binding.binding == attr.binding) { vb = &binding; break; }
+        }
+        if (!vb) continue;
+
+        // Bind buffer for this attribute
+        auto bufIt = m_buffers.find(vb->buffer);
+        if (bufIt != m_buffers.end()) {
+            glBindBuffer(GL_ARRAY_BUFFER, bufIt->second.id);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+
+        glEnableVertexAttribArray(attr.location);
+        const GLint comps = componentsFromFormat(attr.format);
+        const GLenum glType = typeFromFormat(attr.format);
+        const GLboolean normalized = (glType != GL_FLOAT) ? GL_TRUE : GL_FALSE;
+        glVertexAttribPointer(attr.location, comps, glType, normalized, vb->stride,
+                              reinterpret_cast<void*>(static_cast<uintptr_t>(attr.offset)));
+        // Instancing support
+        glVertexAttribDivisor(attr.location, vb->perInstance ? 1 : 0);
+    }
+
+    // Bind index buffer to VAO if provided
+    if (desc.indexBuffer != 0) {
+        auto ibIt = m_buffers.find(desc.indexBuffer);
+        if (ibIt != m_buffers.end()) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibIt->second.id);
+        }
     }
     
     glBindVertexArray(0);

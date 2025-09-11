@@ -58,6 +58,7 @@ set(APP_SOURCES
     ${SRC_DIR}/material-core.cpp
     ${SRC_DIR}/render-pass.cpp
     ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi-gl.cpp
 )
@@ -107,6 +108,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/material-core.cpp
     ${SRC_DIR}/render-pass.cpp
     ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi-gl.cpp
 )

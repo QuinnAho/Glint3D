@@ -68,6 +68,10 @@ bool ApplicationCore::init(const std::string& windowTitle, int width, int height
         std::cerr << "Failed to initialize render system\n";
         return false;
     }
+    // Inject RHI into scene for buffer creation via RHI
+    if (auto* rhi = m_renderer->getRHI()) {
+        m_scene->setRHI(rhi);
+    }
     // Initialize gizmo defaults on renderer
     m_renderer->setGizmoMode(m_gizmoMode);
     m_renderer->setGizmoAxis(m_gizmoAxis);

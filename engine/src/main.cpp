@@ -1,6 +1,9 @@
 #include "application_core.h"
 #include "render_utils.h"
 #include "cli_parser.h"
+#include "render-mode-selector.h"
+#include "material-core.h"
+#include "scene_manager.h"
 #include "path_security.h"
 #include <string>
 #include <vector>
@@ -231,6 +234,46 @@ int main(int argc, char** argv)
             Logger::info("Operations applied successfully");
         }
 
+        // Select render mode (new unified flag). '--mode' overrides '--raytrace'
+        // In UI builds, we keep existing behavior; in headless we decide before render
+        if (!parseResult.options.mode.empty()) {
+            const std::string& mode = parseResult.options.mode;
+            if (mode == "raster") {
+                app->setRaytraceMode(false);
+                Logger::info("Render mode: raster");
+            } else if (mode == "ray") {
+                app->setRaytraceMode(true);
+                Logger::info("Render mode: ray");
+            } else { // auto
+                // Build MaterialCore list from scene objects (legacy bridge)
+                std::vector<MaterialCore> materials;
+                const auto& objs = app->getSceneManager().getObjects();
+                materials.reserve(objs.size());
+                for (const auto& obj : objs) {
+                    MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
+                    // Prefer PBR factors on the object when present
+                    mc.baseColor = obj.baseColorFactor;
+                    mc.metallic = obj.metallicFactor;
+                    mc.roughness = obj.roughnessFactor;
+                    mc.ior = obj.ior;
+                    mc.clampValues();
+                    materials.push_back(mc);
+                }
+                RenderConfig cfg; // defaults: Auto + preview=false
+                RenderModeSelector selector;
+                RenderMode sel = selector.selectMode(materials, cfg);
+                if (sel == RenderMode::Ray) {
+                    app->setRaytraceMode(true);
+                } else {
+                    app->setRaytraceMode(false);
+                }
+                Logger::info(std::string("Auto mode selected: ") + RenderModeUtils::renderModeToString(sel));
+            }
+        } else if (parseResult.options.forceRaytrace) {
+            // Back-compat fallback
+            app->setRaytraceMode(true);
+        }
+
         // Render if requested
         if (!parseResult.options.outputFile.empty() || !parseResult.options.opsFile.empty()) {
             std::string outputPath = parseResult.options.outputFile;
@@ -265,6 +308,13 @@ int main(int argc, char** argv)
         return 0;
     } else {
         Logger::info("Launching UI mode");
+        // In UI mode, honor --mode raster/ray at startup (optional)
+        if (!parseResult.options.mode.empty()) {
+            if (parseResult.options.mode == "raster") app->setRaytraceMode(false);
+            else if (parseResult.options.mode == "ray") app->setRaytraceMode(true);
+        } else if (parseResult.options.forceRaytrace) {
+            app->setRaytraceMode(true);
+        }
         app->run();
         delete app;
         return 0;

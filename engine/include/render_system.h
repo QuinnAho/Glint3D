@@ -6,6 +6,10 @@
 #include <cstdint>
 #include "gl_platform.h"
 #include "gizmo.h"
+// RHI types for pipeline handles
+#include "rhi/rhi.h"
+// Forward declare RHI to avoid heavy include in header
+class RHI;
 
 // Forward declarations
 class SceneManager;
@@ -168,6 +172,9 @@ public:
     bool loadHDREnvironment(const std::string& hdrPath);
     void setIBLIntensity(float intensity);
     
+    // RHI access (for SceneManager to create buffers)
+    class RHI* getRHI() const { return m_rhi.get(); }
+    
     // Gizmo/selection configuration
     void setGizmoMode(GizmoMode mode) { m_gizmoMode = mode; }
     void setGizmoAxis(GizmoAxis axis) { m_gizmoAxis = axis; }
@@ -223,6 +230,23 @@ private:
     std::unique_ptr<Shader> m_screenQuadShader;
     int m_raytraceWidth = 512;
     int m_raytraceHeight = 512;
+
+    // RHI pipelines (shader binding handled by legacy Shader for now)
+    PipelineHandle m_basicPipeline = INVALID_HANDLE;
+    PipelineHandle m_pbrPipeline = INVALID_HANDLE;
+    ShaderHandle m_basicShaderRhi = INVALID_HANDLE;
+    ShaderHandle m_pbrShaderRhi = INVALID_HANDLE;
+
+    // Helpers
+    static std::string loadTextFile(const std::string& path);
+    void ensureObjectPipeline(struct SceneObject& obj, bool usePbr);
+    // Uniform helpers targeting current GL program
+    void setUniformMat4(const char* name, const glm::mat4& m);
+    void setUniformVec3(const char* name, const glm::vec3& v);
+    void setUniformVec4(const char* name, const glm::vec4& v);
+    void setUniformFloat(const char* name, float v);
+    void setUniformInt(const char* name, int v);
+    void setUniformBool(const char* name, bool v);
     
     // Shaders
     std::unique_ptr<Shader> m_basicShader;
@@ -274,4 +298,7 @@ private:
     // Internal helpers
     void createOrResizeTargets(int width, int height);
     void destroyTargets();
+
+    // Minimal RHI integration (initial cut)
+    std::unique_ptr<RHI> m_rhi;
 };

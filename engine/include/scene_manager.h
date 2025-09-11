@@ -9,11 +9,20 @@
 #include "objloader.h"
 #include "Texture.h"
 #include "shader.h"
+#include "rhi/rhi.h"
+#include "rhi/rhi-types.h"
 
 struct SceneObject
 {
     std::string name;
     GLuint   VAO = 0, VBO_positions = 0, VBO_normals = 0, VBO_uvs = 0, VBO_tangents = 0, EBO = 0;
+    // RHI buffer handles (migration)
+    BufferHandle rhiVboPositions = INVALID_HANDLE;
+    BufferHandle rhiVboNormals = INVALID_HANDLE;
+    BufferHandle rhiVboUVs = INVALID_HANDLE;
+    BufferHandle rhiEbo = INVALID_HANDLE;
+    PipelineHandle rhiPipelineBasic = INVALID_HANDLE;
+    PipelineHandle rhiPipelinePbr = INVALID_HANDLE;
     glm::mat4 modelMatrix{ 1.0f };        // World transform (computed from hierarchy)
     
     // Hierarchy support
@@ -94,10 +103,15 @@ public:
     void clear();
 
 private:
+    RHI* m_rhi = nullptr; // not owned; provided by RenderSystem
     std::vector<SceneObject> m_objects;
     std::unordered_map<std::string, Material> m_materials;
     int m_selectedObjectIndex = -1;
 
     void setupObjectOpenGL(SceneObject& obj);
     void cleanupObjectOpenGL(SceneObject& obj);
+
+public:
+    // Inject RHI (called from Application once RenderSystem is initialized)
+    void setRHI(RHI* rhi) { m_rhi = rhi; }
 };

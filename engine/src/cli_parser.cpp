@@ -69,6 +69,25 @@ CLIParseResult CLIParser::parse(int argc, char** argv)
     result.options.outputWidth = getIntValue("--w", 1024);
     result.options.outputHeight = getIntValue("--h", 1024);
     result.options.reflectionSpp = getIntValue("--refl-spp", 8);
+    // New: render mode (raster|ray|auto)
+    {
+        std::string modeStr = getValue("--mode", "auto");
+        if (hasFlag("--mode")) {
+            if (modeStr.empty()) {
+                result.exitCode = CLIExitCode::UnknownFlag;
+                result.errorMessage = "Missing value for --mode (expected raster|ray|auto)";
+                return result;
+            }
+            std::string lower = modeStr;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            if (lower != "raster" && lower != "ray" && lower != "auto") {
+                result.exitCode = CLIExitCode::UnknownFlag;
+                result.errorMessage = "Invalid mode: " + modeStr + " (supported: raster, ray, auto)";
+                return result;
+            }
+            result.options.mode = lower;
+        }
+    }
     int samplesVal = getIntValue("--samples", 1);
     
     // Parse render settings
@@ -322,6 +341,7 @@ std::vector<std::string> CLIParser::getValidFlags()
         "--asset-root",
         "--w",
         "--h",
+        "--mode",
         "--samples",
         "--refl-spp",
         "--denoise",

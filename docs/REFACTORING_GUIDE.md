@@ -245,18 +245,22 @@ public:
 - **Task 3**: Build system integration completed
 
 **Phase 2: Unified Materials (Task 4) -  COMPLETED**  
--  **Task 4**: MaterialCore implemented with unified BSDF representation
+-  **Task 4**: MaterialCore implemented with unified BSDF representation (not yet adopted by SceneObject/raytracer)
 
-**Phase 3: Pass System (Task 6) -  COMPLETED**
--  **Task 6**: RenderGraph and pass system implemented
+**Phase 3: Pass System (Task 6) -  COMPLETED (FOUNDATION ONLY)**
+-  **Task 6**: RenderGraph and pass types created; not wired into live render loop
 
-**Phase 5: Hybrid Pipeline (Task 10) -  COMPLETED**
--  **Task 10**: Render mode selector with intelligent Auto mode
+**Phase 5: Hybrid Pipeline (Task 10) -  PARTIAL**
+-  **Task 10**: Render mode selector implemented;
+   - CLI `--mode raster|ray|auto` added; Auto selection integrated for headless renders and honored at UI startup
+   - Remaining: connect to runtime pipeline/graph and expose in UI with selection reasoning
 
-**Implementation Status**: **6 of 20 tasks complete (30%)**
--  **Architecture Foundation**: Complete - RHI, MaterialCore, RenderGraph, ModeSelector
--  **Next Phase**: Integration with existing render system (Tasks 5, 7-9, 11-12)
--  **Remaining**: Screen-space refraction, production features, platform support
+**Implementation Status**: **8 tasks complete + 3 partial (≈55%)**
+-  **Completed/Implemented**: RHI interface + GL backend (Tasks 1–2), MaterialCore (4), RenderGraph foundation (6), Material binder (23), Shader updates for transmission/clearcoat initial (24), Transmissive blending pre-SSR (24.5)
+-  **Partially Implemented**: Hybrid Auto (10), RHI threading (21), RHI shader creation/binding for object rendering (31)
+-  **Newly Integrated**: CLI mode selection (headless Auto gating raster vs ray); RHI draw and offscreen textures; per-geometry RHI pipelines with buffer→attribute binding
+-  **Major Gaps**: RenderGraph not yet wired to runtime; SSR/OIT for transmission; SceneObject still holds legacy material fields (MaterialCore not yet the sole source); some subsystems (skybox/grid) still use legacy GL shader path; textures still bound as legacy GL samplers
+-  **Next Focus**: Finish Task 31 across subsystems (skybox/grid), adopt MaterialCore end-to-end (Task 22/5), wire passes (Task 25), implement SSR/OIT, and capability detection (Task 29)
 
 **Files Added**:
 ```
@@ -270,6 +274,19 @@ engine/include/render-pass.h                 Pass system
 engine/src/render-pass.cpp                   Pass implementation
 engine/include/render-mode-selector.h        Hybrid mode selector
 engine/src/render-mode-selector.cpp          Mode selection logic
+
+**Recent Changes (since last status)**:
+- CLI: Added `--mode raster|ray|auto`; deprecated `--raytrace` in help text
+- Headless: Auto mode now analyzes scene materials (bridged to MaterialCore) to pick raster vs ray
+ - Shaders: Added uniforms and minimal logic for transmission (thickness/attenuation) and clearcoat in `engine/shaders/pbr.frag`
+ - Engine: Introduced `bindMaterialUniforms(Shader&, const MaterialCore&)` helper to set PBR+extensions uniforms (`engine/include/material_binding.h`, `engine/src/material_binding.cpp`)
+ - Raster Path: Integrated MaterialCore binder when using PBR shader; enabled alpha blending for transmissive materials (approx; SSR pending)
+- RHI: Minimal integration in RenderSystem (OpenGL backend) for viewport/clear and per-frame begin/end
+ - RHI: Offscreen color texture creation and draw calls now go through RHI (legacy GL draw removed from engine code)
+ - RHI: Buffer-to-attribute binding added (VertexBinding.buffer + indexBuffer in PipelineDesc); RhiGL::setupVertexArray now binds buffers and configures attribs (R/RG/RGB/RGBA float and 8-bit)
+ - SceneManager (RHI path): Creates per-geometry RHI buffers and builds per-geometry pipelines capturing vertex layout + index buffer; RenderSystem uses `obj.rhiPipeline` for draws
+ - Fix: Draw path now detects indexed draw when either legacy GL EBO or RHI index buffer exists (prevents missing geometry when using RHI-only setup)
+ - RHI Shader Binding (Object Rendering): Shaders for raster objects are now created via RHI and attached to pipelines. Uniforms are applied to the currently bound program (via helpers), avoiding program/VAO mismatches that could yield invisible geometry.
 ```
 
 **Dependencies Added**:
@@ -1198,9 +1215,85 @@ set(GLINT_ENABLE_WEBGPU_PREP ON)     # WebGPU headers for future
 - REST /jobs wrapper + signed URL outputs
 - **Deliverable**: Production-ready AI-accessible rendering service
 
+## 3A. Audit Gaps & Newly Identified Tasks
+
+This subsection captures gaps observed in the current repo and adds concrete follow-ups beyond the original list.
+
+### Gaps Identified
+- Raster path still issues OpenGL calls directly (not via RHI) in `engine/src/render_system.cpp`.
+- Scene uses legacy `Material` plus ad-hoc PBR fields in `SceneObject` (dual material source of truth).
+- `RenderGraph` and pass classes exist but are not executed by the render loop.
+- `pbr.frag` has no uniforms/logic for transmission, thickness, attenuation, clearcoat.
+- Mode selector not surfaced in UI (no toggle/telemetry of selection reason).
+- CLI and examples still reference `--raytrace` (now deprecated in help text).
+
+### New Tasks (21+)
+
+#### Task 21: Thread Raster Through RHI (Initial Cut)
+- Scope: Introduce RHI usage for texture creation, shader programs, and vertex/index buffers in `render_system.cpp`.
+- Acceptance: Opaque scenes render identically; no direct `glGenTextures`/`glCreateShader` in engine code outside RhiGL.
+ - Status: Partially implemented. RHI used for viewport/clear, per-frame begin/end, and draw calls; offscreen render target created via RHI. SceneManager creates RHI vertex/index buffers; RenderSystem builds per-geometry pipelines (with shader + vertex layout + index buffer) and prefers them when present.
+
+#### Task 22: SceneObject → MaterialCore Adoption
+- Scope: Add a `MaterialCore` field to `SceneObject` and map legacy/PBR fields into it during load; use this struct everywhere.
+- Acceptance: Both raster binding and raytracer read from `MaterialCore` (no PBR→legacy conversions).
+
+#### Task 23: Material Uniform Binder
+- Scope: Implement a binder to set shader uniforms from `MaterialCore` (baseColor, metallic, roughness, ior, transmission, thickness, attenuation, clearcoat...)
+- Acceptance: Centralized function used by raster path; easy to extend and test.
+- Status: Implemented and integrated in raster PBR path.
+
+#### Task 24: Shader Updates for Transmission & Clearcoat
+ - Scope: Add uniforms and minimal logic to `engine/shaders/pbr.frag` for transmission, thickness, attenuation, clearcoat, clearcoatRoughness.
+ - Acceptance: Visual parity on metallic/roughness grid; clearcoat lobe visibly contributes; attenuation applies with thickness.
+ - Status: Implemented (initial). Alpha/transparency integration and SSR remain future work.
+
+#### Task 23.5: MaterialCore Uniform Binder
+- Scope: Provide a centralized helper to map MaterialCore fields to shader uniforms used by PBR.
+- Acceptance: One-line call to bind all required uniforms for PBR + extensions.
+- Status: Implemented (`bindMaterialUniforms`) and added to build; integrated in raster PBR path.
+
+#### Task 24.5: Transmissive Blending (Pre-SSR)
+- Scope: Enable alpha blending and depth-write disable for transmissive materials when using the PBR shader.
+- Acceptance: Transparent objects composite with background; order issues acceptable until SSR/OIT lands.
+- Status: Implemented (approximation). SSR/OIT remain future tasks.
+
+#### Task 31: RHI Shader Creation & Binding (Raster Objects)
+- Scope: Create RHI shaders from GLSL source files via `ShaderDesc`, store `ShaderHandle` in `PipelineDesc.shader`, and bind GL programs via pipeline binding.
+- Acceptance: Raster object rendering compiles shaders via RHI, pipelines have valid `shader` handles, uniforms apply to the bound program, and no legacy shader `use()` calls are required in object draw paths.
+- Status: Implemented for raster object rendering. Remaining: port skybox/grid/aux pipelines to RHI and migrate texture creation/binds.
+
+#### Task 25: Integrate RenderGraph (Raster Path)
+- Scope: Replace monolithic raster render with passes: GBuffer → Lighting → (SSR-T placeholder) → Post → Readback.
+- Acceptance: Frame renders via `RenderGraph` with same output as legacy path on opaque scenes.
+
+#### Task 26: Hybrid Mode in UI
+- Scope: Add a UI toggle for `raster|ray|auto`, surface auto-selection reason, and allow preview/final presets.
+- Acceptance: Mode switch works; “reason” string visible; persists across sessions.
+
+#### Task 27: CLI/Docs Migration
+- Scope: Update docs and examples to use `--mode`; log deprecation warning when `--raytrace` is used; add examples for auto mode.
+- Acceptance: README and help align; examples run using `--mode`.
+
+#### Task 28: Determinism Harness Hook
+- Scope: Wire `--seed` through all stochastic paths (glossy reflection sampling, raytracer); provide regression using `tests/determinism`.
+- Acceptance: Re-runs with same seed are pixel-stable within tolerance; script passes locally.
+
+#### Task 29: Capability Detection & Fallbacks (Raster)
+- Scope: Implement capability probe; warn/fallback when SSR/OIT/float textures are missing.
+- Acceptance: No crashes on low-cap devices; clear logs and graceful visuals.
+
+#### Task 30: Legacy Cleanup Plan
+- Scope: Track and gradually remove legacy material structs/conversions once both pipelines fully read `MaterialCore`.
+- Acceptance: Compile without legacy conversions; no duplicate material fields in `SceneObject`.
+
 #### **Optional: Advanced Features**
 -  Intel Embree integration (2-10x faster CPU ray tracing)
 -  Vulkan/WebGPU backend preparation
 -  Advanced volume rendering (subsurface scattering, volumetrics)
+
+#### Task 31: RHI Shader Creation & Binding
+- Scope: Create RHI shaders from GLSL source files via `ShaderDesc`, store `ShaderHandle` in `PipelineDesc.shader`, and bind GL programs via `bindPipeline` (retire legacy `Shader` wrapper in raster path).
+- Acceptance: Raster path compiles shaders via RHI, pipelines have valid `shader` handles, and no legacy shader `use()` calls remain in draw paths.
 
 Good luck with the refactor! Each milestone builds incrementally toward a modern, AI-friendly, production-ready rendering system that solves the current dual-pipeline limitations while future-proofing for next-generation graphics APIs.

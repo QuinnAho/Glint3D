@@ -8,6 +8,11 @@
 #include "ibl_system.h"
 #include "raytracer.h"
 #include "shader.h"
+#include "material-core.h"
+#include "material_binding.h"
+#include "rhi/rhi.h"
+#include "rhi/rhi-types.h"
+#include "rhi/rhi-gl.h"
 #include "gl_platform.h"
 #include <iostream>
 #include <vector>
@@ -17,6 +22,72 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cstdio>
+#include <fstream>
+
+std::string RenderSystem::loadTextFile(const std::string& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::ostringstream ss; ss << f.rdbuf();
+    return ss.str();
+}
+
+void RenderSystem::setUniformMat4(const char* name, const glm::mat4& m)
+{
+    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniformMatrix4fv(loc, 1, GL_FALSE, &m[0][0]);
+}
+void RenderSystem::setUniformVec3(const char* name, const glm::vec3& v)
+{
+    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform3fv(loc, 1, &v[0]);
+}
+void RenderSystem::setUniformVec4(const char* name, const glm::vec4& v)
+{
+    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform4fv(loc, 1, &v[0]);
+}
+void RenderSystem::setUniformFloat(const char* name, float v)
+{
+    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform1f(loc, v);
+}
+void RenderSystem::setUniformInt(const char* name, int v)
+{
+    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform1i(loc, v);
+}
+void RenderSystem::setUniformBool(const char* name, bool v)
+{
+    setUniformInt(name, v ? 1 : 0);
+}
+
+void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
+{
+    if (!m_rhi) return;
+    bool hasNormals = (obj.rhiVboNormals != INVALID_HANDLE);
+    bool hasUVs = (obj.rhiVboUVs != INVALID_HANDLE);
+    PipelineHandle& target = usePbr ? obj.rhiPipelinePbr : obj.rhiPipelineBasic;
+    if (target != INVALID_HANDLE) return;
+
+    PipelineDesc pd{};
+    pd.topology = PrimitiveTopology::Triangles;
+    pd.shader = usePbr ? m_pbrShaderRhi : m_basicShaderRhi;
+    pd.debugName = obj.name + (usePbr ? ":pipeline_pbr" : ":pipeline_basic");
+
+    VertexBinding bPos{}; bPos.binding = 0; bPos.stride = 3 * sizeof(float); bPos.buffer = obj.rhiVboPositions; pd.vertexBindings.push_back(bPos);
+    if (hasNormals) { VertexBinding bN{}; bN.binding = 1; bN.stride = 3 * sizeof(float); bN.buffer = obj.rhiVboNormals; pd.vertexBindings.push_back(bN); }
+    if (hasUVs) { VertexBinding bUV{}; bUV.binding = 2; bUV.stride = 2 * sizeof(float); bUV.buffer = obj.rhiVboUVs; pd.vertexBindings.push_back(bUV); }
+
+    VertexAttribute aPos{}; aPos.location = 0; aPos.binding = 0; aPos.format = TextureFormat::RGB32F; aPos.offset = 0; pd.vertexAttributes.push_back(aPos);
+    if (hasNormals) { VertexAttribute aN{}; aN.location = 1; aN.binding = 1; aN.format = TextureFormat::RGB32F; aN.offset = 0; pd.vertexAttributes.push_back(aN); }
+    if (hasUVs) { VertexAttribute aUV{}; aUV.location = 2; aUV.binding = 2; aUV.format = TextureFormat::RG32F; aUV.offset = 0; pd.vertexAttributes.push_back(aUV); }
+
+    pd.indexBuffer = obj.rhiEbo;
+    target = m_rhi->createPipeline(pd);
+    // Bind immediately so subsequent uniform calls apply to correct program
+    m_rhi->bindPipeline(target);
+}
 
 // PNG writer
 #ifndef __EMSCRIPTEN__
@@ -57,14 +128,22 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     glViewport(0, 0, windowWidth, windowHeight);
     glClearColor(m_backgroundColor.r, m_backgroundColor.g, m_backgroundColor.b, 1.0f);
 
-    // Load shaders
+    // Minimal RHI init (OpenGL backend)
+    if (!m_rhi) {
+        m_rhi = createRHI(RHI::Backend::OpenGL);
+        if (m_rhi) {
+            RhiInit init{}; init.windowWidth = windowWidth; init.windowHeight = windowHeight; init.enableSRGB = m_framebufferSRGBEnabled;
+            m_rhi->init(init);
+            m_rhi->setViewport(0, 0, windowWidth, windowHeight);
+        }
+    }
+
+    // Load shaders (legacy wrapper still present for non-RHI paths)
     m_basicShader = std::make_unique<Shader>();
-    if (!m_basicShader->load("shaders/standard.vert", "shaders/standard.frag"))
-        std::cerr << "[RenderSystem] Failed to load standard shader.\n";
+    m_basicShader->load("shaders/standard.vert", "shaders/standard.frag");
 
     m_pbrShader = std::make_unique<Shader>();
-    if (!m_pbrShader->load("shaders/pbr.vert", "shaders/pbr.frag"))
-        std::cerr << "[RenderSystem] Failed to load PBR shader.\n";
+    m_pbrShader->load("shaders/pbr.vert", "shaders/pbr.frag");
 
     m_gridShader = std::make_unique<Shader>();
     if (!m_gridShader->load("shaders/grid.vert", "shaders/grid.frag"))
@@ -86,6 +165,31 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     if (m_skybox) m_skybox->init();
     if (m_iblSystem) m_iblSystem->init();
     
+    // Create shaders via RHI and minimal pipelines for fallback
+    if (m_rhi) {
+        // Create RHI shaders
+        ShaderDesc sdBasic{};
+        sdBasic.vertexSource = loadTextFile("shaders/standard.vert");
+        sdBasic.fragmentSource = loadTextFile("shaders/standard.frag");
+        sdBasic.debugName = "standard";
+        m_basicShaderRhi = m_rhi->createShader(sdBasic);
+
+        ShaderDesc sdPbr{};
+        sdPbr.vertexSource = loadTextFile("shaders/pbr.vert");
+        sdPbr.fragmentSource = loadTextFile("shaders/pbr.frag");
+        sdPbr.debugName = "pbr";
+        m_pbrShaderRhi = m_rhi->createShader(sdPbr);
+
+        PipelineDesc pd{};
+        pd.topology = PrimitiveTopology::Triangles;
+        pd.debugName = "basic_pipeline";
+        pd.shader = m_basicShaderRhi;
+        m_basicPipeline = m_rhi->createPipeline(pd);
+        pd.debugName = "pbr_pipeline";
+        pd.shader = m_pbrShaderRhi;
+        m_pbrPipeline = m_rhi->createPipeline(pd);
+    }
+
     // Initialize raytracing resources only when needed
     if (m_renderMode == RenderMode::Raytrace) {
         initScreenQuad();
@@ -161,13 +265,20 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
         createOrResizeTargets(m_fbWidth, m_fbHeight);
         m_recreateTargets = false;
     }
+    // Begin RHI frame
+    if (m_rhi) m_rhi->beginFrame();
+
     // Bind target for rendering
     if (m_samples > 1 && m_msaaFBO != 0) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_msaaFBO);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (m_rhi) {
+        m_rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
+    } else {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
 
     // If using gradient background and no skybox, draw full-screen gradient
     if (m_bgMode == BackgroundMode::Gradient && !m_showSkybox && m_gradientShader) {
@@ -219,29 +330,50 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
             const auto& obj = objs[selObj];
             if (obj.VAO != 0) {
                 Shader* s = m_basicShader.get();
-                s->use();
-                // Post-processing uniforms for standard shader (selection overlay respects gamma/exposure)
-                s->setFloat("exposure", m_exposure);
-                s->setFloat("gamma", m_gamma);
-                s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
-                // Matrices
-                s->setMat4("model", obj.modelMatrix);
-                s->setMat4("view", m_viewMatrix);
-                s->setMat4("projection", m_projectionMatrix);
-                // Solid highlight color via ambient-only lighting
-                s->setInt("shadingMode", 0); // flat path
-                s->setBool("useTexture", false);
-                s->setVec3("objectColor", glm::vec3(0.2f, 0.7f, 1.0f)); // cyan-ish
-                s->setVec3("viewPos", m_camera.position);
-                // Force bright ambient and no direct lights
-                glActiveTexture(GL_TEXTURE0 + 7);
-                glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-                s->setInt("shadowMap", 7);
-                s->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
-                // Material ambient = 1, other params not used in flat ambient-only path
-                s->setVec3("material.ambient", glm::vec3(1.0f));
-                s->setInt("numLights", 0);
-                s->setVec4("globalAmbient", glm::vec4(1.0f));
+                if (m_rhi) {
+                    ensureObjectPipeline(const_cast<SceneObject&>(obj), false);
+                    // Post-processing uniforms for standard shader (selection overlay respects gamma/exposure)
+                    setUniformFloat("exposure", m_exposure);
+                    setUniformFloat("gamma", m_gamma);
+                    setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
+                    // Matrices
+                    setUniformMat4("model", obj.modelMatrix);
+                    setUniformMat4("view", m_viewMatrix);
+                    setUniformMat4("projection", m_projectionMatrix);
+                    // Solid highlight color via ambient-only lighting
+                    setUniformInt("shadingMode", 0); // flat path
+                    setUniformBool("useTexture", false);
+                    setUniformVec3("objectColor", glm::vec3(0.2f, 0.7f, 1.0f)); // cyan-ish
+                    setUniformVec3("viewPos", m_camera.position);
+                    // Force bright ambient and no direct lights
+                    glActiveTexture(GL_TEXTURE0 + 7);
+                    glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
+                    setUniformInt("shadowMap", 7);
+                    setUniformMat4("lightSpaceMatrix", glm::mat4(1.0f));
+                    // Material ambient = 1, other params not used in flat ambient-only path
+                    setUniformVec3("material.ambient", glm::vec3(1.0f));
+                    setUniformInt("numLights", 0);
+                    setUniformVec4("globalAmbient", glm::vec4(1.0f));
+                } else {
+                    s->use();
+                    s->setFloat("exposure", m_exposure);
+                    s->setFloat("gamma", m_gamma);
+                    s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+                    s->setMat4("model", obj.modelMatrix);
+                    s->setMat4("view", m_viewMatrix);
+                    s->setMat4("projection", m_projectionMatrix);
+                    s->setInt("shadingMode", 0);
+                    s->setBool("useTexture", false);
+                    s->setVec3("objectColor", glm::vec3(0.2f, 0.7f, 1.0f));
+                    s->setVec3("viewPos", m_camera.position);
+                    glActiveTexture(GL_TEXTURE0 + 7);
+                    glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
+                    s->setInt("shadowMap", 7);
+                    s->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
+                    s->setVec3("material.ambient", glm::vec3(1.0f));
+                    s->setInt("numLights", 0);
+                    s->setVec4("globalAmbient", glm::vec4(1.0f));
+                }
 
                 // Draw as wireframe overlay with slight depth bias to reduce z-fighting
 #ifndef __EMSCRIPTEN__
@@ -252,13 +384,21 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 glLineWidth(1.5f);
 #endif
-                glBindVertexArray(obj.VAO);
-                if (obj.EBO != 0) {
-                    glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+                if (m_rhi && ((obj.rhiPipelineBasic != INVALID_HANDLE) || m_basicPipeline != INVALID_HANDLE)) {
+                    DrawDesc dd{};
+                    dd.pipeline = (obj.rhiPipelineBasic != INVALID_HANDLE) ? obj.rhiPipelineBasic : m_basicPipeline;
+                    bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+                    if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+                    m_rhi->draw(dd);
                 } else {
-                    glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+                    glBindVertexArray(obj.VAO);
+                    if (obj.EBO != 0) {
+                        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+                    } else {
+                        glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+                    }
+                    glBindVertexArray(0);
                 }
-                glBindVertexArray(0);
                 // Selection overlay adds an extra draw call
                 m_stats.drawCalls += 1;
 #ifndef __EMSCRIPTEN__
@@ -312,6 +452,9 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     }
+
+    // End RHI frame
+    if (m_rhi) m_rhi->endFrame();
 }
 
 bool RenderSystem::loadSkybox(const std::string& path)
@@ -530,21 +673,37 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     GLint prevViewport[4] = {0, 0, 0, 0};
     glGetIntegerv(GL_VIEWPORT, prevViewport);
 
-    // Create color texture (RGBA8)
+    // Create color texture (RGBA8) via RHI
+    TextureHandle colorTexHandle = INVALID_HANDLE;
     GLuint colorTex = 0;
-    glGenTextures(1, &colorTex);
-    glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    if (m_rhi) {
+        TextureDesc td{};
+        td.type = TextureType::Texture2D;
+        td.format = TextureFormat::RGBA8;
+        td.width = width; td.height = height; td.depth = 1;
+        td.generateMips = false;
+        td.debugName = "renderToPNG_color";
+        colorTexHandle = m_rhi->createTexture(td);
+        // Obtain GL id to attach to FBO (OpenGL backend only)
+        if (auto* gl = dynamic_cast<RhiGL*>(m_rhi.get())) {
+            colorTex = gl->getGLTexture(colorTexHandle);
+        }
+    } else {
+        glGenTextures(1, &colorTex);
+        glBindTexture(GL_TEXTURE_2D, colorTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
 
     // Render scene into the texture
     bool ok = renderToTexture(scene, lights, colorTex, width, height);
     if (!ok) {
-        glDeleteTextures(1, &colorTex);
+        if (m_rhi && colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
+        else glDeleteTextures(1, &colorTex);
         return false;
     }
 
@@ -586,7 +745,8 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 
     // Cleanup
     glDeleteFramebuffers(1, &fbo);
-    glDeleteTextures(1, &colorTex);
+    if (m_rhi && colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
+    else glDeleteTextures(1, &colorTex);
 
     return writeOK != 0;
 #endif
@@ -603,6 +763,7 @@ void RenderSystem::updateProjectionMatrix(int windowWidth, int windowHeight)
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     m_projectionMatrix = glm::perspective(glm::radians(m_camera.fov), aspect, 
                                          m_camera.nearClip, m_camera.farClip);
+    if (m_rhi) m_rhi->setViewport(0, 0, windowWidth, windowHeight);
 }
 
 void RenderSystem::setReflectionSpp(int spp)
@@ -920,15 +1081,16 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     Shader* s = usePBR && m_pbrShader ? m_pbrShader.get() : m_basicShader.get();
     if (!s) return;
     
-    // Cache shader state to avoid redundant use() calls
-    static Shader* lastShader = nullptr;
-    if (s != lastShader) {
-        s->use();
-        lastShader = s;
-        
-        // Set common uniforms once per shader switch
-        setupCommonUniforms(s);
+    // Ensure pipeline is bound before setting uniforms in RHI path
+    if (m_rhi) {
+        ensureObjectPipeline(const_cast<SceneObject&>(obj), (s == m_pbrShader.get()));
+    } else {
+        // Cache shader state to avoid redundant use() calls
+        static Shader* lastShader = nullptr;
+        if (s != lastShader) { s->use(); lastShader = s; }
     }
+    // Set common uniforms
+    setupCommonUniforms(s);
 
     // Matrices
     s->setMat4("model", obj.modelMatrix);
@@ -941,40 +1103,91 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
 
     if (s == m_basicShader.get()) {
         // Post-processing uniforms for standard shader
-        s->setFloat("exposure", m_exposure);
-        s->setFloat("gamma", m_gamma);
-        s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+        if (m_rhi) {
+            setUniformFloat("exposure", m_exposure);
+            setUniformFloat("gamma", m_gamma);
+            setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
+        } else {
+            s->setFloat("exposure", m_exposure);
+            s->setFloat("gamma", m_gamma);
+            s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+        }
         // Material for standard shader
-        s->setVec3("material.diffuse",  obj.material.diffuse);
-        s->setVec3("material.specular", obj.material.specular);
-        s->setVec3("material.ambient",  obj.material.ambient);
-        s->setFloat("material.shininess", obj.material.shininess);
-        s->setFloat("material.roughness", obj.material.roughness);
-        s->setFloat("material.metallic",  obj.material.metallic);
+        if (m_rhi) {
+            setUniformVec3("material.diffuse",  obj.material.diffuse);
+            setUniformVec3("material.specular", obj.material.specular);
+            setUniformVec3("material.ambient",  obj.material.ambient);
+            setUniformFloat("material.shininess", obj.material.shininess);
+            setUniformFloat("material.roughness", obj.material.roughness);
+            setUniformFloat("material.metallic",  obj.material.metallic);
+        } else {
+            s->setVec3("material.diffuse",  obj.material.diffuse);
+            s->setVec3("material.specular", obj.material.specular);
+            s->setVec3("material.ambient",  obj.material.ambient);
+            s->setFloat("material.shininess", obj.material.shininess);
+            s->setFloat("material.roughness", obj.material.roughness);
+            s->setFloat("material.metallic",  obj.material.metallic);
+        }
     } else {
-        // PBR uniforms
-        s->setVec4("baseColorFactor", obj.baseColorFactor);
-        s->setFloat("metallicFactor", obj.metallicFactor);
-        s->setFloat("roughnessFactor", obj.roughnessFactor);
-        s->setFloat("ior", obj.ior);
-        s->setBool("hasBaseColorMap", obj.baseColorTex != nullptr);
-        s->setBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
-        s->setBool("hasMRMap", obj.mrTex != nullptr);
-        s->setBool("hasTangents", obj.VBO_tangents != 0);
+        // Build MaterialCore snapshot from legacy + PBR fields
+        MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
+        mc.baseColor = obj.baseColorFactor;
+        mc.metallic = obj.metallicFactor;
+        mc.roughness = obj.roughnessFactor;
+        mc.ior = obj.ior;
+        mc.clampValues();
+        if (m_rhi) {
+            setUniformVec4("baseColorFactor", mc.baseColor);
+            setUniformFloat("metallicFactor", mc.metallic);
+            setUniformFloat("roughnessFactor", mc.roughness);
+            setUniformFloat("ior", mc.ior);
+            setUniformFloat("transmission", mc.transmission);
+            setUniformFloat("thickness", mc.thickness);
+            setUniformFloat("attenuationDistance", mc.attenuationDistance);
+            setUniformVec3("attenuationColor", glm::vec3(mc.baseColor));
+            setUniformFloat("clearcoat", mc.clearcoat);
+            setUniformFloat("clearcoatRoughness", mc.clearcoatRoughness);
+            setUniformBool("hasBaseColorMap", obj.baseColorTex != nullptr);
+            setUniformBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
+            setUniformBool("hasMRMap", obj.mrTex != nullptr);
+            setUniformBool("hasTangents", obj.VBO_tangents != 0);
+        } else {
+            // Bind via legacy wrapper
+            bindMaterialUniforms(*s, mc);
+            s->setBool("hasBaseColorMap", obj.baseColorTex != nullptr);
+            s->setBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
+            s->setBool("hasMRMap", obj.mrTex != nullptr);
+            s->setBool("hasTangents", obj.VBO_tangents != 0);
+        }
         
         // Set post-processing uniforms for PBR shader
-        s->setFloat("exposure", m_exposure);
-        s->setFloat("gamma", m_gamma);
-        s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+        if (m_rhi) {
+            setUniformFloat("exposure", m_exposure);
+            setUniformFloat("gamma", m_gamma);
+            setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
+        } else {
+            s->setFloat("exposure", m_exposure);
+            s->setFloat("gamma", m_gamma);
+            s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+        }
         
         int unit = 0;
-        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); s->setInt("baseColorTex", unit++); }
-        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); s->setInt("normalTex", unit++); }
-        if (obj.mrTex) { obj.mrTex->bind(unit); s->setInt("mrTex", unit++); }
+        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); if (m_rhi) setUniformInt("baseColorTex", unit); else s->setInt("baseColorTex", unit); unit++; }
+        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); if (m_rhi) setUniformInt("normalTex", unit); else s->setInt("normalTex", unit); unit++; }
+        if (obj.mrTex) { obj.mrTex->bind(unit); if (m_rhi) setUniformInt("mrTex", unit); else s->setInt("mrTex", unit); }
     }
 
     // Lights (sets globalAmbient, lights[], numLights)
-    lights.applyLights(s->getID());
+    if (m_rhi) {
+        GLuint prog = 0;
+        if (auto* glrhi = dynamic_cast<RhiGL*>(m_rhi.get())) {
+            ShaderHandle sh = (s == m_pbrShader.get()) ? m_pbrShaderRhi : m_basicShaderRhi;
+            prog = glrhi->getGLShader(sh);
+        }
+        if (prog) lights.applyLights(prog);
+    } else {
+        lights.applyLights(s->getID());
+    }
 
     // Bind dummy shadow map and identity lightSpaceMatrix to avoid undefined sampling
     glActiveTexture(GL_TEXTURE0 + 7);
@@ -1013,11 +1226,40 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         lastRenderMode = m_renderMode;
     }
     
+    // Enable blending for transmissive materials (approx; SSR pending)
+    bool blendingEnabled = false;
+    if (s == m_pbrShader.get()) {
+        // Decide using transmission from legacy material or base alpha
+        float transmission = obj.material.transmission;
+        if (transmission > 0.01f || obj.baseColorFactor.a < 0.999f) {
+            glEnable(GL_BLEND);
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            blendingEnabled = true;
+        }
+    }
+
     // Optimized draw call
-    if (obj.EBO != 0) {
-        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+    if (m_rhi) {
+        ensureObjectPipeline(const_cast<SceneObject&>(obj), (s == m_pbrShader.get()));
+        DrawDesc dd{};
+        dd.pipeline = (s == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
+                                               : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
+        // Use indexed draw if either legacy GL EBO exists or RHI index buffer was created
+        bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+        if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+        m_rhi->draw(dd);
     } else {
-        glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+        if (obj.EBO != 0) {
+            glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+        } else {
+            glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+        }
+    }
+
+    if (blendingEnabled) {
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
     }
 
     // Count one draw call for this object
@@ -1336,20 +1578,30 @@ void RenderSystem::renderObjectsBatched(const SceneManager& scene, const Light& 
 
 void RenderSystem::setupCommonUniforms(Shader* shader)
 {
-    // Set common uniforms that don't change per object
-    shader->setMat4("view", m_viewMatrix);
-    shader->setMat4("projection", m_projectionMatrix);
-    shader->setVec3("viewPos", m_camera.position);
-    shader->setInt("shadingMode", (int)m_shadingMode);
-    shader->setFloat("exposure", m_exposure);
-    shader->setFloat("gamma", m_gamma);
-    shader->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+    // Prefer RHI-bound current program; fall back to shader wrapper
+    if (m_rhi) {
+        setUniformMat4("view", m_viewMatrix);
+        setUniformMat4("projection", m_projectionMatrix);
+        setUniformVec3("viewPos", m_camera.position);
+        setUniformInt("shadingMode", (int)m_shadingMode);
+        setUniformFloat("exposure", m_exposure);
+        setUniformFloat("gamma", m_gamma);
+        setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
+    } else {
+        shader->setMat4("view", m_viewMatrix);
+        shader->setMat4("projection", m_projectionMatrix);
+        shader->setVec3("viewPos", m_camera.position);
+        shader->setInt("shadingMode", (int)m_shadingMode);
+        shader->setFloat("exposure", m_exposure);
+        shader->setFloat("gamma", m_gamma);
+        shader->setInt("toneMappingMode", static_cast<int>(m_tonemap));
+    }
     
     // Bind dummy shadow map
     glActiveTexture(GL_TEXTURE0 + 7);
     glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-    shader->setInt("shadowMap", 7);
-    shader->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
+    if (m_rhi) setUniformInt("shadowMap", 7); else shader->setInt("shadowMap", 7);
+    if (m_rhi) setUniformMat4("lightSpaceMatrix", glm::mat4(1.0f)); else shader->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
     
     // Bind IBL textures if available
     if (m_iblSystem) {
@@ -1364,52 +1616,111 @@ void RenderSystem::setupCommonUniforms(Shader* shader)
 void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights, Shader* shader)
 {
     // Fast object rendering with minimal per-object state changes
-    shader->setMat4("model", obj.modelMatrix);
+    if (m_rhi) {
+        ensureObjectPipeline(const_cast<SceneObject&>(obj), (shader == m_pbrShader.get()));
+        setUniformMat4("model", obj.modelMatrix);
+    } else {
+        shader->setMat4("model", obj.modelMatrix);
+    }
     
     if (shader == m_basicShader.get()) {
         // Standard shader material uniforms
-        shader->setVec3("material.diffuse",  obj.material.diffuse);
-        shader->setVec3("material.specular", obj.material.specular);
-        shader->setVec3("material.ambient",  obj.material.ambient);
-        shader->setFloat("material.shininess", obj.material.shininess);
-        shader->setFloat("material.roughness", obj.material.roughness);
-        shader->setFloat("material.metallic",  obj.material.metallic);
+        if (m_rhi) {
+            setUniformVec3("material.diffuse",  obj.material.diffuse);
+            setUniformVec3("material.specular", obj.material.specular);
+            setUniformVec3("material.ambient",  obj.material.ambient);
+            setUniformFloat("material.shininess", obj.material.shininess);
+            setUniformFloat("material.roughness", obj.material.roughness);
+            setUniformFloat("material.metallic",  obj.material.metallic);
+        } else {
+            shader->setVec3("material.diffuse",  obj.material.diffuse);
+            shader->setVec3("material.specular", obj.material.specular);
+            shader->setVec3("material.ambient",  obj.material.ambient);
+            shader->setFloat("material.shininess", obj.material.shininess);
+            shader->setFloat("material.roughness", obj.material.roughness);
+            shader->setFloat("material.metallic",  obj.material.metallic);
+        }
         
         // Texturing
         if (obj.texture) {
             obj.texture->bind(0);
-            shader->setBool("useTexture", true);
-            shader->setInt("cowTexture", 0);
+            if (m_rhi) { setUniformBool("useTexture", true); setUniformInt("cowTexture", 0); }
+            else { shader->setBool("useTexture", true); shader->setInt("cowTexture", 0); }
         } else {
-            shader->setBool("useTexture", false);
-            shader->setVec3("objectColor", obj.color);
+            if (m_rhi) { setUniformBool("useTexture", false); setUniformVec3("objectColor", obj.color); }
+            else { shader->setBool("useTexture", false); shader->setVec3("objectColor", obj.color); }
         }
     } else {
-        // PBR shader uniforms
-        shader->setVec4("baseColorFactor", obj.baseColorFactor);
-        shader->setFloat("metallicFactor", obj.metallicFactor);
-        shader->setFloat("roughnessFactor", obj.roughnessFactor);
-        shader->setFloat("ior", obj.ior);
-        shader->setBool("hasBaseColorMap", obj.baseColorTex != nullptr);
-        shader->setBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
-        shader->setBool("hasMRMap", obj.mrTex != nullptr);
-        shader->setBool("hasTangents", obj.VBO_tangents != 0);
+        // PBR shader uniforms via MaterialCore binder
+        MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
+        mc.baseColor = obj.baseColorFactor;
+        mc.metallic = obj.metallicFactor;
+        mc.roughness = obj.roughnessFactor;
+        mc.ior = obj.ior;
+        mc.clampValues();
+        if (m_rhi) {
+            setUniformVec4("baseColorFactor", mc.baseColor);
+            setUniformFloat("metallicFactor", mc.metallic);
+            setUniformFloat("roughnessFactor", mc.roughness);
+            setUniformFloat("ior", mc.ior);
+            setUniformFloat("transmission", mc.transmission);
+            setUniformFloat("thickness", mc.thickness);
+            setUniformFloat("attenuationDistance", mc.attenuationDistance);
+            setUniformVec3("attenuationColor", glm::vec3(mc.baseColor));
+            setUniformFloat("clearcoat", mc.clearcoat);
+            setUniformFloat("clearcoatRoughness", mc.clearcoatRoughness);
+            setUniformBool("hasBaseColorMap", obj.baseColorTex != nullptr);
+            setUniformBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
+            setUniformBool("hasMRMap", obj.mrTex != nullptr);
+            setUniformBool("hasTangents", obj.VBO_tangents != 0);
+        } else {
+            bindMaterialUniforms(*shader, mc);
+            shader->setBool("hasBaseColorMap", obj.baseColorTex != nullptr);
+            shader->setBool("hasNormalMap", obj.normalTex != nullptr && obj.VBO_tangents != 0);
+            shader->setBool("hasMRMap", obj.mrTex != nullptr);
+            shader->setBool("hasTangents", obj.VBO_tangents != 0);
+        }
         
         int unit = 0;
-        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); shader->setInt("baseColorTex", unit++); }
-        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); shader->setInt("normalTex", unit++); }
-        if (obj.mrTex) { obj.mrTex->bind(unit); shader->setInt("mrTex", unit++); }
+        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); if (m_rhi) setUniformInt("baseColorTex", unit); else shader->setInt("baseColorTex", unit); unit++; }
+        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); if (m_rhi) setUniformInt("normalTex", unit); else shader->setInt("normalTex", unit); unit++; }
+        if (obj.mrTex) { obj.mrTex->bind(unit); if (m_rhi) setUniformInt("mrTex", unit); else shader->setInt("mrTex", unit); }
     }
-    
-    glBindVertexArray(obj.VAO);
-    
+    // Simple blending for transmissive materials (approx; SSR pending)
+    bool blendingEnabled = false;
+    if (shader == m_pbrShader.get()) {
+        float transmission = obj.material.transmission;
+        if (transmission > 0.01f || obj.baseColorFactor.a < 0.999f) {
+            glEnable(GL_BLEND);
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            blendingEnabled = true;
+        }
+    }
+
     // Draw call
-    if (obj.EBO != 0) {
-        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+    if (m_rhi) {
+        DrawDesc dd{};
+        dd.pipeline = (shader == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
+                                                    : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
+        bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+        if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+        m_rhi->draw(dd);
     } else {
-        glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+        glBindVertexArray(obj.VAO);
+        if (obj.EBO != 0) {
+            glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
+        } else {
+            glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+        }
+        glBindVertexArray(0);
     }
     
+    if (blendingEnabled) {
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+    }
+
     m_stats.drawCalls += 1;
 }
 
