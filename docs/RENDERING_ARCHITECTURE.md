@@ -12,9 +12,9 @@ Glint3D has **TWO SEPARATE** rendering pipelines that handle materials completel
 | Aspect | **Rasterized** (Default) | **Raytraced** (--raytrace) |
 |--------|--------------------------|----------------------------|
 | **Activation** | `./glint.exe --render out.png` | `./glint.exe --render out.png --raytrace` |
-| **Performance** | ⚡ Real-time (< 1 second) | 🐌 Offline (30+ seconds) |
-| **Glass Support** | ❌ **NO REFRACTION** | ✅ **FULL REFRACTION** |
-| **Transmission** | ❌ **IGNORED** | ✅ **FULLY SUPPORTED** |
+| **Performance** |  Real-time (< 1 second) |  Offline (30+ seconds) |
+| **Glass Support** |  **NO REFRACTION** |  **FULL REFRACTION** |
+| **Transmission** |  **IGNORED** |  **FULLY SUPPORTED** |
 | **Files Used** | `pbr.frag`, `standard.frag` | `raytracer.cpp`, `refraction.cpp` |
 | **Material Fields** | `baseColorFactor`, `ior` (F0 only) | `material.ior`, `material.transmission` |
 

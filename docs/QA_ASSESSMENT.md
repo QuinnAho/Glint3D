@@ -814,12 +814,12 @@ tests/scripts/run_golden_tests.sh      # Visual regression tests
 - Automated golden generation if references missing
 
 CI Integration (implemented)
-- ✅ `validate-golden-images` job in .github/workflows/ci.yml with SSIM comparison and artifact upload
-- ✅ Automated golden generation if references missing
-- ✅ Python-based comparison with configurable thresholds (desktop: SSIM≥0.995 OR Δ≤2 LSB, web: SSIM≥0.990)
-- ✅ Comprehensive test coverage: 5 core scenes covering lighting, camera, tone mapping
-- ✅ Failure artifacts: diff images, heatmaps, JSON reports with detailed metrics
-- ✅ Workflow dispatch job (regen-goldens-linux) for candidate generation and review
+-  `validate-golden-images` job in .github/workflows/ci.yml with SSIM comparison and artifact upload
+-  Automated golden generation if references missing
+-  Python-based comparison with configurable thresholds (desktop: SSIM≥0.995 OR Δ≤2 LSB, web: SSIM≥0.990)
+-  Comprehensive test coverage: 5 core scenes covering lighting, camera, tone mapping
+-  Failure artifacts: diff images, heatmaps, JSON reports with detailed metrics
+-  Workflow dispatch job (regen-goldens-linux) for candidate generation and review
 
 ---
 
@@ -897,7 +897,7 @@ When developing new features, keep the graphics API evolution in mind:
 ## IMPLEMENTED FEATURES - BRDF TESTING SYSTEM
 
 ### Cook-Torrance BRDF Implementation
-**Status**: FULLY IMPLEMENTED AND TESTED ✅  
+**Status**: FULLY IMPLEMENTED AND TESTED  
 **Priority**: High (Complete)
 **Location**: `engine/src/brdf.cpp`, `engine/include/brdf.h` (integrated in `engine/src/raytracer.cpp`)
 
@@ -937,7 +937,7 @@ When developing new features, keep the graphics API evolution in mind:
 ## IMPLEMENTED FEATURES - GOLDEN IMAGE CI
 
 ### Golden Image Testing System
-**Status**: FULLY IMPLEMENTED ✅  
+**Status**: FULLY IMPLEMENTED   
 **Priority**: High (Complete)
 **Documentation**: `docs/GOLDEN_IMAGE_CI.md`
 

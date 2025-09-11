@@ -6,9 +6,9 @@ The Golden Image CI system provides automated visual regression testing for Glin
 
 ## Acceptance Criteria
 
-✅ **Desktop Comparison**: SSIM ≥ 0.995 OR per-channel Δ ≤ 2 LSB  
-✅ **Web vs Desktop**: SSIM ≥ 0.990  
-✅ **CI Artifacts**: Diff images + heatmaps uploaded on failure
+ **Desktop Comparison**: SSIM ≥ 0.995 OR per-channel Δ ≤ 2 LSB  
+ **Web vs Desktop**: SSIM ≥ 0.990  
+ **CI Artifacts**: Diff images + heatmaps uploaded on failure
 
 ## System Architecture
 
@@ -45,7 +45,7 @@ graph TD
     F -->|Yes| G[Compare Against Goldens]
     F -->|No| H[Generate Initial Goldens]
     G --> I{All Comparisons Pass?}
-    I -->|Yes| J[✅ Success]
+    I -->|Yes| J[Success]
     I -->|No| K[Upload Diff Artifacts]
     K --> L[❌ Fail Build]
     H --> M[Upload Initial Goldens]
@@ -258,12 +258,12 @@ Default test resolution: 400x300 pixels
 
 ### Scene Coverage
 Current test scenes cover:
-- ✅ Point/Directional/Spot lighting
-- ✅ Camera presets and positioning  
-- ✅ Tone mapping and exposure
-- ❌ Material variations (future)
-- ❌ Complex geometry (future)
-- ❌ Animation/temporal consistency (future)
+-  Point/Directional/Spot lighting
+-  Camera presets and positioning  
+-  Tone mapping and exposure
+-  Material variations (future)
+-  Complex geometry (future)
+-  Animation/temporal consistency (future)
 
 ## Integration with Development Workflow
 

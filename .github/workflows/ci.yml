@@ -272,9 +272,9 @@ jobs:
           print(f'Failed: {data[\"total_comparisons\"] - data[\"passed_comparisons\"]}')
           for result in data['results']:
               if not result['passed']:
-                  print(f'❌ {result[\"filename\"]}: SSIM={result[\"ssim_score\"]:.4f}, MaxΔ={result[\"max_channel_diff\"]}')
+                  print(f' {result[\"filename\"]}: SSIM={result[\"ssim_score\"]:.4f}, MaxΔ={result[\"max_channel_diff\"]}')
               else:
-                  print(f'✅ {result[\"filename\"]}: SSIM={result[\"ssim_score\"]:.4f}, MaxΔ={result[\"max_channel_diff\"]}')
+                  print(f' {result[\"filename\"]}: SSIM={result[\"ssim_score\"]:.4f}, MaxΔ={result[\"max_channel_diff\"]}')
           "
             fi
           fi

@@ -36,7 +36,7 @@ if [ ! -f "builds/desktop/cmake/glint" ] && [ ! -f "builds/desktop/cmake/Release
     cmake -S ../../.. -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles"
     cmake --build . --config Release -j
     cd ../../..
-    echo -e "${GREEN}✅ Build completed${NC}"
+    echo -e "${GREEN} Build completed${NC}"
     echo
 fi
 
@@ -48,9 +48,9 @@ echo -e "${BLUE}1. Running Unit Tests${NC}"
 echo "---------------------"
 if tests/scripts/run_unit_tests.sh > tests/results/logs/unit_tests.log 2>&1; then
     UNIT_TESTS_PASSED=1
-    echo -e "${GREEN}✅ Unit tests passed${NC}"
+    echo -e "${GREEN} Unit tests passed${NC}"
 else
-    echo -e "${RED}❌ Unit tests failed${NC}"
+    echo -e "${RED} Unit tests failed${NC}"
     echo "Check tests/results/logs/unit_tests.log for details"
 fi
 echo
@@ -60,9 +60,9 @@ echo -e "${BLUE}2. Running Integration Tests${NC}"
 echo "----------------------------"
 if tests/scripts/run_integration_tests.sh > tests/results/logs/integration_tests.log 2>&1; then
     INTEGRATION_TESTS_PASSED=1
-    echo -e "${GREEN}✅ Integration tests passed${NC}"
+    echo -e "${GREEN} Integration tests passed${NC}"
 else
-    echo -e "${RED}❌ Integration tests failed${NC}"
+    echo -e "${RED} Integration tests failed${NC}"
     echo "Check tests/results/logs/integration_tests.log for details"
 fi
 echo
@@ -72,9 +72,9 @@ echo -e "${BLUE}3. Running Security Tests${NC}"
 echo "-------------------------"
 if tests/scripts/run_security_tests.sh > tests/results/logs/security_tests.log 2>&1; then
     SECURITY_TESTS_PASSED=1
-    echo -e "${GREEN}✅ Security tests passed${NC}"
+    echo -e "${GREEN} Security tests passed${NC}"
 else
-    echo -e "${RED}❌ Security tests failed${NC}"
+    echo -e "${RED} Security tests failed${NC}"
     echo "Check tests/results/logs/security_tests.log for details"
 fi
 echo
@@ -84,9 +84,9 @@ echo -e "${BLUE}4. Running Golden Image Tests${NC}"
 echo "-----------------------------"
 if tests/scripts/run_golden_tests.sh > tests/results/logs/golden_tests.log 2>&1; then
     GOLDEN_TESTS_PASSED=1
-    echo -e "${GREEN}✅ Golden image tests passed${NC}"
+    echo -e "${GREEN} Golden image tests passed${NC}"
 else
-    echo -e "${RED}❌ Golden image tests failed${NC}"
+    echo -e "${RED} Golden image tests failed${NC}"
     echo "Check tests/results/logs/golden_tests.log for details"
 fi
 echo
@@ -98,10 +98,10 @@ TOTAL_TIME=$((TEST_END_TIME - TEST_START_TIME))
 echo "=============================="
 echo -e "${BLUE}🧪 Test Suite Summary${NC}"
 echo "=============================="
-echo -e "Unit Tests:        $([ $UNIT_TESTS_PASSED -eq 1 ] && echo -e "${GREEN}✅ PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
-echo -e "Integration Tests: $([ $INTEGRATION_TESTS_PASSED -eq 1 ] && echo -e "${GREEN}✅ PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
-echo -e "Security Tests:    $([ $SECURITY_TESTS_PASSED -eq 1 ] && echo -e "${GREEN}✅ PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
-echo -e "Golden Image Tests:$([ $GOLDEN_TESTS_PASSED -eq 1 ] && echo -e "${GREEN}✅ PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
+echo -e "Unit Tests:        $([ $UNIT_TESTS_PASSED -eq 1 ] && echo -e "${GREEN} PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
+echo -e "Integration Tests: $([ $INTEGRATION_TESTS_PASSED -eq 1 ] && echo -e "${GREEN} PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
+echo -e "Security Tests:    $([ $SECURITY_TESTS_PASSED -eq 1 ] && echo -e "${GREEN} PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
+echo -e "Golden Image Tests:$([ $GOLDEN_TESTS_PASSED -eq 1 ] && echo -e "${GREEN} PASS${NC}" || echo -e "${RED}❌ FAIL${NC}")"
 echo
 echo "Total execution time: ${TOTAL_TIME}s"
 echo "Results saved to: tests/results/"
