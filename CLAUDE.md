@@ -40,7 +40,7 @@ emrun --no_browser --port 8080 builds/web/emscripten/glint.html
 
 ### Web UI (React/Tailwind)
 ```bash
-cd web
+cd platforms/web
 npm install
 npm run dev
 # Web UI hosts the engine (WASM) and communicates via JSON Ops
@@ -64,7 +64,7 @@ npm run build:web    # Build production frontend only
 
 ### Component Structure
 ```
-web/src/
+platforms/web/src/
 ├── App.tsx                 # Main application layout with grid system
 ├── components/
 │   ├── CanvasHost.tsx      # WebGL canvas initialization and engine loading
@@ -73,7 +73,7 @@ web/src/
 │   ├── CommandPalette.tsx  # Keyboard shortcuts and quick actions
 │   └── TopBar.tsx          # Theme toggle, share link, and navigation
 ├── sdk/
-│   └── viewer.ts           # Legacy Emscripten bridge (use @glint3d/wasm-bindings)
+│   └── viewer.ts           # Legacy Emscripten bridge (use @glint3d/web-sdk)
 └── main.tsx               # React app entry point
 ```
 
@@ -99,10 +99,10 @@ web/src/
 - **Vite**: Modern dev server on port 5173 with React plugin
 - **Tauri**: Desktop app configuration with 1280x800 default window
 - **Emscripten**: CMake build system generating web-compatible artifacts
-- **Asset Copying**: Engine build artifacts copied to `web/public/engine/`
+- **Asset Copying**: Engine build artifacts copied to `platforms/web/public/engine/`
 
 ### Deployment Status
-- **Web**: Ready for static hosting (build outputs to `web/dist/`)
+- **Web**: Ready for static hosting (build outputs to `platforms/web/dist/`)
 - **Desktop**: Tauri bundle ready for cross-platform distribution
 - **CI/CD**: Engine builds automatically generate web artifacts
 - **Asset Management**: Engine assets (models, textures, shaders) properly bundled

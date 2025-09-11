@@ -1,4 +1,4 @@
-#include "panels/scene_tree_panel.h"
+#include "../include_panels/scene_tree_panel.h"
 
 #ifndef WEB_USE_HTML_UI
 #include "imgui.h"

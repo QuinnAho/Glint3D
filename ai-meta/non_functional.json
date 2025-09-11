@@ -1,0 +1,124 @@
+{
+  "version": "1.0.0",
+  "description": "Non-functional requirements and quality attributes for Glint3D",
+  "performance": {
+    "rendering": {
+      "desktop_targets": {
+        "frame_time": "< 16ms @ 1080p",
+        "startup_time": "< 3s cold start",
+        "memory_usage": "< 2GB for typical scenes",
+        "draw_calls": "< 5000 per frame",
+        "triangle_budget": "< 15M visible triangles"
+      },
+      "web_targets": {
+        "frame_time": "< 33ms @ 720p",
+        "startup_time": "< 5s including WASM load",
+        "memory_usage": "< 512MB heap + 256MB WASM",
+        "bundle_size": "< 5MB WASM + assets",
+        "initial_load": "< 2MB critical path"
+      },
+      "quality_metrics": {
+        "visual_fidelity": "SSIM > 0.995 vs reference",
+        "determinism": "Identical output across runs",
+        "cross_platform": "Max 2 LSB difference between platforms"
+      }
+    },
+    "scalability": {
+      "scene_complexity": {
+        "max_objects": 10000,
+        "max_lights": 256,
+        "max_materials": 1000,
+        "max_texture_resolution": "4K on desktop, 2K on web"
+      },
+      "concurrent_users": {
+        "desktop": "Single user per instance",
+        "web": "1000+ concurrent sessions (server dependent)"
+      }
+    }
+  },
+  "reliability": {
+    "availability": {
+      "desktop": "99.9% uptime excluding user-initiated shutdowns",
+      "web": "99.99% availability (CDN + redundant hosting)"
+    },
+    "error_handling": {
+      "graceful_degradation": "Fallback to lower quality on resource constraints",
+      "error_recovery": "Scene state preserved on non-critical failures",
+      "crash_recovery": "Auto-save scene state every 30s"
+    },
+    "data_integrity": {
+      "scene_serialization": "Lossless round-trip for all supported formats",
+      "asset_validation": "Hash-based integrity checking",
+      "transaction_safety": "Atomic operations with rollback on failure"
+    }
+  },
+  "usability": {
+    "accessibility": {
+      "keyboard_navigation": "Full functionality without mouse",
+      "screen_readers": "ARIA labels on all interactive elements",
+      "color_blind_support": "No color-only information encoding",
+      "internationalization": "UTF-8 support, RTL-ready layout"
+    },
+    "user_experience": {
+      "responsive_design": "Adaptive layout for 1024x768 to 4K displays",
+      "loading_states": "Progress indicators for operations > 1s",
+      "error_messaging": "Human-readable error descriptions with suggested actions",
+      "undo_redo": "Unlimited history for all user operations"
+    }
+  },
+  "security": {
+    "data_protection": {
+      "asset_sandboxing": "All file access bounded by asset root",
+      "shader_validation": "Static analysis prevents code injection",
+      "memory_safety": "No buffer overruns or use-after-free"
+    },
+    "network_security": {
+      "no_external_dependencies": "Engine core has no network access",
+      "secure_sharing": "Scene URLs use client-side encryption",
+      "cors_compliance": "Proper origin validation for web embedding"
+    },
+    "privacy": {
+      "no_telemetry": "No usage tracking without explicit consent",
+      "local_storage": "Scene data never leaves user device by default",
+      "anonymization": "Share links contain no personally identifiable information"
+    }
+  },
+  "maintainability": {
+    "code_quality": {
+      "test_coverage": "> 80% line coverage for engine core",
+      "static_analysis": "Zero warnings on highest warning level",
+      "documentation": "All public APIs have JSDoc/Doxygen comments",
+      "code_style": "Consistent formatting via automated tools"
+    },
+    "architecture": {
+      "layer_isolation": "Zero circular dependencies between layers",
+      "interface_stability": "Semantic versioning for all public APIs",
+      "dependency_management": "Pinned versions for all external dependencies",
+      "build_reproducibility": "Identical outputs from identical inputs"
+    },
+    "ai_maintainability": {
+      "intent_coverage": "All user workflows expressible via SDK intents",
+      "schema_validation": "All operations validated against machine-readable schemas",
+      "constraint_enforcement": "Architectural rules checked automatically",
+      "change_isolation": "Local changes don't require understanding entire codebase"
+    }
+  },
+  "portability": {
+    "platforms": {
+      "desktop": ["Windows 10+", "macOS 10.15+", "Ubuntu 18.04+"],
+      "web": ["Chrome 80+", "Firefox 75+", "Safari 13+", "Edge 80+"],
+      "mobile": "Planned for future versions"
+    },
+    "hardware": {
+      "minimum_gpu": "OpenGL 3.3 / WebGL 2.0 support",
+      "recommended_gpu": "Dedicated GPU with 4GB VRAM",
+      "cpu_requirements": "Dual-core 2.5GHz or equivalent",
+      "memory_requirements": "8GB RAM (4GB available to application)"
+    },
+    "deployment": {
+      "packaging": "Single executable (desktop) or static files (web)",
+      "dependencies": "Self-contained with optional system libraries",
+      "configuration": "Zero-config default, file-based customization"
+    }
+  }
+}

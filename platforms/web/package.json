@@ -1,9 +1,9 @@
 {
-  "name": "@glint3d/web",
+  "name": "glint3d-web-platform",
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "description": "Glint3D web frontend - React/TypeScript UI for WebGL2 3D viewer",
+  "description": "Glint3D Web Platform - React + Emscripten integration",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -16,6 +16,7 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
+    "@glint3d/web-sdk": "file:../../sdk/web",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "@tauri-apps/api": "^1.6.0"

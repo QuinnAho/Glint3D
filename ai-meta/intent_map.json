@@ -1,0 +1,114 @@
+{
+  "version": "1.0.0",
+  "description": "Machine-readable map of AI interaction intents and their implementations",
+  "intents": {
+    "scene_manipulation": {
+      "description": "Operations for modifying 3D scene content",
+      "entry_points": [
+        "sdk/web/glint3d.ts:loadModel",
+        "sdk/web/glint3d.ts:duplicateObject", 
+        "sdk/web/glint3d.ts:removeObject",
+        "sdk/web/glint3d.ts:setObjectTransform",
+        "sdk/web/glint3d.ts:setObjectMaterial"
+      ],
+      "schemas": ["schemas/json_ops_v2.json#/definitions/Operation"],
+      "implementation": "engine/src/json_ops.cpp",
+      "test_coverage": "tests/integration/json_ops/basic/",
+      "ai_guidance": "Use these for adding/modifying/removing 3D objects in scenes"
+    },
+    "lighting_control": {
+      "description": "Operations for managing scene lighting",
+      "entry_points": [
+        "sdk/web/glint3d.ts:addLight",
+        "sdk/web/glint3d.ts:updateLight",
+        "sdk/web/glint3d.ts:removeLight"
+      ],
+      "schemas": ["schemas/json_ops_v2.json#/definitions/Light"],
+      "implementation": "engine/src/json_ops.cpp",
+      "test_coverage": "tests/integration/json_ops/lighting/",
+      "ai_guidance": "Use these for adding/modifying point, directional, and spot lights"
+    },
+    "camera_control": {
+      "description": "Operations for camera positioning and settings",
+      "entry_points": [
+        "sdk/web/glint3d.ts:setCamera",
+        "sdk/web/glint3d.ts:setCameraPreset"
+      ],
+      "schemas": ["schemas/json_ops_v2.json#/definitions/Camera"],
+      "implementation": "engine/src/json_ops.cpp",
+      "test_coverage": "tests/integration/json_ops/camera/",
+      "ai_guidance": "Use these for positioning camera and setting standard viewpoints"
+    },
+    "rendering_output": {
+      "description": "Operations for generating rendered images",
+      "entry_points": [
+        "sdk/web/glint3d.ts:render",
+        "sdk/web/glint3d.ts:renderToFile"
+      ],
+      "schemas": ["schemas/json_ops_v2.json"],
+      "implementation": "engine/src/render_offscreen.cpp",
+      "test_coverage": "tests/integration/rendering/",
+      "ai_guidance": "Use these for generating final rendered output with specified quality settings"
+    },
+    "scene_state": {
+      "description": "Operations for scene serialization and state management", 
+      "entry_points": [
+        "sdk/web/glint3d.ts:getScene",
+        "sdk/web/glint3d.ts:importScene",
+        "sdk/web/glint3d.ts:exportScene"
+      ],
+      "schemas": ["schemas/json_ops_v2.json"],
+      "implementation": "engine/src/json_ops.cpp",
+      "test_coverage": "tests/integration/json_ops/",
+      "ai_guidance": "Use these for saving/loading complete scene configurations"
+    },
+    "material_system": {
+      "description": "Operations for PBR material assignment and editing",
+      "entry_points": [
+        "sdk/web/glint3d.ts:setObjectMaterial"
+      ],
+      "schemas": ["schemas/json_ops_v2.json#/definitions/Material"],
+      "implementation": "engine/src/json_ops.cpp",
+      "test_coverage": "tests/integration/json_ops/materials/",
+      "ai_guidance": "Use these for setting PBR material properties including glass/transmission effects"
+    }
+  },
+  "common_workflows": {
+    "basic_scene_setup": {
+      "description": "Load model, add lighting, position camera, render",
+      "steps": ["load_model", "add_light", "set_camera", "render"],
+      "example": "tests/integration/json_ops/basic/basic_scene_workflow.json"
+    },
+    "glass_material_demo": {
+      "description": "Setup transparent/refractive materials with proper lighting",
+      "steps": ["load_model", "set_object_material", "add_light", "set_camera", "render"],
+      "notes": "Requires raytracing mode for proper refraction",
+      "example": "tests/integration/json_ops/materials/glass_demo.json"
+    },
+    "lighting_study": {
+      "description": "Compare different lighting setups on same geometry",
+      "steps": ["load_model", "add_light", "render", "update_light", "render"],
+      "example": "tests/integration/json_ops/lighting/lighting_comparison.json"
+    }
+  },
+  "ai_development_guidelines": {
+    "preferred_entry_points": [
+      "Use SDK intents over direct JSON Ops when possible",
+      "Use schemas for validation before implementation",
+      "Check test coverage before modifying workflows",
+      "Verify constraint compliance via tools/arch_check.py"
+    ],
+    "debugging_approach": [
+      "Start with unit tests for isolated components", 
+      "Use golden tests for visual regression detection",
+      "Check security tests for path traversal protection",
+      "Validate performance via determinism tests"
+    ],
+    "extension_patterns": [
+      "Add new intents to SDK first, then implement in engine",
+      "Update schemas before adding new operations",
+      "Add test coverage for new functionality",
+      "Update this intent map when adding new entry points"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "architecture": {
+    "layers": {
+      "engine": {
+        "description": "Core C++ engine with RHI abstraction",
+        "dependencies": ["external"],
+        "forbidden_dependencies": ["platforms", "ui", "sdk"],
+        "public_headers": ["engine/include/glint3d/"],
+        "stability": "stable"
+      },
+      "platforms": {
+        "description": "Platform-specific integration code",
+        "dependencies": ["engine"],
+        "forbidden_dependencies": ["ui", "sdk"],
+        "stability": "stable"
+      },
+      "ui": {
+        "description": "User interface implementations",
+        "dependencies": ["sdk", "platforms"],
+        "forbidden_dependencies": ["engine"],
+        "stability": "evolving"
+      },
+      "sdk": {
+        "description": "Versioned APIs for external consumption",
+        "dependencies": ["schemas"],
+        "forbidden_dependencies": ["engine", "platforms", "ui"],
+        "stability": "stable"
+      },
+      "schemas": {
+        "description": "JSON schemas and contracts",
+        "dependencies": [],
+        "forbidden_dependencies": ["*"],
+        "stability": "stable"
+      }
+    },
+    "dependency_rules": {
+      "one_way_only": true,
+      "no_circular_deps": true,
+      "explicit_interfaces": true,
+      "versioned_contracts": true
+    }
+  },
+  "naming_conventions": {
+    "directories": "snake_case",
+    "files": "snake_case",
+    "classes": "PascalCase",
+    "functions": "camelCase",
+    "constants": "UPPER_SNAKE_CASE",
+    "interfaces": "IPascalCase"
+  },
+  "file_patterns": {
+    "headers": "*.h",
+    "sources": "*.cpp",
+    "shaders": "*.vert|*.frag|*.glsl",
+    "schemas": "*.json",
+    "configs": "*.json|*.yaml|*.toml"
+  },
+  "security_boundaries": {
+    "asset_loading": {
+      "description": "All file operations must respect asset root boundaries",
+      "enforcement": "runtime_validation",
+      "violation_action": "error_and_log"
+    },
+    "shader_compilation": {
+      "description": "Only vetted shader sources allowed",
+      "enforcement": "build_time_validation",
+      "violation_action": "build_failure"
+    },
+    "network_access": {
+      "description": "No network operations in engine core",
+      "enforcement": "static_analysis",
+      "violation_action": "ci_failure"
+    }
+  },
+  "performance_constraints": {
+    "frame_budget": {
+      "desktop": "16ms",
+      "web": "33ms"
+    },
+    "memory_budget": {
+      "desktop": "2GB",
+      "web": "512MB"
+    },
+    "binary_size": {
+      "desktop": "100MB",
+      "web": "5MB"
+    }
+  }
+}

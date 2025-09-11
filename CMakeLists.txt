@@ -17,7 +17,7 @@ set(SRC_DIR engine/src)
 set(IMGUI_DIR engine)
 
 set(APP_SOURCES
-    ${SRC_DIR}/main.cpp
+    platforms/desktop/main.cpp
     ${SRC_DIR}/application_core.cpp
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
@@ -28,7 +28,6 @@ set(APP_SOURCES
     ${SRC_DIR}/render_settings.cpp
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
-    ${SRC_DIR}/imgui_ui_layer.cpp
     # ${SRC_DIR}/render_offscreen.cpp  # legacy (Application-based); excluded from build
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
@@ -56,7 +55,7 @@ set(APP_SOURCES
     ${SRC_DIR}/refraction.cpp
     ${SRC_DIR}/file_dialog.cpp
     ${SRC_DIR}/image_io.cpp
-    ${SRC_DIR}/panels/scene_tree_panel.cpp
+    platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
     ${SRC_DIR}/render-pass.cpp
@@ -76,7 +75,6 @@ set(CORE_SOURCES
     ${SRC_DIR}/cli_parser.cpp
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
-    ${SRC_DIR}/imgui_ui_layer.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
@@ -104,7 +102,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/refraction.cpp
     ${SRC_DIR}/file_dialog.cpp
     ${SRC_DIR}/image_io.cpp
-    ${SRC_DIR}/panels/scene_tree_panel.cpp
+    platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
     ${SRC_DIR}/render-pass.cpp
@@ -119,8 +117,9 @@ set(IMGUI_SOURCES
     engine/libraries/include/imgui/imgui_draw.cpp
     engine/libraries/include/imgui/imgui_tables.cpp
     engine/libraries/include/imgui/imgui_widgets.cpp
-    ${IMGUI_DIR}/imgui_impl_glfw.cpp
-    ${IMGUI_DIR}/imgui_impl_opengl3.cpp
+    platforms/desktop/imgui/imgui_impl_glfw.cpp
+    platforms/desktop/imgui/imgui_impl_opengl3.cpp
+    platforms/desktop/imgui_ui_layer.cpp
 )
 
 # Web (Emscripten) build
@@ -138,6 +137,9 @@ if (EMSCRIPTEN)
     target_include_directories(glint_core PUBLIC
         engine/include
         engine
+        platforms/desktop
+        platforms/desktop/imgui
+        platforms/desktop/include_panels
         engine/libraries/include
         engine/libraries/include/stb
         engine/libraries/include/imgui
@@ -152,6 +154,9 @@ if (EMSCRIPTEN)
     target_include_directories(glint PRIVATE
         engine/include
         engine
+        platforms/desktop
+        platforms/desktop/imgui
+        platforms/desktop/include_panels
         engine/libraries/include
         engine/libraries/include/stb
         engine/libraries/include/imgui
@@ -205,6 +210,9 @@ else()
     target_include_directories(glint_core PUBLIC
         engine/include
         engine
+        platforms/desktop
+        platforms/desktop/imgui
+        platforms/desktop/include_panels
         engine/libraries/include
         engine/libraries/include/stb
         engine/libraries/include/imgui
@@ -219,6 +227,9 @@ else()
     target_include_directories(glint PRIVATE
         engine/include
         engine
+        platforms/desktop
+        platforms/desktop/imgui
+        platforms/desktop/include_panels
         engine/libraries/include
         engine/libraries/include/stb
         engine/libraries/include/imgui

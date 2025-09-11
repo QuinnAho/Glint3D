@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Glint3D Configuration Schema",
+  "description": "Configuration schema for Glint3D engine settings and build parameters",
+  "type": "object",
+  "properties": {
+    "engine": {
+      "type": "object",
+      "properties": {
+        "renderMode": {
+          "type": "string",
+          "enum": ["raster", "ray", "auto"],
+          "default": "auto"
+        },
+        "assetRoot": {
+          "type": "string",
+          "description": "Root directory for asset loading (security boundary)"
+        },
+        "maxTextureSize": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 8192,
+          "default": 2048
+        },
+        "enableDenoising": {
+          "type": "boolean",
+          "default": true
+        },
+        "debug": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "properties": {
+        "defaultWidth": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096,
+          "default": 1024
+        },
+        "defaultHeight": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096,
+          "default": 1024
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 16
+        },
+        "maxBounces": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "default": 8
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "auto"],
+          "default": "auto"
+        },
+        "showPerformanceHUD": {
+          "type": "boolean",
+          "default": false
+        },
+        "enableHotReload": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
-#include "imgui_ui_layer.h"
+#include "imgui/imgui_ui_layer.h"
 #include "ui_bridge.h"
-#include "panels/scene_tree_panel.h"
+#include "include_panels/scene_tree_panel.h"
 #include "gl_platform.h"
 #include "render_utils.h"
 #include <GLFW/glfw3.h>

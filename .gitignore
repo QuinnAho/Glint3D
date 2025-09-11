@@ -149,3 +149,4 @@ packages/*/coverage/
 web/coverage/
 
 # ... any other build or large files you don't want ...
+node_modules
