@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <memory>
-#include "material-core.h"
+#include "material_core.h"
 
 // Forward declarations
 class SceneManager;

@@ -2,8 +2,8 @@
 #include "clock.h"
 #include "render_utils.h"
 #include "cli_parser.h"
-#include "render-mode-selector.h"
-#include "material-core.h"
+#include "render_mode_selector.h"
+#include "material_core.h"
 #include "scene_manager.h"
 #include "path_security.h"
 #include <string>

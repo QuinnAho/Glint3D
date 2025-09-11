@@ -268,15 +268,15 @@ public:
 **Files Added**:
 ```
 engine/include/rhi/rhi.h                     RHI interface
-engine/include/rhi/rhi-types.h               Type definitions  
+engine/include/rhi/rhi_types.h               Type definitions
 engine/include/rhi/rhi_gl.h                  OpenGL backend header
 engine/src/rhi/rhi-gl.cpp                    OpenGL implementation
-engine/include/material-core.h               Unified materials
-engine/src/material-core.cpp                 Material utilities
-engine/include/render-pass.h                 Pass system
-engine/src/render-pass.cpp                   Pass implementation
-engine/include/render-mode-selector.h        Hybrid mode selector
-engine/src/render-mode-selector.cpp          Mode selection logic
+engine/include/material_core.h               Unified materials
+engine/src/material_core.cpp                 Material utilities
+engine/include/render_pass.h                 Pass system
+engine/src/render_pass.cpp                   Pass implementation
+engine/include/render_mode_selector.h        Hybrid mode selector
+engine/src/render_mode_selector.cpp          Mode selection logic
 
 **Recent Changes (since last status)**:
 - CLI: Added `--mode raster|ray|auto`; deprecated `--raytrace` in help text
@@ -314,7 +314,7 @@ Each task is designed to be a single PR with clear acceptance criteria.
 ### **Phase 1: Foundation (Week 1, Days 1-3)**
 
 #### **Task 1: Define RHI Interface**  **COMPLETED**
-**Files**: `engine/include/rhi/rhi.h`, `engine/include/rhi/rhi-types.h`
+**Files**: `engine/include/rhi/rhi.h`, `engine/include/rhi/rhi_types.h`
 
 **What was done:**
 ```cpp
@@ -407,7 +407,7 @@ public:
 ### **Phase 2: Unified Materials (Week 1, Days 4-5)**
 
 #### **Task 4: Introduce MaterialCore and Migrate SceneObject**  **COMPLETED**
-**Files**: `engine/include/material-core.h`, `engine/src/material-core.cpp`
+**Files**: `engine/include/material_core.h`, `engine/src/material_core.cpp`
 
 **What was done:**
 - Created comprehensive MaterialCore struct with complete BSDF parameter set
@@ -417,7 +417,7 @@ public:
 
 **Files implemented:**
 ```cpp
-// engine/include/material-core.h - Unified material representation
+// engine/include/material_core.h - Unified material representation
 struct MaterialCore {
     glm::vec4 baseColor{1.0f, 1.0f, 1.0f, 1.0f};
     float metallic{0.0f};
@@ -444,7 +444,7 @@ struct MaterialCore {
     void validate();
 };
 
-// engine/src/material-core.cpp - Implementation with validation logic
+// engine/src/material_core.cpp - Implementation with validation logic
 ```
 
 **Status:** Structural implementation complete. SceneObject migration pending integration with existing render system.
@@ -475,7 +475,7 @@ Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const Mater
 ### **Phase 3: Pass System (Week 2, Days 1-2)**
 
 #### **Task 6: Add Minimal RenderGraph**  **COMPLETED**
-**Files**: `engine/include/render-pass.h`, `engine/src/render-pass.cpp`
+**Files**: `engine/include/render_pass.h`, `engine/src/render_pass.cpp`
 
 **What was done:**
 - Implemented complete RenderPass base class with setup/execute/teardown lifecycle
@@ -485,7 +485,7 @@ Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const Mater
 
 **Files implemented:**
 ```cpp
-// engine/include/render-pass.h - Pass system foundation
+// engine/include/render_pass.h - Pass system foundation
 struct PassContext {
     RHI* rhi;
     const Scene* scene;
@@ -628,7 +628,7 @@ vec3 computeSSRRefractionBlurred(vec3 viewDir, vec3 normal, float ior, float tra
 ### **Phase 5: Hybrid Pipeline (Week 3, Days 1-3)**
 
 #### **Task 10: Hybrid Auto Mode + CLI Flag**  **COMPLETED**
-**Files**: `engine/include/render-mode-selector.h`, `engine/src/render-mode-selector.cpp`
+**Files**: `engine/include/render_mode_selector.h`, `engine/src/render_mode_selector.cpp`
 
 **What was done:**
 - Implemented comprehensive RenderMode enum with Raster, Ray, and Auto options
@@ -638,7 +638,7 @@ vec3 computeSSRRefractionBlurred(vec3 viewDir, vec3 normal, float ior, float tra
 
 **Files implemented:**
 ```cpp
-// engine/include/render-mode-selector.h - Intelligent pipeline selection
+// engine/include/render_mode_selector.h - Intelligent pipeline selection
 enum class RenderMode {
     Raster,     // Real-time OpenGL/WebGL
     Ray,        // Offline CPU raytracing

@@ -58,7 +58,7 @@ set(APP_SOURCES
     platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
-    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render_pass.cpp
     ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
@@ -108,7 +108,7 @@ set(CORE_SOURCES
     platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
-    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render_pass.cpp
     ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp

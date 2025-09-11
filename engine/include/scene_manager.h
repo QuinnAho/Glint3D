@@ -7,10 +7,10 @@
 #include "material.h"
 #include "light.h"
 #include "objloader.h"
-#include "Texture.h"
+#include "texture.h"
 #include "shader.h"
 #include "rhi/rhi.h"
-#include "rhi/rhi-types.h"
+#include "rhi/rhi_types.h"
 
 struct SceneObject
 {

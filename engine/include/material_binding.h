@@ -1,6 +1,6 @@
 #pragma once
 
-#include "material-core.h"
+#include "material_core.h"
 class Shader;
 
 // Bind MaterialCore fields to shader uniforms expected by pbr.frag
