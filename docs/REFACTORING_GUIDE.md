@@ -250,6 +250,9 @@ public:
 **Phase 3: Pass System (Task 6) -  COMPLETED (FOUNDATION ONLY)**
 -  **Task 6**: RenderGraph and pass types created; not wired into live render loop
 
+**Phase 4: Screen-Space Refraction (Tasks 8–9) - NOT STARTED**
+-  SSR-T and roughness-aware blur are pending; temporary transmissive blending is in place as a stopgap
+
 **Phase 5: Hybrid Pipeline (Task 10) -  PARTIAL**
 -  **Task 10**: Render mode selector implemented;
    - CLI `--mode raster|ray|auto` added; Auto selection integrated for headless renders and honored at UI startup
@@ -1297,3 +1300,77 @@ This subsection captures gaps observed in the current repo and adds concrete fol
 - Acceptance: Raster path compiles shaders via RHI, pipelines have valid `shader` handles, and no legacy shader `use()` calls remain in draw paths.
 
 Good luck with the refactor! Each milestone builds incrementally toward a modern, AI-friendly, production-ready rendering system that solves the current dual-pipeline limitations while future-proofing for next-generation graphics APIs.
+
+## Milestone Plan (A–E)
+
+The following consolidates high‑priority work with clear acceptance criteria. Where an item already exists in this guide, it is referenced rather than duplicated.
+
+### A. Blockers / High Impact
+
+- Adopt MaterialCore end‑to‑end: Replace legacy material fields in `SceneObject`; delete all converters.
+  - Acceptance: Both raster and ray read `MaterialCore`; no legacy material structs remain.
+  - Notes: Already tracked by Task 22 (MaterialCore Adoption) and Task 30 (Legacy Cleanup Plan). Ensure raytracer reads `MaterialCore` directly; remove PBR↔legacy conversions.
+
+- Wire RenderGraph into main render loop: Drive raster via GBuffer → Lighting → (SSR_T?) → Post → Readback.
+  - Acceptance: Opaque scenes match pre-graph output (± tiny FP diffs).
+  - Notes: Already tracked by Task 25 (Integrate RenderGraph). Validate parity on core scenes.
+
+- Finish SSR‑T + OIT fallback: Screen‑space refraction; weighted blended OIT for multi‑layer; alpha‑blend fallback if caps missing.
+  - Acceptance: Transmissive objects look refractive on WebGL2; logs show graceful fallback on weak devices.
+  - Notes: Builds on Task 24.5 (Transmissive Blending pre‑SSR) and Task 29 (Capability Detection). Add SSR‑T pass and WBOIT path; gate features via capability probe.
+
+- Hybrid Auto default & UI surfacing: `--mode auto` default for headless; UI toggle and “reason” text.
+  - Acceptance: Users see why Auto chose raster/ray; CLI default is Auto.
+  - Notes: UI portion overlaps with Task 26 (Hybrid Mode in UI). Update CLI default in parser/help and print selection reason in logs/UI.
+
+### B. AI‑Support & Automation
+
+- JSON Ops v2: Versioned schema, idempotent ops, explicit seed, `operationId`.
+  - Acceptance: Validator can replay ops deterministically.
+
+- REST `/jobs` (thin service): `POST /jobs` with ops → job id; `GET /jobs/{id}` status; `GET /jobs/{id}/outputs` (signed URLs/local paths).
+  - Acceptance: End‑to‑end job demo with simple queue and local FS store.
+
+- Determinism & metadata: `--seed` plumbed; write `render.json` (engine version, chosen mode, pass timings, caps).
+  - Acceptance: Same seed ⇒ same pixels within tolerance.
+  - Notes: Complements Task 28 (Determinism Harness Hook). Add `render.json` emission after readback with timings/caps.
+
+- Validator + goldens: `glint validate --suite core`; SSIM/PSNR thresholds; record pass timings.
+  - Acceptance: CI green on core scenes.
+
+### C. Web Robustness & Perf
+
+- WebGL2 compliance pass: Precision qualifiers, MRT guards, NPOT guards, float‑texture fallbacks; size‑budgeted web‑preview build.
+  - Acceptance: Core scenes run in browser; WASM meets target size (e.g., ≤7 MB gz).
+
+- Shader toolchain in CI: Build GLSL → SPIR‑V; SPIRV‑Cross to GLSL ES; reflect to verify bindings.
+  - Acceptance: CI fails on broken shaders/bindings.
+
+### D. DX & Docs
+
+- Examples & docs migration: Replace `--raytrace` with `--mode`; add Auto examples; write `docs/rendering_arch_v1.md`.
+  - Acceptance: Examples run; docs reflect final architecture.
+  - Notes: Overlaps Task 27 (CLI/Docs Migration). Ensure deprecation warning and updated samples.
+
+- Profiling & capability detection: Scoped timers per pass; capability probe; clear warnings on fallback.
+  - Acceptance: Timings appear in metadata; no crashes on limited hardware.
+  - Notes: Extends Task 29 (Capability Detection) with per‑pass timers and inclusion in `render.json`.
+
+### E. Cleanup
+
+- Remove dead code: Delete legacy material structs/converters and stray GL paths outside RhiGL.
+  - Acceptance: Repo builds clean; validator passes.
+  - Notes: Complements Task 30 (Legacy Cleanup Plan). Ensure no direct GL calls remain outside `engine/src/rhi/rhi-gl.cpp`.
+
+### Quick Wins (do these next)
+
+- Make Auto the default in headless; print the selection reason.
+- Add precision qualifiers to shaders and guard non‑WebGL2 features.
+- Add `render.json` output with mode + timings (super helpful for demos and debugging).
+- Update examples to `--mode` and include a glass scene that shows SSR vs ray.
+
+### Nice Extras (not blockers, big value)
+
+- Weighted blended OIT gives robust layered transparency without per‑pixel linked lists.
+- Embree behind a flag speeds ray mode with near‑zero integration risk.
+- Web‑preview vs desktop‑final builds keep the web light and desktop powerful.
