@@ -81,7 +81,7 @@ python generate_goldens.py builds/desktop/cmake/Release/glint.exe
 
 # Generate with custom settings
 python generate_goldens.py builds/desktop/cmake/Debug/glint.exe \
-  --asset-root engine/assets --width 512 --height 384 \
+  --asset-root assets --width 512 --height 384 \
   --summary generation_report.json
 ```
 
@@ -104,7 +104,7 @@ cmake --build builds/desktop/cmake --config Release
 
 # Generate initial golden set
 python tools/generate_goldens.py builds/desktop/cmake/Release/glint.exe \
-  --asset-root engine/assets --golden-dir examples/golden
+  --asset-root assets --golden-dir examples/golden
 ```
 
 ### Updating Goldens

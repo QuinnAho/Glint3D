@@ -1,7 +1,7 @@
 [
   {
     "op": "load",
-    "path": "engine/assets/models/sphere.obj",
+    "path": "assets/models/sphere.obj",
     "name": "TestSphere",
     "transform": {
       "position": [0, 0, 0],

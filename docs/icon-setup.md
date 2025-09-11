@@ -8,7 +8,7 @@ The Glint3D logo is embedded into the Windows executable using Windows resources
 
 ## Files
 
-- **Source Logo**: `engine/assets/img/Glint3DIcon.png` - Original PNG logo (64x64)
+- **Source Logo**: `assets/img/Glint3DIcon.png` - Original PNG logo (64x64)
 - **Windows Icon**: `engine/resources/glint3d.ico` - Converted ICO format for Windows
 - **Resource Script**: `engine/resources/glint3d.rc` - Windows resource definition
 - **Converter Tool**: `tools/create_basic_ico.py` - Python script to convert PNG to ICO
@@ -53,7 +53,7 @@ endif()
 
 If you need to update the icon:
 
-1. Replace `engine/assets/img/Glint3DIcon.png` with your new logo
+1. Replace `assets/img/Glint3DIcon.png` with your new logo
 2. Run the converter: `cd tools && python create_basic_ico.py`
 3. Rebuild the project: `cmake --build builds/desktop/cmake --config Release`
 

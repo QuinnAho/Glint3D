@@ -134,7 +134,7 @@ Examples:
   
   # Generate with custom asset root and size  
   python generate_goldens.py builds/desktop/cmake/Debug/glint.exe \\
-    --asset-root engine/assets --width 512 --height 384
+    --asset-root assets --width 512 --height 384
         """
     )
     

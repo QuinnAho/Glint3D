@@ -47,7 +47,7 @@ def create_basic_ico(png_path, ico_path):
         return False
 
 if __name__ == "__main__":
-    png_path = "../engine/assets/img/Glint3DIcon.png"
+    png_path = "../assets/img/Glint3DIcon.png"
     ico_path = "../engine/resources/glint3d.ico"
     
     if os.path.exists(png_path):

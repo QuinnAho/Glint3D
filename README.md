@@ -60,7 +60,7 @@ cmake --build builds/desktop/cmake -j
 emcmake cmake -S . -B builds/web/emscripten -DCMAKE_BUILD_TYPE=Release
 cmake --build builds/web/emscripten -j
 ```
-Open `builds/web/emscripten/glint.html` with a local web server. Assets under `engine/assets` and `engine/shaders` are preloaded.  
+Open `builds/web/emscripten/glint.html` with a local web server. Assets under `assets` and `engine/shaders` are preloaded.  
 
 ---
 
@@ -186,7 +186,7 @@ Options:
 - `engine/src/` — rendering, UI, loaders, raytracer  
 - `engine/include/` — headers  
 - `engine/shaders/` — GLSL  
-- `engine/assets/` — sample models/textures   
+- `assets/` — sample models/textures   
 - `builds/` — organized build outputs (desktop/web/vs)  
 - `examples/json-ops/` — sample JSON Ops  
 - `docs/` — JSON Ops documentation  

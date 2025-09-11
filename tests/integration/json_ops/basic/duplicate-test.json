@@ -1,7 +1,7 @@
 [
   {
     "op": "load",
-    "path": "engine/assets/models/cube.obj",
+    "path": "assets/models/cube.obj",
     "name": "OriginalCube",
     "position": [0, 0, 0]
   },

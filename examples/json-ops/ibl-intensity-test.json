@@ -1,7 +1,7 @@
 [
   {
     "op": "load",
-    "path": "engine/assets/models/Suzanne.obj",
+    "path": "assets/models/Suzanne.obj",
     "name": "MetallicSphere",
     "position": [0, 0, -3]
   },

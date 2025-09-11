@@ -574,7 +574,7 @@ void ImGuiUILayer::renderSettingsPanel(const UIState& state)
                     UICommandData cmd; cmd.command = UICommand::ApplyJsonOps; cmd.stringParam = std::string(buf); if (onCommand) onCommand(cmd);
                 } else if (bgMode == 2) {
                     // HDR stub: send current path or placeholder
-                    std::string path = state.backgroundHDRPath.empty() ? std::string("engine/assets/img/studio_small_08_4k.exr") : state.backgroundHDRPath;
+                    std::string path = state.backgroundHDRPath.empty() ? std::string("assets/img/studio_small_08_4k.exr") : state.backgroundHDRPath;
                     std::string payload = std::string("[{\"op\":\"set_background\",\"hdr\":\"") + escapeJsonString(path) + "\"}]";
                     UICommandData cmd; cmd.command = UICommand::ApplyJsonOps; cmd.stringParam = payload; if (onCommand) onCommand(cmd);
                 }
@@ -608,7 +608,7 @@ void ImGuiUILayer::renderSettingsPanel(const UIState& state)
                 // HDR/EXR path input
                 static char hdrBuf[256] = "";
                 if (std::strlen(hdrBuf) == 0) {
-                    std::string init = state.backgroundHDRPath.empty() ? std::string("engine/assets/img/studio_small_08_4k.exr") : state.backgroundHDRPath;
+                    std::string init = state.backgroundHDRPath.empty() ? std::string("assets/img/studio_small_08_4k.exr") : state.backgroundHDRPath;
                     #ifdef _WIN32
                     strncpy_s(hdrBuf, sizeof(hdrBuf), init.c_str(), _TRUNCATE);
                     #else
@@ -641,7 +641,7 @@ void ImGuiUILayer::renderSettingsPanel(const UIState& state)
                     UICommandData cmd;
                     cmd.command = UICommand::LoadHDREnvironment;
                     // Use current renderer state, or default if empty
-                    std::string path = state.backgroundHDRPath.empty() ? "engine/assets/img/studio_small_08_4k.exr" : state.backgroundHDRPath;
+                    std::string path = state.backgroundHDRPath.empty() ? "assets/img/studio_small_08_4k.exr" : state.backgroundHDRPath;
                     cmd.stringParam = path;
                     if (onCommand) onCommand(cmd);
                 }

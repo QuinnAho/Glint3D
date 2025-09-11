@@ -2,7 +2,7 @@
   "ops": [
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "sphere_r00_m00",
       "position": [-4, 2, 0],
       "scale": [0.8, 0.8, 0.8]

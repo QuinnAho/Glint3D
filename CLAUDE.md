@@ -703,7 +703,7 @@ tests/scripts/run_golden_tests.sh      # Visual regression tests
 ---
 
 ## Application Branding
-- **Logo**: Glint3D diamond icon in `engine/assets/img/Glint3DIcon.png`
+- **Logo**: Glint3D diamond icon in `assets/img/Glint3DIcon.png`
 - **Windows Icon**: Auto-converted to ICO format and embedded in executable via Windows resources
 - **Resource File**: `engine/resources/glint3d.rc` includes icon and version information
 - **Icon Regeneration**: Use `tools/create_basic_ico.py` when updating logo

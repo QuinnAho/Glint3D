@@ -1,7 +1,7 @@
 [
   {
     "op": "load",
-    "path": "engine/assets/models/Suzanne.obj",
+    "path": "assets/models/Suzanne.obj",
     "name": "Monkey",
     "position": [0, 0, -3]
   },
@@ -16,7 +16,7 @@
   },
   {
     "op": "load_hdr_environment",
-    "path": "engine/assets/img/studio_small_08_4k.exr"
+    "path": "assets/img/studio_small_08_4k.exr"
   },
   {
     "op": "set_ibl_intensity",

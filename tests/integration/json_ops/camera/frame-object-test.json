@@ -3,13 +3,13 @@
   "ops": [
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "TargetCube",
       "position": [0, 0, 0]
     },
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "OffCube",
       "position": [10, 5, 3]
     },

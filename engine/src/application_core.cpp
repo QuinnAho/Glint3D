@@ -684,10 +684,9 @@ void ApplicationCore::setWindowIcon()
     
     // Try multiple possible icon paths for different build systems
     const std::vector<std::string> iconPaths = {
-        "engine/assets/img/Glint3DIcon.png",    // CMake build from repo root
-        "assets/img/Glint3DIcon.png",           // Visual Studio build from repo root
-        "../engine/assets/img/Glint3DIcon.png", // If running from build dir
-        "../../engine/assets/img/Glint3DIcon.png" // Alternative build dir structure
+        "assets/img/Glint3DIcon.png",           // CMake build from repo root
+        "../assets/img/Glint3DIcon.png",        // If running from build dir
+        "../../assets/img/Glint3DIcon.png"      // Alternative build dir structure
     };
     
     int width, height, channels;

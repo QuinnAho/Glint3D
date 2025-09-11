@@ -190,13 +190,13 @@ if (EMSCRIPTEN)
         -sFORCE_FILESYSTEM=1
         "-sEXPORTED_FUNCTIONS=['_main','_app_apply_ops_json','_app_share_link','_app_scene_to_json','_app_is_ready']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/engine/assets@/assets"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/engine/shaders@/shaders"
     )
 
     # Optionally preload cow texture if it exists (path may vary)
-    if (EXISTS "${CMAKE_SOURCE_DIR}/engine/assets/cow-tex-fin.jpg")
-        target_link_options(glint PRIVATE "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/engine/assets/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg")
+    if (EXISTS "${CMAKE_SOURCE_DIR}/assets/textures/cow-tex-fin.jpg")
+        target_link_options(glint PRIVATE "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/assets/textures/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg")
     elseif (EXISTS "${CMAKE_SOURCE_DIR}/engine/cow-tex-fin.jpg")
         target_link_options(glint PRIVATE "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/engine/cow-tex-fin.jpg@/assets/cow-tex-fin.jpg")
     endif()

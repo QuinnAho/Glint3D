@@ -3,19 +3,19 @@
   "ops": [
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "Cube1",
       "position": [-2, 0, 0]
     },
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "Cube2",
       "position": [0, 0, 0]
     },
     {
       "op": "load",
-      "path": "engine/assets/models/cube.obj",
+      "path": "assets/models/cube.obj",
       "name": "Cube3",
       "position": [2, 0, 0]
     },
