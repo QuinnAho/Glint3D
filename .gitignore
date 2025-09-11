@@ -148,5 +148,30 @@ coverage/
 packages/*/coverage/
 web/coverage/
 
-# ... any other build or large files you don't want ...
+# Large files and temporary assets (use Git LFS for permanent large assets)
+# Note: EXR, HDR, and other large asset formats are handled by Git LFS via .gitattributes
+*.iso
+*.dmg
+*.app
+*.deb
+*.rpm
+*.msi
+*.pkg
+
+# Temporary asset generation outputs
+temp_assets/
+*_temp.*
+*_generated.*
+
+# Asset processing intermediates
+assets/processed/
+assets/cache/
+assets/temp/
+
+# OS and editor backups
+*.backup
+*.bak
+*~
+
+# Any remaining uncategorized large files or node_modules
 node_modules

@@ -1,2 +1,10 @@
 *.rlib filter=lfs diff=lfs merge=lfs -text
 *.rmeta filter=lfs diff=lfs merge=lfs -text
+# Large asset files for Git LFS
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.hdr filter=lfs diff=lfs merge=lfs -text
+*.ktx2 filter=lfs diff=lfs merge=lfs -text
+*.basis filter=lfs diff=lfs merge=lfs -text
+assets/models/*.fbx filter=lfs diff=lfs merge=lfs -text
+assets/models/*.glb filter=lfs diff=lfs merge=lfs -text
+assets/models/*.dae filter=lfs diff=lfs merge=lfs -text
