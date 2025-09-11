@@ -1,0 +1,25 @@
+# Libraries directory configuration
+# This directory should primarily contain header-only libraries and essential binary libs
+
+# Allow static libraries that are essential and small
+!include/
+!src/
+
+# Exclude vcpkg build artifacts (these are large and regenerable)
+buildtrees/
+downloads/
+packages/
+installed/
+.vs/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Only allow small essential binary files, exclude large generated ones
+*.lib
+*.dll
+*.a
+*.so
+*.dylib

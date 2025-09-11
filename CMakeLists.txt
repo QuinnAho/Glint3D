@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
+
+# Modern vcpkg integration via manifest mode
+# Users should install vcpkg globally and set CMAKE_TOOLCHAIN_FILE
+# See setup instructions in SETUP.md
+
 project(glint C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -25,7 +30,6 @@ set(APP_SOURCES
     ${SRC_DIR}/path_security.cpp
     ${SRC_DIR}/imgui_ui_layer.cpp
     # ${SRC_DIR}/render_offscreen.cpp  # legacy (Application-based); excluded from build
-    ${SRC_DIR}/ai_instructions.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
@@ -41,10 +45,9 @@ set(APP_SOURCES
     ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
-    ${SRC_DIR}/RayUtils.cpp
-    ${SRC_DIR}/BVHNode.cpp
+    ${SRC_DIR}/rayutils.cpp
+    ${SRC_DIR}/bvh_node.cpp
     ${SRC_DIR}/raytracer.cpp
-    ${SRC_DIR}/ai_bridge.cpp
     ${SRC_DIR}/assimp_loader.cpp
     ${SRC_DIR}/triangle.cpp
     ${SRC_DIR}/brdf.cpp
@@ -55,12 +58,12 @@ set(APP_SOURCES
     ${SRC_DIR}/image_io.cpp
     ${SRC_DIR}/panels/scene_tree_panel.cpp
     # New refactored rendering system
-    ${SRC_DIR}/material-core.cpp
+    ${SRC_DIR}/material_core.cpp
     ${SRC_DIR}/render-pass.cpp
-    ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
-    ${SRC_DIR}/rhi/rhi-gl.cpp
+    ${SRC_DIR}/rhi/rhi_gl.cpp
 )
 
 # Core library: expose engine without the app entry
@@ -74,7 +77,6 @@ set(CORE_SOURCES
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
     ${SRC_DIR}/imgui_ui_layer.cpp
-    ${SRC_DIR}/ai_instructions.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
@@ -90,10 +92,9 @@ set(CORE_SOURCES
     ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
-    ${SRC_DIR}/RayUtils.cpp
-    ${SRC_DIR}/BVHNode.cpp
+    ${SRC_DIR}/rayutils.cpp
+    ${SRC_DIR}/bvh_node.cpp
     ${SRC_DIR}/raytracer.cpp
-    ${SRC_DIR}/ai_bridge.cpp
     ${SRC_DIR}/assimp_loader.cpp
     ${SRC_DIR}/triangle.cpp
     ${SRC_DIR}/json_ops.cpp
@@ -105,12 +106,12 @@ set(CORE_SOURCES
     ${SRC_DIR}/image_io.cpp
     ${SRC_DIR}/panels/scene_tree_panel.cpp
     # New refactored rendering system
-    ${SRC_DIR}/material-core.cpp
+    ${SRC_DIR}/material_core.cpp
     ${SRC_DIR}/render-pass.cpp
-    ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
-    ${SRC_DIR}/rhi/rhi-gl.cpp
+    ${SRC_DIR}/rhi/rhi_gl.cpp
 )
 
 set(IMGUI_SOURCES
@@ -229,22 +230,30 @@ else()
     find_package(OpenGL REQUIRED)
 
     # GLFW (prefer config, fallback to module, then vendored/vcpkg paths)
+    # Try vcpkg's glfw3 target first
     find_package(glfw3 CONFIG QUIET)
-    if (NOT glfw3_FOUND)
-        find_package(glfw3 QUIET)
-    endif()
-
-    if (TARGET glfw OR TARGET glfw3)
-        if (TARGET glfw)
-            target_link_libraries(glint PRIVATE glfw OpenGL::GL)
-        else()
-            target_link_libraries(glint PRIVATE glfw3 OpenGL::GL)
-        endif()
+    if (glfw3_FOUND AND TARGET glfw)
+        # vcpkg provides glfw target
+        target_link_libraries(glint PRIVATE glfw OpenGL::GL)
+        message(STATUS "Found GLFW3 via vcpkg config")
+    elseif (TARGET glfw3)
+        target_link_libraries(glint PRIVATE glfw3 OpenGL::GL)
+        message(STATUS "Found GLFW3 target")
     else()
+        # Fallback to module mode
+        find_package(glfw3 QUIET)
+        if (TARGET glfw OR TARGET glfw3)
+            if (TARGET glfw)
+                target_link_libraries(glint PRIVATE glfw OpenGL::GL)
+            else()
+                target_link_libraries(glint PRIVATE glfw3 OpenGL::GL)
+            endif()
+        else()
         message(WARNING "glfw3 not found via CMake packages. Trying manual locate (vcpkg and vendored lib).")
         # Best-effort manual lookup: vcpkg + vendored lib under engine/libraries/lib
         # Cover common Windows library name variants and locations.
         set(_GLFW_HINT_DIRS
+            "${CMAKE_SOURCE_DIR}/engine/Libraries/include/vcpkg/installed/x64-windows/lib"
             "$ENV{VCPKG_ROOT}/installed/x64-windows/lib"
             "$ENV{VCPKG_ROOT}/installed/x64-windows-static/lib"
             "$ENV{GLFW_ROOT}/lib"
@@ -261,6 +270,7 @@ else()
         # Try to find headers as well (for vendored headers or vcpkg)
         find_path(GLFW3_INCLUDE_DIR GLFW/glfw3.h
             HINTS
+                "${CMAKE_SOURCE_DIR}/engine/Libraries/include/vcpkg/installed/x64-windows/include"
                 "$ENV{VCPKG_ROOT}/installed/x64-windows/include"
                 "$ENV{VCPKG_ROOT}/installed/x64-windows-static/include"
                 "$ENV{GLFW_ROOT}/include"
@@ -275,6 +285,7 @@ else()
             endif()
         else()
             message(FATAL_ERROR "glfw3 not found. Install via vcpkg and pass -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake or provide GLFW3 to CMake.")
+        endif()
         endif()
     endif()
 
@@ -298,17 +309,17 @@ else()
     if (assimp_FOUND OR Assimp_FOUND)
         if (TARGET assimp::assimp)
             target_link_libraries(glint PRIVATE assimp::assimp)
+            target_link_libraries(glint_core PRIVATE assimp::assimp)
         elseif (TARGET assimp)
             target_link_libraries(glint PRIVATE assimp)
+            target_link_libraries(glint_core PRIVATE assimp)
         endif()
         target_compile_definitions(glint PRIVATE HAVE_ASSIMP=1 USE_ASSIMP=1)
+        target_compile_definitions(glint_core PRIVATE HAVE_ASSIMP=1 USE_ASSIMP=1)
         message(STATUS "Assimp found and enabled")
     else()
-        if (UNIX AND NOT APPLE)
-            message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled. Install with: sudo apt install libassimp-dev")
-        else()
-            message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
-        endif()
+        message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
+        message(STATUS "Run the setup script to install dependencies: ./setup_dependencies.bat")
     endif()
 
     # Optional: Intel Open Image Denoise (desktop-only)

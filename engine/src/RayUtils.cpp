@@ -1,4 +1,4 @@
-#include "RayUtils.h"
+#include "rayutils.h"
 
 bool rayIntersectsAABB(
     const Ray& ray,

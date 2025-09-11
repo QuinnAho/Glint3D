@@ -89,9 +89,6 @@ struct UIState {
     // Recent files (MRU)
     std::vector<std::string> recentFiles;
 
-    // AI controls
-    bool useAI = true;
-    std::string aiEndpoint; // e.g. http://127.0.0.1:11434
 };
 
 // Command interface for UI actions
@@ -126,8 +123,6 @@ enum class UICommand {
     ApplyJsonOps,
     RenderToPNG,
     SetMSAASamples,
-    SetUseAI,
-    SetAIEndpoint,
     SetRequireRMBToMove,
     
     // UI visibility toggles
@@ -232,8 +227,6 @@ private:
     // State
     std::vector<std::string> m_consoleLog;
     bool m_previewOnly = false;
-    bool m_useAI = true;
-    std::string m_aiEndpoint;
     bool m_requireRMBToMove = true;
     int  m_selectedLightIndex = -1;
 

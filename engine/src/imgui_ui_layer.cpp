@@ -950,41 +950,6 @@ void ImGuiUILayer::renderConsole(const UIState& state)
         ImGui::PopStyleColor();
         ImGui::SameLine();
         
-        // Push controls to the right
-        float remaining_width = ImGui::GetContentRegionAvail().x;
-        float ai_controls_width = 350.0f;
-        ImGui::SameLine(remaining_width - ai_controls_width);
-        
-        // AI controls in a more compact layout
-        bool useAI = state.useAI;
-        if (ImGui::Checkbox("AI", &useAI)) {
-            UICommandData cmd; 
-            cmd.command = UICommand::SetUseAI; 
-            cmd.boolParam = useAI; 
-            if (onCommand) onCommand(cmd);
-        }
-        
-        ImGui::SameLine();
-        ImGui::Text("Endpoint:");
-        ImGui::SameLine();
-        
-        static char endpointBuf[256] = "";
-        // Sync buffer if different
-        if (endpointBuf[0] == '\0' || std::string(endpointBuf) != state.aiEndpoint) {
-            std::snprintf(endpointBuf, sizeof(endpointBuf), "%s", 
-                         state.aiEndpoint.empty() ? "http://127.0.0.1:11434" : state.aiEndpoint.c_str());
-        }
-        
-        ImGui::SetNextItemWidth(200.0f);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.13f, 0.14f, 1.00f));  // Darker input
-        if (ImGui::InputText("##ai_endpoint", endpointBuf, sizeof(endpointBuf), 
-                            ImGuiInputTextFlags_EnterReturnsTrue)) {
-            UICommandData cmd; 
-            cmd.command = UICommand::SetAIEndpoint; 
-            cmd.stringParam = std::string(endpointBuf); 
-            if (onCommand) onCommand(cmd);
-        }
-        ImGui::PopStyleColor();
         
         ImGui::Separator();
         

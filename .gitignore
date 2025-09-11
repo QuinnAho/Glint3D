@@ -119,6 +119,14 @@ imgui.ini
 *.so
 *.a
 
+# vcpkg installation and cache directories
+vcpkg/
+engine/libraries/include/vcpkg/buildtrees/
+engine/libraries/include/vcpkg/downloads/
+engine/libraries/include/vcpkg/installed/
+engine/libraries/include/vcpkg/packages/
+engine/libraries/include/vcpkg/.vs/
+
 # Large and frequently changing cache directories
 .claude/
 .claude/settings.local.json

@@ -27,8 +27,6 @@ UIBridge::UIBridge(SceneManager& scene, RenderSystem& renderer,
     , m_camera(camera)
     , m_lights(lights)
 {
-    // Default AI endpoint for local Ollama
-    m_aiEndpoint = "http://127.0.0.1:11434";
     // Initialize modular JSON ops executor for shared implementation
     m_ops = std::make_unique<JsonOpsExecutor>(m_scene, m_renderer, m_camera, m_lights);
 }
@@ -152,9 +150,6 @@ UIState UIBridge::buildUIState() const
     // Recent files MRU
     state.recentFiles = m_recentFiles;
     
-    // AI
-    state.useAI = m_useAI;
-    state.aiEndpoint = m_aiEndpoint;
     
     return state;
 }
@@ -308,12 +303,6 @@ void UIBridge::handleUICommand(const UICommandData& command)
                 m_renderer.setSampleCount(s);
                 addConsoleMessage("MSAA samples set to " + std::to_string(s));
             }
-            break;
-        case UICommand::SetUseAI:
-            m_useAI = command.boolParam;
-            break;
-        case UICommand::SetAIEndpoint:
-            m_aiEndpoint = command.stringParam;
             break;
         case UICommand::AddLight:
             {

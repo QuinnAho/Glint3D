@@ -1,0 +1,30 @@
+{
+  "name": "glint3d",
+  "version": "0.3.0",
+  "description": "Glint3D - Modern 3D Rendering Engine",
+  "homepage": "https://github.com/your-repo/glint3d",
+  "supports": "windows & linux & osx",
+  "dependencies": [
+    {
+      "name": "assimp",
+      "features": ["tools"]
+    },
+    "glfw3",
+    "glm",
+    {
+      "name": "openimagedenoise",
+      "platform": "!emscripten"
+    }
+  ],
+  "features": {
+    "web": {
+      "description": "Web/Emscripten build support",
+      "dependencies": []
+    },
+    "tools": {
+      "description": "Development tools and utilities", 
+      "dependencies": []
+    }
+  },
+  "builtin-baseline": "2024-12-01"
+}

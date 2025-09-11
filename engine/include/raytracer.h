@@ -4,7 +4,7 @@
 #include "ray.h"
 #include "objloader.h"
 #include "material.h"
-#include "BVHNode.h"
+#include "bvh_node.h"
 #include "light.h"  
 #include "microfacet_sampling.h"
 #include "raytracer_lighting.h"
