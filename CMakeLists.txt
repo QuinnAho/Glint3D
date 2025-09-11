@@ -288,43 +288,86 @@ else()
 
     # ---- Assimp on desktop only ----
     find_package(assimp CONFIG QUIET)
-    if (assimp_FOUND)
-        target_link_libraries(glint PRIVATE assimp::assimp)
+    if (NOT assimp_FOUND)
+        # Try alternative package names
+        find_package(Assimp CONFIG QUIET)
+    endif()
+    
+    if (assimp_FOUND OR Assimp_FOUND)
+        if (TARGET assimp::assimp)
+            target_link_libraries(glint PRIVATE assimp::assimp)
+        elseif (TARGET assimp)
+            target_link_libraries(glint PRIVATE assimp)
+        endif()
         target_compile_definitions(glint PRIVATE HAVE_ASSIMP=1 USE_ASSIMP=1)
+        message(STATUS "Assimp found and enabled")
     else()
-        message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
+        if (UNIX AND NOT APPLE)
+            message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled. Install with: sudo apt install libassimp-dev")
+        else()
+            message(WARNING "Assimp not found. glTF/FBX/DAE will be disabled in this build.")
+        endif()
     endif()
 
     # Optional: Intel Open Image Denoise (desktop-only)
-    # First try to find in our libraries directory
-    set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/engine/libraries/lib/cmake;${CMAKE_PREFIX_PATH}")
-    find_package(OpenImageDenoise CONFIG QUIET)
-    if (OpenImageDenoise_FOUND)
-        target_link_libraries(glint PRIVATE OpenImageDenoise)
-        target_link_libraries(glint_core PRIVATE OpenImageDenoise)
-        target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
-        target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
-        message(STATUS "OpenImageDenoise found and enabled")
-    else()
-        # Try manual lookup if package config not found
-        find_library(OIDN_LIB 
-            NAMES OpenImageDenoise
-            HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/lib"
-        )
-        find_path(OIDN_INCLUDE_DIR OpenImageDenoise/oidn.h
-            HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/include"
-        )
-        
-        if (OIDN_LIB AND OIDN_INCLUDE_DIR)
-            target_link_libraries(glint PRIVATE ${OIDN_LIB})
-            target_link_libraries(glint_core PRIVATE ${OIDN_LIB})
-            target_include_directories(glint PRIVATE ${OIDN_INCLUDE_DIR})
-            target_include_directories(glint_core PRIVATE ${OIDN_INCLUDE_DIR})
+    if (WIN32)
+        # Windows: Use our vendored libraries first
+        set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/engine/libraries/lib/cmake;${CMAKE_PREFIX_PATH}")
+        find_package(OpenImageDenoise CONFIG QUIET)
+        if (OpenImageDenoise_FOUND)
+            target_link_libraries(glint PRIVATE OpenImageDenoise)
+            target_link_libraries(glint_core PRIVATE OpenImageDenoise)
             target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
             target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
-            message(STATUS "OpenImageDenoise found manually and enabled")
+            message(STATUS "OpenImageDenoise found and enabled")
         else()
-            message(STATUS "OpenImageDenoise not found; denoiser disabled.")
+            # Try manual lookup if package config not found
+            find_library(OIDN_LIB 
+                NAMES OpenImageDenoise
+                HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/lib"
+            )
+            find_path(OIDN_INCLUDE_DIR OpenImageDenoise/oidn.h
+                HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/include"
+            )
+            
+            if (OIDN_LIB AND OIDN_INCLUDE_DIR)
+                target_link_libraries(glint PRIVATE ${OIDN_LIB})
+                target_link_libraries(glint_core PRIVATE ${OIDN_LIB})
+                target_include_directories(glint PRIVATE ${OIDN_INCLUDE_DIR})
+                target_include_directories(glint_core PRIVATE ${OIDN_INCLUDE_DIR})
+                target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
+                target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
+                message(STATUS "OpenImageDenoise found manually and enabled")
+            else()
+                message(STATUS "OpenImageDenoise not found; denoiser disabled.")
+            endif()
+        endif()
+    else()
+        # Linux/Unix: Try system packages first, then fallback to vendored
+        find_package(PkgConfig QUIET)
+        if (PkgConfig_FOUND)
+            pkg_check_modules(OIDN QUIET OpenImageDenoise)
+        endif()
+        
+        if (NOT OIDN_FOUND)
+            find_package(OpenImageDenoise CONFIG QUIET)
+        endif()
+        
+        if (OpenImageDenoise_FOUND OR OIDN_FOUND)
+            if (OpenImageDenoise_FOUND)
+                target_link_libraries(glint PRIVATE OpenImageDenoise)
+                target_link_libraries(glint_core PRIVATE OpenImageDenoise)
+            else()
+                target_link_libraries(glint PRIVATE ${OIDN_LIBRARIES})
+                target_link_libraries(glint_core PRIVATE ${OIDN_LIBRARIES})
+                target_include_directories(glint PRIVATE ${OIDN_INCLUDE_DIRS})
+                target_include_directories(glint_core PRIVATE ${OIDN_INCLUDE_DIRS})
+            endif()
+            target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
+            target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
+            message(STATUS "OpenImageDenoise found and enabled")
+        else()
+            message(STATUS "OpenImageDenoise not found; denoiser disabled. Install with: sudo apt install liboidn-dev")
         endif()
     endif()
 
@@ -366,7 +409,7 @@ if (ENABLE_EXR)
         target_sources(glint_core PRIVATE ${MINIZ_SOURCE} ${_MINIZ_EXTRA_SRC})
         # Includes already contain engine/libraries/include
     else()
-        message(WARNING "TinyEXR/miniz not found under engine/Libraries; EXR support disabled. Place tinyexr.h, miniz.h in engine/libraries/include and miniz.c in engine/libraries/src")
+        message(WARNING "TinyEXR/miniz not found under engine/libraries; EXR support disabled. Place tinyexr.h, miniz.h in engine/libraries/include and miniz.c in engine/libraries/src")
     endif()
 endif()
 
