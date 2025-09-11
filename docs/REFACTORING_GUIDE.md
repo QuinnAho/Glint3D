@@ -237,54 +237,54 @@ public:
 
 ## 3. Migration Plan - 20 Sequential Tasks
 
-### **✅ CURRENT PROGRESS SUMMARY**
+### **CURRENT PROGRESS SUMMARY**
 
-**Phase 1: Foundation (Tasks 1-3) - ✅ COMPLETED**
-- ✅ **Task 1**: RHI Interface defined with complete GPU abstraction
-- ✅ **Task 2**: RhiGL implemented with full OpenGL backend
-- ✅ **Task 3**: Build system integration completed
+**Phase 1: Foundation (Tasks 1-3) - COMPLETED**
+- **Task 1**: RHI Interface defined with complete GPU abstraction
+- **Task 2**: RhiGL implemented with full OpenGL backend
+- **Task 3**: Build system integration completed
 
-**Phase 2: Unified Materials (Task 4) - ✅ COMPLETED**  
-- ✅ **Task 4**: MaterialCore implemented with unified BSDF representation
+**Phase 2: Unified Materials (Task 4) -  COMPLETED**  
+-  **Task 4**: MaterialCore implemented with unified BSDF representation
 
-**Phase 3: Pass System (Task 6) - ✅ COMPLETED**
-- ✅ **Task 6**: RenderGraph and pass system implemented
+**Phase 3: Pass System (Task 6) -  COMPLETED**
+-  **Task 6**: RenderGraph and pass system implemented
 
-**Phase 5: Hybrid Pipeline (Task 10) - ✅ COMPLETED**
-- ✅ **Task 10**: Render mode selector with intelligent Auto mode
+**Phase 5: Hybrid Pipeline (Task 10) -  COMPLETED**
+-  **Task 10**: Render mode selector with intelligent Auto mode
 
 **Implementation Status**: **6 of 20 tasks complete (30%)**
-- ✅ **Architecture Foundation**: Complete - RHI, MaterialCore, RenderGraph, ModeSelector
-- 🔄 **Next Phase**: Integration with existing render system (Tasks 5, 7-9, 11-12)
-- ⏳ **Remaining**: Screen-space refraction, production features, platform support
+-  **Architecture Foundation**: Complete - RHI, MaterialCore, RenderGraph, ModeSelector
+-  **Next Phase**: Integration with existing render system (Tasks 5, 7-9, 11-12)
+-  **Remaining**: Screen-space refraction, production features, platform support
 
 **Files Added**:
 ```
-engine/include/rhi/rhi.h                    ✅ RHI interface
-engine/include/rhi/rhi-types.h              ✅ Type definitions  
-engine/include/rhi/rhi-gl.h                 ✅ OpenGL backend header
-engine/src/rhi/rhi-gl.cpp                   ✅ OpenGL implementation
-engine/include/material-core.h              ✅ Unified materials
-engine/src/material-core.cpp                ✅ Material utilities
-engine/include/render-pass.h                ✅ Pass system
-engine/src/render-pass.cpp                  ✅ Pass implementation
-engine/include/render-mode-selector.h       ✅ Hybrid mode selector
-engine/src/render-mode-selector.cpp         ✅ Mode selection logic
+engine/include/rhi/rhi.h                     RHI interface
+engine/include/rhi/rhi-types.h               Type definitions  
+engine/include/rhi/rhi-gl.h                  OpenGL backend header
+engine/src/rhi/rhi-gl.cpp                    OpenGL implementation
+engine/include/material-core.h               Unified materials
+engine/src/material-core.cpp                 Material utilities
+engine/include/render-pass.h                 Pass system
+engine/src/render-pass.cpp                   Pass implementation
+engine/include/render-mode-selector.h        Hybrid mode selector
+engine/src/render-mode-selector.cpp          Mode selection logic
 ```
 
 **Dependencies Added**:
 ```
-engine/libraries/include/fmt/               ✅ Fast formatting
-engine/libraries/include/spdlog/            ✅ Structured logging
-engine/libraries/include/cgltf/             ✅ Lightweight glTF
-engine/libraries/include/tinyexr/           ✅ HDR images
-engine/libraries/include/shaderc/           ✅ Shader compilation
-engine/libraries/include/spirv_cross/       ✅ Cross-compilation
-engine/libraries/include/spirv_reflect/     ✅ Reflection
-engine/libraries/include/volk/              ✅ Vulkan loader
-engine/libraries/include/VulkanMemoryAllocator/ ✅ VMA
-engine/libraries/include/embree3/           ✅ Ray acceleration
-engine/libraries/include/OpenImageDenoise/  ✅ AI denoising
+engine/libraries/include/fmt/                Fast formatting
+engine/libraries/include/spdlog/             Structured logging
+engine/libraries/include/cgltf/              Lightweight glTF
+engine/libraries/include/tinyexr/            HDR images
+engine/libraries/include/shaderc/            Shader compilation
+engine/libraries/include/spirv_cross/        Cross-compilation
+engine/libraries/include/spirv_reflect/      Reflection
+engine/libraries/include/volk/               Vulkan loader
+engine/libraries/include/VulkanMemoryAllocator/  VMA
+engine/libraries/include/embree3/            Ray acceleration
+engine/libraries/include/OpenImageDenoise/   AI denoising
 ```
 
 ---
@@ -293,7 +293,7 @@ Each task is designed to be a single PR with clear acceptance criteria.
 
 ### **Phase 1: Foundation (Week 1, Days 1-3)**
 
-#### **Task 1: Define RHI Interface** ✅ **COMPLETED**
+#### **Task 1: Define RHI Interface**  **COMPLETED**
 **Files**: `engine/include/rhi/rhi.h`, `engine/include/rhi/rhi-types.h`
 
 **What was done:**
@@ -336,7 +336,7 @@ struct TextureDesc { TextureType type; TextureFormat format; int width, height, 
 struct BufferDesc { BufferType type; BufferUsage usage; size_t size; /* etc. */ };
 ```
 
-**Status:** ✅ **COMPLETED** - Project compiles with new headers and type definitions.
+**Status:**  **COMPLETED** - Project compiles with new headers and type definitions.
 
 #### **Task 2: Implement RhiGL (Desktop OpenGL)**
 **Files**: `engine/rhi/RhiGL.h` (new), `engine/rhi/RhiGL.cpp` (new)
@@ -386,7 +386,7 @@ public:
 
 ### **Phase 2: Unified Materials (Week 1, Days 4-5)**
 
-#### **Task 4: Introduce MaterialCore and Migrate SceneObject** ✅ **COMPLETED**
+#### **Task 4: Introduce MaterialCore and Migrate SceneObject**  **COMPLETED**
 **Files**: `engine/include/material-core.h`, `engine/src/material-core.cpp`
 
 **What was done:**
@@ -454,7 +454,7 @@ Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const Mater
 
 ### **Phase 3: Pass System (Week 2, Days 1-2)**
 
-#### **Task 6: Add Minimal RenderGraph** ✅ **COMPLETED**
+#### **Task 6: Add Minimal RenderGraph**  **COMPLETED**
 **Files**: `engine/include/render-pass.h`, `engine/src/render-pass.cpp`
 
 **What was done:**
@@ -607,7 +607,7 @@ vec3 computeSSRRefractionBlurred(vec3 viewDir, vec3 normal, float ior, float tra
 
 ### **Phase 5: Hybrid Pipeline (Week 3, Days 1-3)**
 
-#### **Task 10: Hybrid Auto Mode + CLI Flag** ✅ **COMPLETED**
+#### **Task 10: Hybrid Auto Mode + CLI Flag**  **COMPLETED**
 **Files**: `engine/include/render-mode-selector.h`, `engine/src/render-mode-selector.cpp`
 
 **What was done:**
@@ -908,27 +908,27 @@ if (!caps.supportsSSR && material.transmission > 0.01f) {
 ## 5. Expected Outcomes
 
 ### User Experience Improvements
-- ✅ Glass materials work identically in both raster and ray modes
-- ✅ No need to remember `--raytrace` flag (auto mode handles it)
-- ✅ Real-time preview with offline-quality final renders
-- ✅ Consistent material behavior eliminates confusion
+-  Glass materials work identically in both raster and ray modes
+-  No need to remember `--raytrace` flag (auto mode handles it)
+-  Real-time preview with offline-quality final renders
+-  Consistent material behavior eliminates confusion
 
 ### Developer Experience Improvements
-- ✅ Single MaterialCore struct (no dual storage synchronization)
-- ✅ Clean RHI abstraction (easy to add Vulkan/WebGPU backends)
-- ✅ Modular pass system (easy to add new effects like SSS, volumetrics)
-- ✅ Comprehensive test suite (catch regressions early)
+-  Single MaterialCore struct (no dual storage synchronization)
+-  Clean RHI abstraction (easy to add Vulkan/WebGPU backends)
+-  Modular pass system (easy to add new effects like SSS, volumetrics)
+-  Comprehensive test suite (catch regressions early)
 
 ### Performance Characteristics
-- ✅ Real-time refraction via SSR-T (<16ms frame budget maintained)
-- ✅ GPU backend abstraction with minimal overhead (<5% perf cost)
-- ✅ Hybrid mode automatically balances quality vs performance
+-  Real-time refraction via SSR-T (<16ms frame budget maintained)
+-  GPU backend abstraction with minimal overhead (<5% perf cost)
+-  Hybrid mode automatically balances quality vs performance
 
 ### Technical Debt Reduction
-- ✅ Eliminate material duplication and conversion complexity
-- ✅ Replace ad-hoc rendering with structured pass system
-- ✅ Remove platform-specific rendering code paths
-- ✅ Standardize error handling and capability detection
+-  Eliminate material duplication and conversion complexity
+-  Replace ad-hoc rendering with structured pass system
+-  Remove platform-specific rendering code paths
+-  Standardize error handling and capability detection
 
 ## 6. Post-Refactor: What You'll Have Built
 
@@ -1179,28 +1179,28 @@ set(GLINT_ENABLE_WEBGPU_PREP ON)     # WebGPU headers for future
 ### Quick Milestones (Week-Sized Deliverables)
 
 #### **Week 1: Foundation**
-- ✅ RHI (OpenGL backend) + thread existing raster through it
-- ✅ MaterialCore unification + raytracer adaptation
-- 🎯 **Deliverable**: Current functionality preserved with clean abstraction
+-  RHI (OpenGL backend) + thread existing raster through it
+-  MaterialCore unification + raytracer adaptation
+-  **Deliverable**: Current functionality preserved with clean abstraction
 
 #### **Week 2: Core Features**  
-- ✅ RenderGraph (minimal pass system)
-- ✅ SSR-T implementation + roughness-aware blur
-- 🎯 **Deliverable**: Real-time glass materials in raster pipeline
+-  RenderGraph (minimal pass system)
+-  SSR-T implementation + roughness-aware blur
+-  **Deliverable**: Real-time glass materials in raster pipeline
 
 #### **Week 3: Intelligence**
-- ✅ Hybrid Auto mode + `--mode raster|ray|auto` CLI
-- ✅ JSON Ops v2 + deterministic metadata
-- 🎯 **Deliverable**: Intelligent pipeline selection, reproducible renders
+-  Hybrid Auto mode + `--mode raster|ray|auto` CLI
+-  JSON Ops v2 + deterministic metadata
+-  **Deliverable**: Intelligent pipeline selection, reproducible renders
 
 #### **Week 4: Production**
-- ✅ Validator + golden test suite + CI integration
-- ✅ REST /jobs wrapper + signed URL outputs
-- 🎯 **Deliverable**: Production-ready AI-accessible rendering service
+- Validator + golden test suite + CI integration
+- REST /jobs wrapper + signed URL outputs
+- **Deliverable**: Production-ready AI-accessible rendering service
 
 #### **Optional: Advanced Features**
-- ⚡ Intel Embree integration (2-10x faster CPU ray tracing)
-- ⚡ Vulkan/WebGPU backend preparation
-- ⚡ Advanced volume rendering (subsurface scattering, volumetrics)
+-  Intel Embree integration (2-10x faster CPU ray tracing)
+-  Vulkan/WebGPU backend preparation
+-  Advanced volume rendering (subsurface scattering, volumetrics)
 
 Good luck with the refactor! Each milestone builds incrementally toward a modern, AI-friendly, production-ready rendering system that solves the current dual-pipeline limitations while future-proofing for next-generation graphics APIs.
