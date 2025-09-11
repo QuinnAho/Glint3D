@@ -1,31 +1,12 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <random>
+#include "seeded_rng.h"
 
 namespace microfacet
 {
     // Utility class for deterministic random number generation with seed support
-    class SeededRNG
-    {
-    public:
-        explicit SeededRNG(uint32_t seed = 0) : m_rng(seed) {}
-        
-        void setSeed(uint32_t seed) { m_rng.seed(seed); }
-        
-        // Generate uniform float in [0, 1)
-        float uniform() { return m_uniform(m_rng); }
-        
-        // Generate uniform float in [0, 1) - stratified sampling helper
-        float stratified(int sample, int totalSamples, float jitter = 0.0f) {
-            float base = (float(sample) + jitter) / float(totalSamples);
-            return std::min(0.999999f, base); // Avoid exact 1.0
-        }
-        
-    private:
-        std::mt19937 m_rng;
-        std::uniform_real_distribution<float> m_uniform{0.0f, 1.0f};
-    };
+    using SeededRNG = SeededRng;
 
     // Sample a microfacet normal using Beckmann distribution
     // Returns the sampled microfacet normal in world space

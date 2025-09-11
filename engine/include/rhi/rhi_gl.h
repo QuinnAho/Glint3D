@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rhi.h"
-#include "rhi-types.h"
+#include "rhi_types.h"
 #include "../gl_platform.h"
 #include <unordered_map>
 #include <vector>

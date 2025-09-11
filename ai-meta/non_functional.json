@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "description": "Non-functional requirements and quality attributes for Glint3D",
+  "build": {
+    "toolchain": { "compiler": "msvc-19.41", "cmake": "3.30", "emscripten": "3.1.68" },
+    "flags": ["-ffast-math=off", "-fno-fast-math", "/fp:strict"]
+  },
   "performance": {
     "rendering": {
       "desktop_targets": {

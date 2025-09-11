@@ -23,8 +23,14 @@
 #include <emscripten/emscripten.h>
 #endif
 
-ApplicationCore::ApplicationCore()
+ApplicationCore::ApplicationCore(std::unique_ptr<IClock> clock)
 {
+    if (clock) {
+        m_clock = std::move(clock);
+    } else {
+        m_clock = std::make_unique<SystemClock>();
+    }
+
     // Create core systems
     m_scene = std::make_unique<SceneManager>();
     m_renderer = std::make_unique<RenderSystem>();
@@ -32,7 +38,7 @@ ApplicationCore::ApplicationCore()
     m_lights = std::make_unique<Light>();
     // Create JSON ops executor (headless + programmatic ops)
     m_ops = std::make_unique<JsonOpsExecutor>(*m_scene, *m_renderer, *m_camera, *m_lights);
-    
+
     // Create UI bridge
     m_uiBridge = std::make_unique<UIBridge>(*m_scene, *m_renderer, *m_camera, *m_lights);
 }
@@ -118,7 +124,7 @@ void ApplicationCore::frame()
 {
     glfwPollEvents();
     // Delta time
-    double now = glfwGetTime();
+    double now = m_clock ? m_clock->now() : 0.0;
     if (m_lastFrameTime == 0.0) m_lastFrameTime = now;
     float dt = static_cast<float>(now - m_lastFrameTime);
     m_lastFrameTime = now;
@@ -250,6 +256,7 @@ void ApplicationCore::setRenderSettings(const RenderSettings& settings)
         m_renderer->setSeed(settings.seed);
         m_renderer->setSampleCount(settings.samples);
     }
+    m_rng.setSeed(settings.seed);
 }
 
 const RenderSettings& ApplicationCore::getRenderSettings() const

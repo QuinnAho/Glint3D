@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include "gizmo.h"
 #include "render_settings.h"
+#include "clock.h"
+#include "seeded_rng.h"
 
 // Forward declarations
 struct GLFWwindow;
@@ -19,7 +21,7 @@ class JsonOpsExecutor;
 class ApplicationCore 
 {
 public:
-    ApplicationCore();
+    ApplicationCore(std::unique_ptr<IClock> clock = nullptr);
     ~ApplicationCore();
 
     bool init(const std::string& windowTitle, int width, int height, bool headless = false);
@@ -102,6 +104,9 @@ private:
     
     // Render settings
     RenderSettings m_renderSettings;
+
+    std::unique_ptr<IClock> m_clock;
+    SeededRng m_rng;
 
     // Gizmo state
     GizmoMode m_gizmoMode = GizmoMode::Translate;

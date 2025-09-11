@@ -1,5 +1,6 @@
 #include "rhi/rhi.h"
-#include "rhi/rhi-gl.h"
+#include "rhi/rhi_gl.h"
+#include "rhi/rhi_null.h"
 #include <memory>
 
 std::unique_ptr<RHI> createRHI(RHI::Backend backend) {
@@ -7,6 +8,8 @@ std::unique_ptr<RHI> createRHI(RHI::Backend backend) {
         case RHI::Backend::OpenGL:
         case RHI::Backend::WebGL2:
             return std::make_unique<RhiGL>();
+        case RHI::Backend::Null:
+            return std::make_unique<RhiNull>();
         
         case RHI::Backend::Vulkan:
         case RHI::Backend::WebGPU:
