@@ -54,6 +54,12 @@ set(APP_SOURCES
     ${SRC_DIR}/file_dialog.cpp
     ${SRC_DIR}/image_io.cpp
     ${SRC_DIR}/panels/scene_tree_panel.cpp
+    # New refactored rendering system
+    ${SRC_DIR}/material-core.cpp
+    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/rhi/rhi.cpp
+    ${SRC_DIR}/rhi/rhi-gl.cpp
 )
 
 # Core library: expose engine without the app entry
@@ -97,13 +103,19 @@ set(CORE_SOURCES
     ${SRC_DIR}/file_dialog.cpp
     ${SRC_DIR}/image_io.cpp
     ${SRC_DIR}/panels/scene_tree_panel.cpp
+    # New refactored rendering system
+    ${SRC_DIR}/material-core.cpp
+    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render-mode-selector.cpp
+    ${SRC_DIR}/rhi/rhi.cpp
+    ${SRC_DIR}/rhi/rhi-gl.cpp
 )
 
 set(IMGUI_SOURCES
-    engine/Libraries/include/imgui/imgui.cpp
-    engine/Libraries/include/imgui/imgui_draw.cpp
-    engine/Libraries/include/imgui/imgui_tables.cpp
-    engine/Libraries/include/imgui/imgui_widgets.cpp
+    engine/libraries/include/imgui/imgui.cpp
+    engine/libraries/include/imgui/imgui_draw.cpp
+    engine/libraries/include/imgui/imgui_tables.cpp
+    engine/libraries/include/imgui/imgui_widgets.cpp
     ${IMGUI_DIR}/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/imgui_impl_opengl3.cpp
 )
@@ -123,10 +135,10 @@ if (EMSCRIPTEN)
     target_include_directories(glint_core PUBLIC
         engine/include
         engine
-        engine/Libraries/include
-        engine/Libraries/include/stb
-        engine/Libraries/include/imgui
-        engine/Libraries/include/imgui/backends)
+        engine/libraries/include
+        engine/libraries/include/stb
+        engine/libraries/include/imgui
+        engine/libraries/include/imgui/backends)
     target_compile_definitions(glint_core PRIVATE IMGUI_IMPL_OPENGL_ES3 WEB_USE_HTML_UI=1)
 
     add_executable(glint
@@ -137,10 +149,10 @@ if (EMSCRIPTEN)
     target_include_directories(glint PRIVATE
         engine/include
         engine
-        engine/Libraries/include
-        engine/Libraries/include/stb
-        engine/Libraries/include/imgui
-        engine/Libraries/include/imgui/backends
+        engine/libraries/include
+        engine/libraries/include/stb
+        engine/libraries/include/imgui
+        engine/libraries/include/imgui/backends
     )
     target_link_libraries(glint PRIVATE glint_core)
 
@@ -190,10 +202,10 @@ else()
     target_include_directories(glint_core PUBLIC
         engine/include
         engine
-        engine/Libraries/include
-        engine/Libraries/include/stb
-        engine/Libraries/include/imgui
-        engine/Libraries/include/imgui/backends)
+        engine/libraries/include
+        engine/libraries/include/stb
+        engine/libraries/include/imgui
+        engine/libraries/include/imgui/backends)
 
     add_executable(glint
         ${APP_SOURCES}
@@ -204,10 +216,10 @@ else()
     target_include_directories(glint PRIVATE
         engine/include
         engine
-        engine/Libraries/include
-        engine/Libraries/include/stb
-        engine/Libraries/include/imgui
-        engine/Libraries/include/imgui/backends
+        engine/libraries/include
+        engine/libraries/include/stb
+        engine/libraries/include/imgui
+        engine/libraries/include/imgui/backends
     )
     target_link_libraries(glint PRIVATE glint_core)
 
@@ -228,16 +240,16 @@ else()
         endif()
     else()
         message(WARNING "glfw3 not found via CMake packages. Trying manual locate (vcpkg and vendored lib).")
-        # Best-effort manual lookup: vcpkg + vendored lib under engine/Libraries/lib
+        # Best-effort manual lookup: vcpkg + vendored lib under engine/libraries/lib
         # Cover common Windows library name variants and locations.
         set(_GLFW_HINT_DIRS
             "$ENV{VCPKG_ROOT}/installed/x64-windows/lib"
             "$ENV{VCPKG_ROOT}/installed/x64-windows-static/lib"
             "$ENV{GLFW_ROOT}/lib"
             "$ENV{GLFW_HOME}/lib"
-            "${CMAKE_SOURCE_DIR}/engine/Libraries/lib"
-            "${CMAKE_SOURCE_DIR}/engine/Libraries/lib/Release"
-            "${CMAKE_SOURCE_DIR}/engine/Libraries/lib/Debug"
+            "${CMAKE_SOURCE_DIR}/engine/libraries/lib"
+            "${CMAKE_SOURCE_DIR}/engine/libraries/lib/Release"
+            "${CMAKE_SOURCE_DIR}/engine/libraries/lib/Debug"
         )
         find_library(GLFW3_LIB
             NAMES glfw3 glfw glfw3dll glfw3_mt glfw3_static
@@ -251,7 +263,7 @@ else()
                 "$ENV{VCPKG_ROOT}/installed/x64-windows-static/include"
                 "$ENV{GLFW_ROOT}/include"
                 "$ENV{GLFW_HOME}/include"
-                "${CMAKE_SOURCE_DIR}/engine/Libraries/include"
+                "${CMAKE_SOURCE_DIR}/engine/libraries/include"
         )
 
         if (GLFW3_LIB)
@@ -284,12 +296,36 @@ else()
     endif()
 
     # Optional: Intel Open Image Denoise (desktop-only)
+    # First try to find in our libraries directory
+    set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/engine/libraries/lib/cmake;${CMAKE_PREFIX_PATH}")
     find_package(OpenImageDenoise CONFIG QUIET)
     if (OpenImageDenoise_FOUND)
         target_link_libraries(glint PRIVATE OpenImageDenoise)
+        target_link_libraries(glint_core PRIVATE OpenImageDenoise)
         target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
+        target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
+        message(STATUS "OpenImageDenoise found and enabled")
     else()
-        message(STATUS "OpenImageDenoise not found; denoiser disabled.")
+        # Try manual lookup if package config not found
+        find_library(OIDN_LIB 
+            NAMES OpenImageDenoise
+            HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/lib"
+        )
+        find_path(OIDN_INCLUDE_DIR OpenImageDenoise/oidn.h
+            HINTS "${CMAKE_SOURCE_DIR}/engine/libraries/include"
+        )
+        
+        if (OIDN_LIB AND OIDN_INCLUDE_DIR)
+            target_link_libraries(glint PRIVATE ${OIDN_LIB})
+            target_link_libraries(glint_core PRIVATE ${OIDN_LIB})
+            target_include_directories(glint PRIVATE ${OIDN_INCLUDE_DIR})
+            target_include_directories(glint_core PRIVATE ${OIDN_INCLUDE_DIR})
+            target_compile_definitions(glint PRIVATE OIDN_ENABLED=1)
+            target_compile_definitions(glint_core PRIVATE OIDN_ENABLED=1)
+            message(STATUS "OpenImageDenoise found manually and enabled")
+        else()
+            message(STATUS "OpenImageDenoise not found; denoiser disabled.")
+        endif()
     endif()
 
     if (ENABLE_KTX2)
@@ -312,9 +348,9 @@ endif()
 # Optional: EXR support via TinyEXR + miniz (header/libs must be vendored)
 option(ENABLE_EXR "Enable OpenEXR loading via TinyEXR" ON)
 if (ENABLE_EXR)
-    set(TINYEXR_HEADER "${CMAKE_SOURCE_DIR}/engine/Libraries/include/tinyexr.h")
-    set(MINIZ_HEADER   "${CMAKE_SOURCE_DIR}/engine/Libraries/include/miniz.h")
-    set(MINIZ_SOURCE   "${CMAKE_SOURCE_DIR}/engine/Libraries/src/miniz.c")
+    set(TINYEXR_HEADER "${CMAKE_SOURCE_DIR}/engine/libraries/include/tinyexr.h")
+    set(MINIZ_HEADER   "${CMAKE_SOURCE_DIR}/engine/libraries/include/miniz.h")
+    set(MINIZ_SOURCE   "${CMAKE_SOURCE_DIR}/engine/libraries/src/miniz.c")
     if (EXISTS ${TINYEXR_HEADER} AND EXISTS ${MINIZ_HEADER} AND EXISTS ${MINIZ_SOURCE})
         message(STATUS "TinyEXR/miniz found: enabling EXR support")
         target_compile_definitions(glint PRIVATE EXR_ENABLED=1)
@@ -322,15 +358,15 @@ if (ENABLE_EXR)
         # Add modular miniz sources if present
         set(_MINIZ_EXTRA_SRC)
         foreach(f miniz_tdef.c miniz_tinfl.c miniz_zip.c)
-            if (EXISTS "${CMAKE_SOURCE_DIR}/engine/Libraries/src/${f}")
-                list(APPEND _MINIZ_EXTRA_SRC "${CMAKE_SOURCE_DIR}/engine/Libraries/src/${f}")
+            if (EXISTS "${CMAKE_SOURCE_DIR}/engine/libraries/src/${f}")
+                list(APPEND _MINIZ_EXTRA_SRC "${CMAKE_SOURCE_DIR}/engine/libraries/src/${f}")
             endif()
         endforeach()
         target_sources(glint PRIVATE ${MINIZ_SOURCE} ${_MINIZ_EXTRA_SRC})
         target_sources(glint_core PRIVATE ${MINIZ_SOURCE} ${_MINIZ_EXTRA_SRC})
-        # Includes already contain engine/Libraries/include
+        # Includes already contain engine/libraries/include
     else()
-        message(WARNING "TinyEXR/miniz not found under engine/Libraries; EXR support disabled. Place tinyexr.h, miniz.h in engine/Libraries/include and miniz.c in engine/Libraries/src")
+        message(WARNING "TinyEXR/miniz not found under engine/Libraries; EXR support disabled. Place tinyexr.h, miniz.h in engine/libraries/include and miniz.c in engine/libraries/src")
     endif()
 endif()
 

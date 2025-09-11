@@ -655,19 +655,19 @@ bool RenderSystem::denoise(std::vector<glm::vec3>& color,
         oidn::FilterRef filter = device.newFilter("RT"); // Ray tracing filter
         
         // Set input images
-        filter.setImage("color", color.data(), oidn::Format::Float3, width, height);
+        filter.setImage("color", const_cast<void*>(static_cast<const void*>(color.data())), oidn::Format::Float3, width, height);
         
         // Optional: Set auxiliary buffers if available
         if (normal && normal->size() == color.size()) {
-            filter.setImage("normal", normal->data(), oidn::Format::Float3, width, height);
+            filter.setImage("normal", const_cast<void*>(static_cast<const void*>(normal->data())), oidn::Format::Float3, width, height);
         }
         
         if (albedo && albedo->size() == color.size()) {
-            filter.setImage("albedo", albedo->data(), oidn::Format::Float3, width, height);
+            filter.setImage("albedo", const_cast<void*>(static_cast<const void*>(albedo->data())), oidn::Format::Float3, width, height);
         }
         
         // Set output image (in-place denoising)
-        filter.setImage("output", color.data(), oidn::Format::Float3, width, height);
+        filter.setImage("output", static_cast<void*>(color.data()), oidn::Format::Float3, width, height);
         
         // Set filter quality (optional - can be "fast", "balanced", "high")
         filter.set("hdr", true); // Enable HDR processing for better quality
@@ -744,19 +744,19 @@ bool RenderSystem::denoise(std::vector<glm::vec3>& color, int width, int height,
         oidn::FilterRef filter = device.newFilter("RT"); // Ray tracing filter
         
         // Set input images
-        filter.setImage("color", color.data(), oidn::Format::Float3, width, height);
+        filter.setImage("color", const_cast<void*>(static_cast<const void*>(color.data())), oidn::Format::Float3, width, height);
         
         // Optional: Set auxiliary buffers if available
         if (normal && static_cast<int>(normal->size()) == width * height) {
-            filter.setImage("normal", normal->data(), oidn::Format::Float3, width, height);
+            filter.setImage("normal", const_cast<void*>(static_cast<const void*>(normal->data())), oidn::Format::Float3, width, height);
         }
         
         if (albedo && static_cast<int>(albedo->size()) == width * height) {
-            filter.setImage("albedo", albedo->data(), oidn::Format::Float3, width, height);
+            filter.setImage("albedo", const_cast<void*>(static_cast<const void*>(albedo->data())), oidn::Format::Float3, width, height);
         }
         
         // Set output image (in-place denoising)
-        filter.setImage("output", color.data(), oidn::Format::Float3, width, height);
+        filter.setImage("output", static_cast<void*>(color.data()), oidn::Format::Float3, width, height);
         
         // Set filter quality
         filter.set("hdr", true); // Enable HDR processing for better quality
