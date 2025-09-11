@@ -7,6 +7,7 @@
 #include "bvh_node.h"
 #include "light.h"  
 #include "microfacet_sampling.h"
+#include "seeded_rng.h"
 #include "raytracer_lighting.h"
 #include "refraction.h"
 #include <glm/glm.hpp>
@@ -50,7 +51,7 @@ private:
         const Material& material,
         const Light& lights,
         int depth,
-        microfacet::SeededRNG& rng
+        SeededRng& rng
     ) const;
     
     // Helper method for refraction

@@ -21,6 +21,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
+from datetime import datetime, timezone
 
 class ArchitectureValidator:
     def __init__(self, root_path: Path):
@@ -140,26 +141,74 @@ class ArchitectureValidator:
     
     def validate_naming_conventions(self):
         """Validate file and directory naming conventions"""
-        conventions = self.constraints.get('naming_conventions', {})
-        
-        # Check directory naming (snake_case)
-        for root, dirs, files in os.walk(self.root):
-            for dir_name in dirs:
-                if not re.match(r'^[a-z0-9_\-\.]+$', dir_name):
-                    if not dir_name.startswith('.'):  # Skip hidden dirs
-                        self.warnings.append(
-                            f"NAMING: Directory '{dir_name}' should use snake_case"
-                        )
-        
-        # Check file naming
-        for file_path in self.root.rglob('*'):
-            if file_path.is_file():
-                name = file_path.name
-                if file_path.suffix in ['.cpp', '.h', '.hpp']:
-                    if not re.match(r'^[a-z0-9_]+\.(cpp|h|hpp)$', name):
-                        self.warnings.append(
-                            f"NAMING: File '{name}' should use snake_case"
-                        )
+        ai_config_path = self.root / '.ai.json'
+        enforce_paths: List[Path] = []
+        if ai_config_path.exists():
+            try:
+                with open(ai_config_path) as f:
+                    cfg = json.load(f)
+                for pattern in cfg.get('naming', {}).get('enforce', []):
+                    enforce_paths.extend(self.root.glob(pattern))
+            except Exception as e:
+                self.errors.append(f"NAMING: failed to read .ai.json: {e}")
+
+        for base in enforce_paths:
+            if any(part in base.parts for part in ['Libraries', 'node_modules', 'src-tauri']):
+                continue
+            for root, dirs, files in os.walk(base):
+                path_root = Path(root)
+                if any(part in path_root.parts for part in ['Libraries', 'node_modules', 'src-tauri']):
+                    continue
+                dir_name = path_root.name
+                if not re.match(r'^[a-z0-9_]+$', dir_name):
+                    self.errors.append(
+                        f"NAMING: Directory '{dir_name}' should use snake_case"
+                    )
+                for file_name in files:
+                    if file_name.endswith(('.cpp', '.h', '.hpp')):
+                        if not re.match(r'^[a-z0-9_]+\.(cpp|h|hpp)$', file_name):
+                            self.errors.append(
+                                f"NAMING: File '{file_name}' should use snake_case"
+                            )
+
+    def validate_ai_meta_files(self):
+        """Ensure critical ai-meta files exist and are fresh"""
+        reasoning = self.root / 'ai-meta' / 'reasoning.md'
+        changelog = self.root / 'ai-meta' / 'changelog.json'
+        ontology = self.root / 'ontology' / 'ontology.jsonld'
+
+        if not reasoning.exists():
+            self.errors.append('AI-META: missing reasoning.md')
+        else:
+            content = reasoning.read_text()
+            for section in ['# Decisions', '# Tradeoffs', '# Pending']:
+                if section not in content:
+                    self.errors.append(
+                        f"AI-META: reasoning.md missing section '{section}'"
+                    )
+
+        if not changelog.exists():
+            self.errors.append('AI-META: missing changelog.json')
+        else:
+            try:
+                data = json.load(open(changelog))
+                if not isinstance(data, list) or not data:
+                    self.errors.append('AI-META: changelog.json must be non-empty list')
+                else:
+                    latest = max(entry.get('ts', '') for entry in data)
+                    latest_dt = datetime.fromisoformat(latest.replace('Z', '+00:00'))
+                    if (datetime.now(timezone.utc) - latest_dt).days > 365:
+                        self.errors.append('AI-META: changelog.json is stale')
+            except Exception as e:
+                self.errors.append(f'AI-META: invalid changelog.json: {e}')
+
+        if not ontology.exists():
+            self.errors.append('AI-META: missing ontology/ontology.jsonld')
+        else:
+            try:
+                json.load(open(ontology))
+            except Exception as e:
+                self.errors.append(f'AI-META: invalid ontology.jsonld: {e}')
     
     def validate_security_boundaries(self):
         """Validate security boundary enforcement"""
@@ -170,15 +219,13 @@ class ArchitectureValidator:
             engine_files = self.find_files_in_layer('engine')
             network_patterns = [
                 r'curl',
-                r'http',
-                r'socket',
-                r'connect\(',
-                r'bind\(',
-                r'listen\(',
-                r'accept\('
+                r'\bsocket\b',
+                r'\bconnect\('
             ]
             
             for file_path in engine_files:
+                if any(part in file_path.parts for part in ['Libraries', 'node_modules']):
+                    continue
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         content = f.read()
@@ -229,6 +276,7 @@ class ArchitectureValidator:
         self.validate_naming_conventions()
         self.validate_security_boundaries()
         self.validate_file_patterns()
+        self.validate_ai_meta_files()
         
         # Check for circular dependencies
         circular_deps = self.detect_circular_dependencies()

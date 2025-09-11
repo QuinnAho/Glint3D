@@ -1,4 +1,4 @@
-#include "material-core.h"
+#include "material_core.h"
 #include "material.h"
 #include "pbr_material.h"
 #include <algorithm>

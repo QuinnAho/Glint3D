@@ -1,78 +1,8 @@
-{
-  "version": "1.0.0",
-  "description": "Machine-readable changelog for architectural evolution tracking",
-  "changes": [
-    {
-      "version": "0.3.0",
-      "date": "2024-09-11",
-      "type": "architecture_overhaul",
-      "description": "Separated engine from platform code, introduced intent-based SDK",
-      "changes": {
-        "added": [
-          "platforms/ directory for desktop and web specific code",
-          "sdk/web/ with versioned TypeScript interface",
-          "ai-meta/ directory with machine-readable constraints",
-          "schemas/json_ops_v2.json with intent-based operations",
-          "tools/arch_check.py for dependency validation"
-        ],
-        "moved": [
-          "web/* → platforms/web/",
-          "engine/src/main.cpp → platforms/desktop/main.cpp",
-          "engine/imgui* → platforms/desktop/imgui/",
-          "engine/src/panels/ → platforms/desktop/panels/"
-        ],
-        "deprecated": [
-          "Direct JSON Ops v1 access (use SDK intents)",
-          "Platform-specific code in engine/ directory"
-        ]
-      },
-      "breaking_changes": [
-        "Build system requires platform selection",
-        "Web UI imports must use platforms/web/ paths",
-        "Desktop main entry point moved to platforms/desktop/"
-      ],
-      "migration_guide": {
-        "web_builds": "Update import paths from web/ to platforms/web/",
-        "desktop_builds": "Update CMakeLists.txt to reference platforms/desktop/",
-        "ai_integrations": "Use sdk/web/glint3d.ts instead of direct JSON Ops"
-      }
-    }
-  ],
-  "upcoming": {
-    "v0.4.0": {
-      "planned_features": [
-        "RHI abstraction layer completion",
-        "Vulkan backend implementation", 
-        "WebGPU support",
-        "Neural rendering pipeline integration"
-      ],
-      "timeline": "Q4 2024"
-    },
-    "v0.5.0": {
-      "planned_features": [
-        "Multi-user collaboration support",
-        "Cloud rendering backend",
-        "Mobile platform support",
-        "VR/AR integration"
-      ],
-      "timeline": "Q2 2025"
-    }
-  },
-  "compatibility": {
-    "schema_versions": {
-      "json_ops_v1": "supported until v0.5.0",
-      "json_ops_v2": "current stable",
-      "config_schema": "v1.0.0 stable"
-    },
-    "platform_support": {
-      "desktop": "Windows, macOS, Linux",
-      "web": "Chrome, Firefox, Safari (WebGL2)",
-      "mobile": "planned for v0.5.0"
-    },
-    "deprecation_policy": {
-      "minor_versions": "2 versions backward compatibility",
-      "major_versions": "migration guide provided",
-      "removal_timeline": "1 year advance notice"
-    }
+[
+  {
+    "ts": "2025-09-11T16:00:00Z",
+    "actor": "ai",
+    "change": "Move GL allocations from SceneManager to RhiGL",
+    "constraints_checked": ["scene_manager_no_gpu", "determinism_policy"]
   }
-}
+]

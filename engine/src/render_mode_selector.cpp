@@ -1,6 +1,6 @@
-#include "render-mode-selector.h"
+#include "render_mode_selector.h"
 #include "scene_manager.h"
-#include "render-pass.h"
+#include "render_pass.h"
 #include "rhi/rhi.h"
 #include <algorithm>
 #include <sstream>

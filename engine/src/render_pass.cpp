@@ -1,5 +1,5 @@
-#include "render-pass.h"
-#include "rhi/rhi-types.h"
+#include "render_pass.h"
+#include "rhi/rhi_types.h"
 #include "scene_manager.h"
 #include "light.h"
 #include "raytracer.h"

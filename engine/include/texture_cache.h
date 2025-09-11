@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include <memory>
 #include <string>
-#include "Texture.h"
+#include "texture.h"
 
 // Simple global texture cache keyed by path + flip flag
 class TextureCache {

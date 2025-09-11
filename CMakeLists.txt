@@ -58,11 +58,14 @@ set(APP_SOURCES
     platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
-    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render_pass.cpp
     ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
+    ${SRC_DIR}/rhi/rhi_null.cpp
+    ${SRC_DIR}/rhi/scene_object_gl.cpp
+    ${SRC_DIR}/clock.cpp
 )
 
 # Core library: expose engine without the app entry
@@ -105,11 +108,14 @@ set(CORE_SOURCES
     platforms/desktop/panels/scene_tree_panel.cpp
     # New refactored rendering system
     ${SRC_DIR}/material_core.cpp
-    ${SRC_DIR}/render-pass.cpp
+    ${SRC_DIR}/render_pass.cpp
     ${SRC_DIR}/render_mode_selector.cpp
     ${SRC_DIR}/material_binding.cpp
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
+    ${SRC_DIR}/rhi/rhi_null.cpp
+    ${SRC_DIR}/rhi/scene_object_gl.cpp
+    ${SRC_DIR}/clock.cpp
 )
 
 set(IMGUI_SOURCES

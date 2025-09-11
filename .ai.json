@@ -1,6 +1,12 @@
 {
   "version": "1.0.0",
   "description": "AI interaction configuration for Glint3D",
+  "naming": {
+    "file_case": "snake_case",
+    "dir_case": "snake_case",
+    "disallow": ["camelCase", "kebab-case"],
+    "enforce": ["engine/**", "web/**"]
+  },
   "architecture": {
     "type": "layered",
     "enforcement": "automated",
