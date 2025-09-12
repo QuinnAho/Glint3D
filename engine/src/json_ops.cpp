@@ -359,36 +359,48 @@ bool JsonOpsExecutor::apply(const std::string& json, std::string& error)
             if (!obj.HasMember("material") || !obj["material"].IsObject()) { error = "set_material: missing 'material'"; return false; }
             const auto& matObj = obj["material"];
 
-            // Update material properties
+            // Update material properties using unified MaterialCore
             if (matObj.HasMember("color") && matObj["color"].IsArray()) {
                 glm::vec3 color;
                 if (!getVec3(matObj["color"], color)) { error = "set_material: bad 'color'"; return false; }
                 const_cast<SceneObject*>(targetObj)->color = color;
+                const_cast<SceneObject*>(targetObj)->materialCore.baseColor = glm::vec4(color, 1.0f);
+                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
                 const_cast<SceneObject*>(targetObj)->material.diffuse = color;
-                const_cast<SceneObject*>(targetObj)->baseColorFactor = glm::vec4(color, 1.0f);
             }
 
             if (matObj.HasMember("roughness") && matObj["roughness"].IsNumber()) {
                 float roughness = (float)matObj["roughness"].GetDouble();
+                const_cast<SceneObject*>(targetObj)->materialCore.roughness = roughness;
+                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
                 const_cast<SceneObject*>(targetObj)->material.roughness = roughness;
-                const_cast<SceneObject*>(targetObj)->roughnessFactor = roughness;
             }
 
             if (matObj.HasMember("metallic") && matObj["metallic"].IsNumber()) {
                 float metallic = (float)matObj["metallic"].GetDouble();
+                const_cast<SceneObject*>(targetObj)->materialCore.metallic = metallic;
+                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
                 const_cast<SceneObject*>(targetObj)->material.metallic = metallic;
-                const_cast<SceneObject*>(targetObj)->metallicFactor = metallic;
             }
 
             if (matObj.HasMember("ior") && matObj["ior"].IsNumber()) {
                 float ior = (float)matObj["ior"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->ior = ior;
+                const_cast<SceneObject*>(targetObj)->materialCore.ior = ior;
+                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
                 const_cast<SceneObject*>(targetObj)->material.ior = ior;
             }
 
             if (matObj.HasMember("transmission") && matObj["transmission"].IsNumber()) {
                 float transmission = (float)matObj["transmission"].GetDouble();
+                const_cast<SceneObject*>(targetObj)->materialCore.transmission = transmission;
+                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
                 const_cast<SceneObject*>(targetObj)->material.transmission = transmission;
+            }
+
+            if (matObj.HasMember("thickness") && matObj["thickness"].IsNumber()) {
+                float thickness = (float)matObj["thickness"].GetDouble();
+                const_cast<SceneObject*>(targetObj)->materialCore.thickness = thickness;
+                // Note: thickness is MaterialCore-only, no legacy equivalent
             }
 
             if (matObj.HasMember("specular") && matObj["specular"].IsArray()) {

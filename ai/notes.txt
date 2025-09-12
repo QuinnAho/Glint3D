@@ -1,0 +1,6 @@
+the whitelist disallowed main.cpp, which became a problem when we needed to edit it, if the AI determine it needs to edit that file
+based off some sort of confidence interval, we should allow it to break the guards to do so.
+
+We should add some requirements to test the build of the repo if not already implemented 
+
+we need some folder like 'passes' where we have a prompt and requirments to do a QA pass, or a Debug Pass, or a new feature request

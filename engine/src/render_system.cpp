@@ -505,7 +505,11 @@ void RenderSystem::setIBLIntensity(float intensity)
 bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& lights,
                                   GLuint textureId, int width, int height)
 {
-    if (textureId == 0 || width <= 0 || height <= 0) return false;
+    std::cerr << "[RenderSystem] renderToTexture called with textureId=" << textureId << ", width=" << width << ", height=" << height << std::endl;
+    if (textureId == 0 || width <= 0 || height <= 0) {
+        std::cerr << "[RenderSystem] renderToTexture: invalid parameters" << std::endl;
+        return false;
+    }
 
     // Preserve current framebuffer and viewport
     GLint prevFBO = 0;
@@ -517,7 +521,9 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
     glm::mat4 prevProj = m_projectionMatrix;
     updateProjectionMatrix(width, height);
 
+    std::cerr << "[RenderSystem] m_samples=" << m_samples << std::endl;
     if (m_samples > 1) {
+        std::cerr << "[RenderSystem] Using MSAA path" << std::endl;
         // MSAA path: render into multisampled RBOs and resolve into provided texture
         GLuint fboMSAA = 0, rboColorMSAA = 0, rboDepthMSAA = 0;
         GLuint fboResolve = 0;
@@ -540,7 +546,9 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepthMSAA);
 #endif
 
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        GLenum fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (fboStatus != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "[RenderSystem] MSAA framebuffer not complete: 0x" << std::hex << fboStatus << std::dec << std::endl;
             glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
             if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
             if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
@@ -598,6 +606,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
         return true;
     } else {
+        std::cerr << "[RenderSystem] Using non-MSAA path" << std::endl;
         // Single-sample path (previous behavior)
         // Create FBO
         GLuint fbo = 0;
@@ -605,6 +614,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
         // Attach provided color texture
+        std::cerr << "[RenderSystem] Attaching color texture " << textureId << " to FBO" << std::endl;
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
 #ifndef __EMSCRIPTEN__
         const GLenum drawBufs[1] = { GL_COLOR_ATTACHMENT0 };
@@ -615,19 +625,39 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         GLuint rboDepth = 0;
         glGenRenderbuffers(1, &rboDepth);
         glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-#ifndef __EMSCRIPTEN__
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-#else
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+        // Try different depth formats for maximum compatibility
+        bool depthAttached = false;
+        
+        // Try GL_DEPTH_COMPONENT24 first (desktop preferred)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-#endif
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+            depthAttached = true;
+        }
+        
+        // Fallback to GL_DEPTH_COMPONENT16 if 24-bit failed
+        if (!depthAttached) {
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+                depthAttached = true;
+            }
+        }
+        
+        // Final fallback: try without depth buffer
+        if (!depthAttached) {
+            std::cerr << "[RenderSystem] Warning: Unable to attach depth buffer, proceeding without depth testing" << std::endl;
+            glDeleteRenderbuffers(1, &rboDepth);
+            rboDepth = 0;
+        }
 
         // Validate
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        GLenum fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (fboStatus != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "[RenderSystem] Non-MSAA framebuffer not complete: 0x" << std::hex << fboStatus << std::dec << std::endl;
             glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-            if (rboDepth) glDeleteRenderbuffers(1, &rboDepth);
-            if (fbo) glDeleteFramebuffers(1, &fbo);
+            if (rboDepth != 0) glDeleteRenderbuffers(1, &rboDepth);
+            if (fbo != 0) glDeleteFramebuffers(1, &fbo);
             m_projectionMatrix = prevProj;
             glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
             return false;
@@ -685,8 +715,25 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
         td.debugName = "renderToPNG_color";
         colorTexHandle = m_rhi->createTexture(td);
         // Obtain GL id to attach to FBO (OpenGL backend only)
-        if (auto* gl = dynamic_cast<RhiGL*>(m_rhi.get())) {
+        auto* gl = dynamic_cast<RhiGL*>(m_rhi.get());
+        if (gl) {
             colorTex = gl->getGLTexture(colorTexHandle);
+        }
+        // If RHI texture creation failed or dynamic cast failed, fall back to direct GL
+        if (gl == nullptr || colorTex == 0) {
+            std::cerr << "[RenderSystem] Dynamic cast " << (gl ? "succeeded" : "failed") << ", colorTex=" << colorTex << std::endl;
+            std::cerr << "[RenderSystem] RHI texture creation failed, falling back to direct GL" << std::endl;
+            if (colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
+            colorTexHandle = INVALID_HANDLE;
+            glGenTextures(1, &colorTex);
+            glBindTexture(GL_TEXTURE_2D, colorTex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            std::cerr << "[RenderSystem] Fallback GL texture created: " << colorTex << std::endl;
         }
     } else {
         glGenTextures(1, &colorTex);
@@ -700,10 +747,15 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     }
 
     // Render scene into the texture
+    std::cerr << "[RenderSystem] About to render to texture, colorTex=" << colorTex << std::endl;
     bool ok = renderToTexture(scene, lights, colorTex, width, height);
+    std::cerr << "[RenderSystem] renderToTexture returned " << (ok ? "true" : "false") << std::endl;
     if (!ok) {
-        if (m_rhi && colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
-        else glDeleteTextures(1, &colorTex);
+        if (m_rhi && colorTexHandle != INVALID_HANDLE) {
+            m_rhi->destroyTexture(colorTexHandle);
+        } else {
+            glDeleteTextures(1, &colorTex);
+        }
         return false;
     }
 
@@ -745,8 +797,11 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 
     // Cleanup
     glDeleteFramebuffers(1, &fbo);
-    if (m_rhi && colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
-    else glDeleteTextures(1, &colorTex);
+    if (m_rhi && colorTexHandle != INVALID_HANDLE) {
+        m_rhi->destroyTexture(colorTexHandle);
+    } else {
+        glDeleteTextures(1, &colorTex);
+    }
 
     return writeOK != 0;
 #endif
@@ -1129,13 +1184,8 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
             s->setFloat("material.metallic",  obj.material.metallic);
         }
     } else {
-        // Build MaterialCore snapshot from legacy + PBR fields
-        MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
-        mc.baseColor = obj.baseColorFactor;
-        mc.metallic = obj.metallicFactor;
-        mc.roughness = obj.roughnessFactor;
-        mc.ior = obj.ior;
-        mc.clampValues();
+        // Use unified MaterialCore (eliminates dual storage)
+        const auto& mc = obj.materialCore;
         if (m_rhi) {
             setUniformVec4("baseColorFactor", mc.baseColor);
             setUniformFloat("metallicFactor", mc.metallic);
@@ -1229,9 +1279,9 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     // Enable blending for transmissive materials (approx; SSR pending)
     bool blendingEnabled = false;
     if (s == m_pbrShader.get()) {
-        // Decide using transmission from legacy material or base alpha
-        float transmission = obj.material.transmission;
-        if (transmission > 0.01f || obj.baseColorFactor.a < 0.999f) {
+        // Decide using unified MaterialCore transmission and alpha
+        float transmission = obj.materialCore.transmission;
+        if (transmission > 0.01f || obj.materialCore.baseColor.a < 0.999f) {
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             glDepthMask(GL_FALSE);
@@ -1338,8 +1388,8 @@ void RenderSystem::updateRenderStats(const SceneManager& scene)
                  m.specular.x, m.specular.y, m.specular.z,
                  m.ambient.x, m.ambient.y, m.ambient.z,
                  m.shininess, m.roughness, m.metallic,
-                 o.baseColorFactor.x, o.baseColorFactor.y, o.baseColorFactor.z, o.baseColorFactor.w,
-                 o.metallicFactor, o.roughnessFactor, o.ior,
+                 o.materialCore.baseColor.x, o.materialCore.baseColor.y, o.materialCore.baseColor.z, o.materialCore.baseColor.w,
+                 o.materialCore.metallic, o.materialCore.roughness, o.materialCore.ior,
                  o.baseColorTex ? 1 : 0, o.normalTex ? 1 : 0, o.mrTex ? 1 : 0);
         return std::string(buf);
     };
@@ -1651,13 +1701,8 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
             else { shader->setBool("useTexture", false); shader->setVec3("objectColor", obj.color); }
         }
     } else {
-        // PBR shader uniforms via MaterialCore binder
-        MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
-        mc.baseColor = obj.baseColorFactor;
-        mc.metallic = obj.metallicFactor;
-        mc.roughness = obj.roughnessFactor;
-        mc.ior = obj.ior;
-        mc.clampValues();
+        // PBR shader uniforms via unified MaterialCore
+        const auto& mc = obj.materialCore;
         if (m_rhi) {
             setUniformVec4("baseColorFactor", mc.baseColor);
             setUniformFloat("metallicFactor", mc.metallic);
@@ -1689,8 +1734,8 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
     // Simple blending for transmissive materials (approx; SSR pending)
     bool blendingEnabled = false;
     if (shader == m_pbrShader.get()) {
-        float transmission = obj.material.transmission;
-        if (transmission > 0.01f || obj.baseColorFactor.a < 0.999f) {
+        float transmission = obj.materialCore.transmission;
+        if (transmission > 0.01f || obj.materialCore.baseColor.a < 0.999f) {
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             glDepthMask(GL_FALSE);

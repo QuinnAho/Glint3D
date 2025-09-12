@@ -11,6 +11,7 @@
 #include "shader.h"
 #include "rhi/rhi.h"
 #include "rhi/rhi_types.h"
+#include "material_core.h"
 
 struct SceneObject
 {
@@ -39,12 +40,13 @@ struct SceneObject
 
     bool      isStatic = false;
     glm::vec3 color{ 1.0f };
+    
+    // Unified material system - eliminates dual storage problem
+    MaterialCore materialCore;
+    
+    // Legacy material - deprecated, kept temporarily for migration compatibility
+    // TODO: Remove after full raytracer migration to MaterialCore (FEAT-0241 PR4)
     Material  material;
-    // Basic PBR factors
-    glm::vec4 baseColorFactor{1.0f};
-    float metallicFactor = 1.0f;
-    float roughnessFactor = 1.0f;
-    float ior = 1.5f;                 // Index of refraction for F0 computation
 };
 
 class SceneManager 

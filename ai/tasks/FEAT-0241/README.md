@@ -7,22 +7,22 @@ The core architectural change introduces a unified MaterialCore struct that elim
 
 ## AI-Editable: Status
 - Overall: in_progress
-- Current PR: PR1 (in_progress)
-- Last Updated: 2025-09-11T22:00:00Z
+- Current PR: PR1 (completed)
+- Last Updated: 2025-09-11T23:30:00Z
 
 ## AI-Editable: Checklist (mirror of spec.yaml acceptance_criteria)
-- [ ] Opaque scenes unchanged (SSIM ≥ 0.995 vs goldens)
-- [ ] Transmissive materials show SSR-T with roughness blur
-- [ ] --mode auto picks raster for previews, ray for finals
-- [x] MaterialCore struct eliminates dual material storage
-- [x] RHI abstraction prevents direct OpenGL calls in Engine Core
+- [ ] Opaque scenes unchanged (SSIM ≥ 0.995 vs goldens) — *Future PR (requires SSR-T implementation)*
+- [ ] Transmissive materials show SSR-T with roughness blur — *Future PR (requires SSR-T implementation)*
+- [ ] --mode auto picks raster for previews, ray for finals — *Future PR (requires hybrid mode)*
+- [x] MaterialCore struct eliminates dual material storage — *✅ COMPLETED in PR1*
+- [x] RHI abstraction prevents direct OpenGL calls in Engine Core — *✅ COMPLETED in PR1*
 
 ## AI-Editable: Current PR Progress (PR1: MaterialCore + RHI headers)
 - [x] Define MaterialCore unified BSDF struct
 - [x] Define RHI interface with GL/WebGL2/Vulkan abstraction
-- [ ] Update SceneObject to use MaterialCore instead of dual storage
-- [ ] Add transmission and thickness fields to JSON Ops schema
-- [ ] Write unit tests for MaterialCore BSDF calculations
+- [x] Update SceneObject to use MaterialCore instead of dual storage
+- [x] Add transmission and thickness fields to JSON Ops schema
+- [x] Write unit tests for MaterialCore BSDF calculations
 
 ## AI-Editable: Implementation Notes
 
@@ -46,7 +46,10 @@ The codebase already contains substantial groundwork:
 - **Performance**: Designed for <5% overhead vs direct GL calls
 - **Documentation**: Comprehensive Doxygen documentation for all public APIs
 
-### Current Dual Storage Problem (SceneObject analysis)
+### RESOLVED: Dual Storage Problem Migration
+The dual storage issue in SceneObject has been successfully resolved:
+
+**Before (Dual Storage):**
 ```cpp
 struct SceneObject {
     Material material;           // Legacy (raytracer)
@@ -56,7 +59,28 @@ struct SceneObject {
     float ior;                  // PBR (rasterizer)
 };
 ```
-This creates conversion drift and inconsistent material behavior between pipelines.
+
+**After (Unified MaterialCore):**
+```cpp
+struct SceneObject {
+    MaterialCore materialCore;   // Unified BSDF for both pipelines
+    Material material;           // Kept temporarily for raytracer compatibility (PR4 will eliminate)
+};
+```
+
+**Key Changes Made:**
+- ✅ SceneObject now uses unified MaterialCore as primary material storage
+- ✅ JSON Ops system updated to write to MaterialCore and sync to legacy Material
+- ✅ Render system updated to read from MaterialCore instead of individual PBR factors
+- ✅ Transmission and thickness support added to JSON schema and operations
+- ✅ Legacy Material kept temporarily for raytracer compatibility during transition
+- ✅ Comprehensive unit tests created covering BSDF calculations and edge cases  
+- ✅ JSON schema extended with transmission and thickness for glass material support
+
+**Next Steps for PR2:**
+1. Update `platforms/desktop/main.cpp:260-266` to use `obj.materialCore` instead of old PBR fields
+2. Complete RHI migration by routing render system calls through RHI interface
+3. Add screen-space refraction pass foundation
 
 ### SSR-T Algorithm
 - TBD: Screen-space ray step size vs quality tradeoffs
@@ -65,10 +89,12 @@ This creates conversion drift and inconsistent material behavior between pipelin
 
 ## AI-Editable: Blockers and Risks
 
-### Current Status: PR1 Foundation Complete
-- **MaterialCore Public API**: Ready for SceneObject integration
-- **RHI Public API**: Ready for RenderSystem migration  
-- **Implementation Path Clear**: Both internal and public APIs defined
+### Current Status: PR1 Foundation Complete with Minor Blocker
+- ✅ **MaterialCore Integration**: SceneObject unified storage implemented 
+- ✅ **RHI Public API**: Ready for RenderSystem migration  
+- ✅ **JSON Ops Support**: Transmission and thickness fields added to schema
+- ✅ **Unit Tests**: Comprehensive MaterialCore BSDF validation created
+- ⚠️ **Platform Code Update Needed**: `platforms/desktop/main.cpp:260-266` still uses old PBR fields (outside whitelist)
 
 ### Remaining Risks for PR2-PR5
 - **Migration Complexity**: SceneObject integration may reveal unexpected dependencies

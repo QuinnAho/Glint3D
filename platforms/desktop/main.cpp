@@ -258,12 +258,8 @@ int main(int argc, char** argv)
                 const auto& objs = app->getSceneManager().getObjects();
                 materials.reserve(objs.size());
                 for (const auto& obj : objs) {
-                    MaterialCore mc = MaterialCore::fromLegacyMaterial(obj.material);
-                    // Prefer PBR factors on the object when present
-                    mc.baseColor = obj.baseColorFactor;
-                    mc.metallic = obj.metallicFactor;
-                    mc.roughness = obj.roughnessFactor;
-                    mc.ior = obj.ior;
+                    // Use unified MaterialCore (eliminates dual storage)
+                    MaterialCore mc = obj.materialCore;
                     mc.clampValues();
                     materials.push_back(mc);
                 }

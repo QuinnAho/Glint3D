@@ -1144,9 +1144,9 @@ std::string UIBridge::buildShareLink() const
         matOp.AddMember("op", "set_material", allocator);
         matOp.AddMember("target", Value(obj.name.c_str(), allocator), allocator);
         Value mat(kObjectType);
-        // Color from baseColorFactor if set, else diffuse
+        // Color from MaterialCore baseColor if set, else legacy diffuse
         Value colorArr(kArrayType);
-        glm::vec3 color = glm::vec3(obj.baseColorFactor);
+        glm::vec3 color = glm::vec3(obj.materialCore.baseColor);
         if (color == glm::vec3(1.0f) && obj.material.diffuse != glm::vec3(1.0f)) {
             color = obj.material.diffuse;
         }
