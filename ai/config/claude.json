@@ -1,0 +1,95 @@
+{
+  "description": "Global Claude Code configuration and constraints",
+  "version": "1.0",
+  "
+": "2025-09-11T14:03:12Z",
+  
+  "global_constraints": {
+    "architecture": {
+      "no_gl_outside_rhi": {
+        "description": "No direct OpenGL calls outside RHI abstraction layer",
+        "check": "engine/src/** must not contain gl[A-Z].* except in engine/src/rhi/",
+        "exceptions": ["engine/src/rhi/rhi_gl.cpp", "engine/src/rhi/rhi_webgl.cpp"]
+      },
+      "engine_core_isolation": {
+        "description": "Engine Core must not depend on UI frameworks",
+        "disallow_imports": {
+          "from": "engine/src/**",
+          "patterns": ["imgui/**", "glfw/**", "platforms/**", "ui/**", "react/**"]
+        }
+      },
+      "public_headers_absolute_paths": {
+        "description": "Public headers must use absolute paths for includes",
+        "pattern": "engine/include/glint3d/** should use #include <glint3d/...> not relative paths"
+      }
+    },
+    
+    "testing": {
+      "golden_image_threshold": {
+        "ssim_min": 0.995,
+        "per_channel_delta_max": 2
+      },
+      "unit_test_coverage": {
+        "new_apis_require_tests": true,
+        "min_coverage_percent": 80
+      },
+      "deterministic_rendering": {
+        "description": "All rendering must be reproducible with same seed",
+        "require_seed_parameter": true
+      }
+    },
+    
+    "performance": {
+      "frame_time_budget_ms": 16.0,
+      "memory_overhead_mb_max": 100,
+      "shader_compile_time_s_max": 5.0
+    },
+    
+    "security": {
+      "path_validation": {
+        "description": "All file operations must validate against asset root",
+        "functions_requiring_validation": ["load", "render_image", "set_background"]
+      },
+      "no_secrets_in_code": {
+        "disallow_patterns": ["api_key", "password", "secret", "token"],
+        "check_files": ["**/*.cpp", "**/*.h", "**/*.json", "**/*.yaml"]
+      }
+    }
+  },
+  
+  "file_patterns": {
+    "engine_core": "engine/src/** engine/include/glint3d/**",
+    "ui_layers": "platforms/** ui/** engine/src/ui/**",
+    "shaders": "engine/shaders/**",
+    "tests": "tests/**",
+    "docs": "docs/** *.md",
+    "config": "tasks/** ai-config/** schemas/**"
+  },
+  
+  "quality_gates": {
+    "pre_commit": [
+      "check_architecture_constraints",
+      "validate_file_whitelist", 
+      "run_unit_tests",
+      "check_code_format"
+    ],
+    "pre_merge": [
+      "run_golden_tests",
+      "check_performance_regression",
+      "validate_cross_platform",
+      "update_documentation"
+    ]
+  },
+  
+  "automation": {
+    "ci_scripts": {
+      "architecture_check": "tools/check_architecture.py",
+      "golden_validation": "tests/scripts/run_golden_tests.sh",
+      "performance_benchmark": "tools/benchmark_performance.py"
+    },
+    "hooks": {
+      "pre_commit": ".git/hooks/pre-commit",
+      "commit_msg": ".git/hooks/commit-msg"
+    }
+  }
+}

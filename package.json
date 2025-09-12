@@ -6,13 +6,14 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "web"
+    "platforms/web",
+    "sdk/web"
   ],
   "scripts": {
     "build": "npm run build:packages && npm run build:web",
     "build:packages": "npm run build --workspace=packages/ops-sdk && npm run build --workspace=packages/wasm-bindings",
-    "build:web": "npm run build --workspace=web",
-    "dev": "npm run dev --workspace=web",
+    "build:web": "npm run build --workspace=platforms/web",
+    "dev": "npm run dev --workspace=platforms/web",
     "dev:packages": "npm run dev --workspace=packages/ops-sdk & npm run dev --workspace=packages/wasm-bindings",
     "clean": "npm run clean --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

@@ -1,5 +1,5 @@
 #include "bvh_node.h"
-#include "rayutils.h"
+#include "ray_utils.h"
 #include <algorithm>
 
 extern bool rayIntersectsAABB(const Ray& ray, const glm::vec3& minBound, const glm::vec3& maxBound, float& t);

@@ -45,7 +45,7 @@ Runs on **desktop (OpenGL/GLFW/ImGui)** and **web (WebGL2 via Emscripten)**, wit
 ### Desktop (Windows)
 - Generate project files: `cmake -S . -B builds/desktop/cmake`  
 - Open `builds/desktop/cmake/glint.sln` in Visual Studio 2022 (x64).  
-- Build and run from the repo root so `shaders/` and `assets/` resolve.  
+- Build and run from the repo root so `engine/shaders/` and `assets/` resolve.  
 - Use the top menu to import assets or apply JSON recipes. Hold RMB to fly the camera.  
 
 ### Desktop (CMake, cross-platform)
@@ -183,13 +183,49 @@ Options:
 
 ## Repo Layout
 
-- `engine/src/` — rendering, UI, loaders, raytracer  
-- `engine/include/` — headers  
-- `engine/shaders/` — GLSL  
-- `assets/` — sample models/textures   
-- `builds/` — organized build outputs (desktop/web/vs)  
-- `examples/json-ops/` — sample JSON Ops  
-- `docs/` — JSON Ops documentation  
+```
+Glint3D/
+├── engine/                     # Core C++ engine
+│   ├── src/                    # Core implementation (rendering, raytracing, loaders)
+│   │   ├── importers/         # Asset import plugins (OBJ, Assimp)
+│   │   ├── rhi/               # Render Hardware Interface (OpenGL/WebGL2 abstraction)
+│   │   └── ui/                # Desktop ImGui integration
+│   ├── include/               # Engine headers
+│   │   ├── glint3d/          # Public API headers (MaterialCore, RHI)
+│   │   └── rhi/              # Internal RHI headers
+│   ├── shaders/               # GLSL shaders (PBR, standard, post-processing)
+│   ├── resources/             # Build resources (Windows icon, RC files)
+│   └── Libraries/             # Third-party dependencies (GLFW, ImGui, GLM, stb)
+├── platforms/                  # Platform-specific implementations
+│   ├── desktop/               # Desktop platform integration
+│   └── web/                   # React/Tailwind web platform
+├── packages/                   # NPM packages and SDK components
+│   ├── ops-sdk/               # TypeScript SDK for JSON operations
+│   └── wasm-bindings/         # WASM/JavaScript bindings
+├── sdk/                        # Software Development Kits
+│   └── web/                   # Web SDK and TypeScript definitions  
+├── assets/                     # Runtime content
+│   ├── models/                # 3D models (OBJ, GLB, GLTF)
+│   ├── textures/              # Texture maps
+│   └── img/                   # Images and HDR environments
+├── examples/                   # Usage examples and demos
+│   └── json-ops/              # JSON Operations examples and test cases
+├── tests/                      # Test suites
+│   ├── unit/                  # C++ unit tests
+│   ├── integration/           # JSON Ops integration tests
+│   ├── golden/                # Visual regression testing (golden images)
+│   └── security/              # Security vulnerability tests
+├── schemas/                    # JSON schema definitions
+├── docs/                       # Documentation
+├── tools/                      # Development and build tools
+├── ai/                         # AI-assisted development configuration
+│   ├── config/                # AI constraints and requirements
+│   ├── tasks/                 # Task capsule management system
+│   └── ontology/              # Semantic definitions
+└── builds/                     # Build outputs (generated)
+    ├── desktop/cmake/         # CMake desktop builds
+    └── web/emscripten/        # Emscripten web builds
+```  
 
 ---
 

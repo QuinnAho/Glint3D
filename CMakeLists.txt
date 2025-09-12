@@ -44,7 +44,7 @@ set(APP_SOURCES
     ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
-    ${SRC_DIR}/rayutils.cpp
+    ${SRC_DIR}/ray_utils.cpp
     ${SRC_DIR}/bvh_node.cpp
     ${SRC_DIR}/raytracer.cpp
     ${SRC_DIR}/assimp_loader.cpp
@@ -93,7 +93,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/importers/assimp_importer.cpp
     ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
-    ${SRC_DIR}/rayutils.cpp
+    ${SRC_DIR}/ray_utils.cpp
     ${SRC_DIR}/bvh_node.cpp
     ${SRC_DIR}/raytracer.cpp
     ${SRC_DIR}/assimp_loader.cpp

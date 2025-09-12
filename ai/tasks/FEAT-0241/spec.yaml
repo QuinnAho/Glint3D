@@ -1,0 +1,76 @@
+id: FEAT-0241
+title: SSR-T refraction in raster preview
+owner: ai
+status: planned           # planned|in_progress|blocked|complete
+created: "2025-09-11T14:03:12Z"
+priority: high
+
+description: >
+  Implement Screen-Space Refraction with Transmission (SSR-T) in the rasterized 
+  pipeline to enable real-time glass material previews without requiring raytracing mode.
+  This allows the hybrid auto mode to show refraction effects during interactive editing.
+
+acceptance_criteria:
+  - "Opaque scenes unchanged (SSIM ≥ 0.995 vs goldens)"
+  - "Transmissive materials show SSR-T with roughness blur"
+  - "--mode auto picks raster for previews, ray for finals"
+  - "MaterialCore struct eliminates dual material storage"
+  - "RHI abstraction prevents direct OpenGL calls in Engine Core"
+
+must_requirements:            # IDs from tasks/index.json requirements_catalog
+  - ARCH.NO_GL_OUTSIDE_RHI
+  - API.PUBLIC_HEADERS_PATH
+  - DET.SEED_REPRO
+  - TEST.GOLDEN_SSIM
+  - PERF.FRAME_BUDGET
+
+plan:                         # 5-7 atomic PRs
+  - id: PR1
+    title: "Define MaterialCore unified BSDF + RHI interface headers"
+    status: planned
+    files: ["engine/include/glint3d/material_core.h", "engine/include/glint3d/rhi.h"]
+  - id: PR2
+    title: "Implement RhiGL backend + wire raster pipeline through RHI"
+    status: planned 
+    files: ["engine/src/rhi/**", "engine/src/render_system.cpp"]
+  - id: PR3
+    title: "Add screen-space refraction pass with roughness-aware blur"
+    status: planned
+    files: ["engine/shaders/ssr_refraction.frag", "engine/src/render/ssr_pass.cpp"]
+  - id: PR4
+    title: "Migrate raytracer to MaterialCore, remove PBR conversion"
+    status: planned
+    files: ["engine/src/raytracer.cpp", "engine/include/scene_object.h"]
+  - id: PR5
+    title: "Implement auto mode selection with transmission heuristics"
+    status: planned
+    files: ["engine/src/application.cpp", "engine/src/json_ops.cpp"]
+
+file_whitelist:               # AI MUST stay inside these paths
+  - "engine/include/glint3d/**"
+  - "engine/src/render/**"
+  - "engine/src/rhi/**"
+  - "engine/shaders/**" 
+  - "tests/**"
+  - "docs/**"
+  - "ai/tasks/FEAT-0241/**"
+
+outputs:
+  - docs/rendering_arch_v1.md
+  - engine/include/glint3d/material_core.h
+  - engine/include/glint3d/rhi.h
+  - engine/shaders/ssr_refraction.frag
+
+metrics:
+  ssim_min: 0.995
+  frame_time_ms_max: 16.0
+  memory_overhead_mb_max: 50
+
+dependencies:
+  blocks: []
+  blocked_by: []
+  
+risk_assessment:
+  - "SSR-T quality may not match full raytracing for complex scenes"
+  - "Screen-space techniques have inherent occlusion limitations"  
+  - "WebGL2 texture format constraints may limit precision"

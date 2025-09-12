@@ -1,0 +1,85 @@
+id: FEAT-0242
+title: RHI Abstraction Layer Implementation
+owner: ai
+status: planned
+created: "2025-09-11T14:30:00Z"
+priority: critical
+
+description: >
+  Implement Render Hardware Interface (RHI) abstraction to eliminate direct OpenGL 
+  calls from Engine Core. This enables future Vulkan/WebGPU backends and addresses 
+  the "Backend Lock-in" problem identified in the refactoring plan.
+
+acceptance_criteria:
+  - "No direct OpenGL calls outside engine/src/rhi/ (validated by CI)"
+  - "RenderSystem uses RHI interface instead of direct GL calls"
+  - "Existing rendering behavior unchanged (SSIM >= 0.995)"
+  - "WebGL2 compatibility maintained through RhiWebGL backend"
+  - "Performance overhead < 5% vs direct GL calls"
+
+must_requirements:
+  - ARCH.NO_GL_OUTSIDE_RHI
+  - API.PUBLIC_HEADERS_PATH
+  - TEST.GOLDEN_SSIM
+  - PERF.FRAME_BUDGET
+  - TEST.CROSS_PLATFORM
+
+plan:
+  - id: PR1
+    title: "Define RHI interface headers and base classes"
+    status: planned
+    files: ["engine/include/glint3d/rhi.h", "engine/include/glint3d/rhi_types.h"]
+  - id: PR2
+    title: "Implement RhiGL desktop OpenGL backend"
+    status: planned
+    files: ["engine/src/rhi/rhi_gl.cpp", "engine/include/rhi/rhi_gl.h"]
+  - id: PR3
+    title: "Implement RhiWebGL2 for web platform"
+    status: planned
+    files: ["engine/src/rhi/rhi_webgl.cpp", "engine/include/rhi/rhi_webgl.h"]
+  - id: PR4
+    title: "Migrate RenderSystem to use RHI instead of direct GL"
+    status: planned
+    files: ["engine/src/render_system.cpp", "engine/include/render_system.h"]
+  - id: PR5
+    title: "Remove direct GL calls from remaining engine components"
+    status: planned
+    files: ["engine/src/**/*.cpp"]
+
+file_whitelist:
+  - "engine/include/glint3d/rhi*.h"
+  - "engine/include/rhi/**"
+  - "engine/src/rhi/**" 
+  - "engine/src/render_system.cpp"
+  - "engine/src/render/**"
+  - "tests/unit/rhi_test.cpp"
+  - "tests/integration/rhi_backend_test.cpp"
+  - "docs/rhi_architecture.md"
+  - "ai/tasks/FEAT-0242/**"
+
+outputs:
+  - engine/include/glint3d/rhi.h
+  - engine/src/rhi/rhi_gl.cpp
+  - engine/src/rhi/rhi_webgl.cpp
+  - docs/rhi_architecture.md
+
+metrics:
+  performance_overhead_max: 0.05  # 5% max overhead
+  api_surface_reduction: 0.8      # 80% fewer direct GL calls
+  backend_abstraction_coverage: 0.95  # 95% of GL calls abstracted
+
+dependencies:
+  blocks: [FEAT-0243, FEAT-0245]  # MaterialCore and RenderGraph depend on RHI
+  blocked_by: []
+
+current_problems:
+  - "Direct gl* calls scattered throughout engine/src/"
+  - "Platform-specific code mixed with core rendering logic"
+  - "Hard to add Vulkan/WebGPU support without major refactoring"
+  - "WebGL2 differences handled via preprocessor hacks"
+
+target_architecture: >
+  Clean abstraction where RenderSystem operates through RHI interface,
+  allowing different backends (GL, WebGL2, future Vulkan) without
+  changing core rendering logic. Each backend implements the same
+  RHI interface but with platform-specific optimizations.

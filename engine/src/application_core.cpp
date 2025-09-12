@@ -7,7 +7,7 @@
 #include "light.h"
 #include "ui_bridge.h"
 #include "imgui_ui_layer.h"
-#include "rayutils.h"
+#include "ray_utils.h"
 #include "json_ops.h"
 #ifndef WEB_USE_HTML_UI
 #include "imgui.h"

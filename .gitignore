@@ -30,6 +30,7 @@ Makefile
 # OS generated files
 Thumbs.db
 Desktop.ini
+*.stackdump
 
 # macOS generated files
 .DS_Store

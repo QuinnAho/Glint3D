@@ -1,0 +1,45 @@
+docs:       pending   # pending|pass|fail|skip
+tests:      pending
+qa:         pending
+perf:       pending
+determinism: pending
+parity:     pending   # desktop/web feature parity
+security:   pending
+
+# Pass gates with specific criteria
+criteria:
+  docs:
+    - "Architecture documentation updated in docs/rendering_arch_v1.md"
+    - "JSON schema updated for new material properties"
+    - "API reference includes MaterialCore and RHI interfaces"
+  tests:
+    - "Unit tests for MaterialCore BSDF calculations"
+    - "Golden image tests for SSR-T vs raytracing comparison"
+    - "Integration tests for auto mode selection logic"
+  qa:
+    - "Manual verification of glass materials in UI"
+    - "Cross-platform testing (desktop + web)"
+    - "Regression testing on existing opaque scenes"
+  perf:
+    - "Frame time under 16ms at 1080p with SSR-T enabled"
+    - "Memory usage within 50MB overhead budget"
+    - "Shader compilation time under 2s on target hardware"
+  determinism:
+    - "Consistent output across runs with same seed"
+    - "Pixel-perfect golden image matching (SSIM >= 0.995)"
+    - "No floating-point precision drift across platforms"
+  parity:
+    - "Desktop and web produce equivalent visual results"
+    - "WebGL2 shader compatibility verified"
+    - "Feature graceful degradation on limited hardware"
+  security:
+    - "No new path traversal vulnerabilities"
+    - "Asset root validation preserved"
+    - "No shader code injection vectors"
+
+# Automated checkers
+automation:
+  docs: "check_docs_coverage.py"
+  tests: "run_golden_tests.sh && run_unit_tests.sh" 
+  perf: "benchmark_frame_times.py"
+  determinism: "verify_golden_stability.py"

@@ -140,23 +140,23 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
 
     // Load shaders (legacy wrapper still present for non-RHI paths)
     m_basicShader = std::make_unique<Shader>();
-    m_basicShader->load("shaders/standard.vert", "shaders/standard.frag");
+    m_basicShader->load("engine/shaders/standard.vert", "engine/shaders/standard.frag");
 
     m_pbrShader = std::make_unique<Shader>();
-    m_pbrShader->load("shaders/pbr.vert", "shaders/pbr.frag");
+    m_pbrShader->load("engine/shaders/pbr.vert", "engine/shaders/pbr.frag");
 
     m_gridShader = std::make_unique<Shader>();
-    if (!m_gridShader->load("shaders/grid.vert", "shaders/grid.frag"))
+    if (!m_gridShader->load("engine/shaders/grid.vert", "engine/shaders/grid.frag"))
         std::cerr << "[RenderSystem] Failed to load grid shader.\n";
 
     // Gradient background shader (for background mode = Gradient)
     m_gradientShader = std::make_unique<Shader>();
-    if (!m_gradientShader->load("shaders/gradient.vert", "shaders/gradient.frag"))
+    if (!m_gradientShader->load("engine/shaders/gradient.vert", "engine/shaders/gradient.frag"))
         std::cerr << "[RenderSystem] Failed to load gradient shader.\n";
 
     // Load raytracing screen quad shader
     m_screenQuadShader = std::make_unique<Shader>();
-    if (!m_screenQuadShader->load("shaders/rayscreen.vert", "shaders/rayscreen.frag"))
+    if (!m_screenQuadShader->load("engine/shaders/rayscreen.vert", "engine/shaders/rayscreen.frag"))
         std::cerr << "[RenderSystem] Failed to load rayscreen shader.\n";
 
     // Init helpers
@@ -169,14 +169,14 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     if (m_rhi) {
         // Create RHI shaders
         ShaderDesc sdBasic{};
-        sdBasic.vertexSource = loadTextFile("shaders/standard.vert");
-        sdBasic.fragmentSource = loadTextFile("shaders/standard.frag");
+        sdBasic.vertexSource = loadTextFile("engine/shaders/standard.vert");
+        sdBasic.fragmentSource = loadTextFile("engine/shaders/standard.frag");
         sdBasic.debugName = "standard";
         m_basicShaderRhi = m_rhi->createShader(sdBasic);
 
         ShaderDesc sdPbr{};
-        sdPbr.vertexSource = loadTextFile("shaders/pbr.vert");
-        sdPbr.fragmentSource = loadTextFile("shaders/pbr.frag");
+        sdPbr.vertexSource = loadTextFile("engine/shaders/pbr.vert");
+        sdPbr.fragmentSource = loadTextFile("engine/shaders/pbr.frag");
         sdPbr.debugName = "pbr";
         m_pbrShaderRhi = m_rhi->createShader(sdPbr);
 

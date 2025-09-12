@@ -1,0 +1,51 @@
+{
+  "description": "Task-specific AI constraints for RHI Abstraction Layer implementation",
+  "layering": [
+    {
+      "description": "RHI interface must be pure abstraction - no GL calls in headers",
+      "from": "engine/include/glint3d/rhi*.h",
+      "disallow_patterns": ["gl[A-Z].*\\(", "GL_.*", "#include.*GL/.*"],
+      "require_patterns": ["virtual.*= 0;"]
+    },
+    {
+      "description": "RHI implementation isolation - GL calls only in backend files",
+      "from": "engine/src/rhi/**",
+      "disallow_imports": ["platforms/**", "ui/**", "imgui/**"],
+      "allow_gl_calls": ["engine/src/rhi/rhi_gl.cpp", "engine/src/rhi/rhi_webgl.cpp"]
+    },
+    {
+      "description": "Engine Core must use RHI interface, not direct GL",
+      "from": "engine/src/render_system.cpp",
+      "disallow_patterns": ["gl[A-Z].*\\(", "GL_.*"],
+      "require_patterns": ["rhi->", "m_rhi->"]
+    }
+  ],
+  "edit_scope": [
+    "engine/include/glint3d/rhi*.h",
+    "engine/include/rhi/**",
+    "engine/src/rhi/**",
+    "tests/unit/rhi_test.cpp",
+    "tests/integration/rhi_backend_test.cpp", 
+    "docs/rhi_architecture.md",
+    "ai/tasks/FEAT-0242/**"
+  ],
+  "constraints": {
+    "max_files_per_edit": 3,
+    "require_tests_for_new_apis": true,
+    "require_docs_for_public_headers": true,
+    "preserve_existing_behavior": "All rendering output must remain identical",
+    "performance_budget": "overhead <= 5% vs direct GL calls"
+  },
+  "validation": {
+    "golden_tests_required": true,
+    "ssim_threshold": 0.995,
+    "cross_platform_check": true,
+    "gl_call_audit": "Ensure no direct GL calls outside RHI backends"
+  },
+  "architecture_goals": {
+    "abstraction_level": "Thin wrapper over graphics APIs with minimal overhead",
+    "backend_support": ["OpenGL 3.3+", "WebGL2", "Future: Vulkan, WebGPU"],
+    "resource_management": "Automatic lifetime management with RAII patterns",
+    "state_tracking": "Minimize redundant state changes across API calls"
+  }
+}

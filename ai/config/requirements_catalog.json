@@ -1,0 +1,142 @@
+{
+  "description": "Centralized catalog of reusable requirements referenced by tasks",
+  "version": "1.0",
+  "last_updated": "2025-09-11T14:03:12Z",
+  
+  "architecture": {
+    "ARCH.NO_GL_OUTSIDE_RHI": {
+      "title": "No OpenGL calls outside RHI",
+      "description": "Direct OpenGL calls must only exist within the RHI abstraction layer",
+      "validation": "Check engine/src/** excludes gl[A-Z].* except in engine/src/rhi/",
+      "exceptions": ["engine/src/rhi/rhi_gl.cpp", "engine/src/rhi/rhi_webgl.cpp"],
+      "rationale": "Enables future Vulkan/WebGPU backends and prevents API leakage"
+    },
+    
+    "ARCH.ENGINE_CORE_ISOLATION": {
+      "title": "Engine Core UI isolation", 
+      "description": "Engine Core must not depend on ImGui, GLFW, React, or platform UI",
+      "validation": "engine/src/** imports must not include imgui/**, glfw/**, platforms/**",
+      "rationale": "Enables headless operation and alternative UI implementations"
+    },
+    
+    "ARCH.UNIFIED_MATERIALS": {
+      "title": "Single MaterialCore struct",
+      "description": "Eliminate dual PBR/legacy material storage causing conversion drift",
+      "validation": "SceneObject should have single MaterialCore field, not separate PBR + Material",
+      "rationale": "Prevents material property inconsistency between raster and ray pipelines"
+    }
+  },
+  
+  "api": {
+    "API.PUBLIC_HEADERS_PATH": {
+      "title": "Public headers absolute paths",
+      "description": "Public headers must use #include <glint3d/...> not relative paths",
+      "validation": "engine/include/glint3d/** should not contain #include \"...\"",
+      "rationale": "Enables clean SDK distribution and prevents include path issues"
+    },
+    
+    "API.BACKWARD_COMPATIBILITY": {
+      "title": "Preserve existing API surface",
+      "description": "Public APIs must remain backward compatible or provide migration path",
+      "validation": "JSON Ops schema versioning and deprecated field handling",
+      "rationale": "Protects existing user scripts and automation"
+    }
+  },
+  
+  "testing": {
+    "TEST.GOLDEN_SSIM": {
+      "title": "Golden image regression testing",
+      "description": "Visual changes must pass SSIM >= 0.995 against reference images",
+      "validation": "Golden tests in tests/golden/ with automatic comparison",
+      "tools": ["golden_image_compare.py", "generate_goldens.py"],
+      "rationale": "Prevents visual regressions in rendering pipeline changes"
+    },
+    
+    "TEST.UNIT_COVERAGE": {
+      "title": "Unit test coverage for new APIs",
+      "description": "New public functions require unit tests with >= 80% coverage",
+      "validation": "Coverage report must show adequate test coverage",
+      "rationale": "Ensures reliability and prevents regression"
+    },
+    
+    "TEST.CROSS_PLATFORM": {
+      "title": "Desktop and web feature parity",
+      "description": "New features must work equivalently on desktop OpenGL and WebGL2",
+      "validation": "CI tests on both platforms with identical outputs",
+      "rationale": "Maintains consistent user experience across platforms"
+    }
+  },
+  
+  "determinism": {
+    "DET.SEED_REPRO": {
+      "title": "Deterministic rendering with seeds",
+      "description": "Rendering must produce identical output given same seed and inputs",
+      "validation": "Multiple runs with same seed produce pixel-identical results",
+      "rationale": "Enables reliable testing and debugging of rendering algorithms"
+    },
+    
+    "DET.GOLDEN_STABILITY": {
+      "title": "Golden image stability",
+      "description": "Reference images must be stable across platforms and driver versions",
+      "validation": "Golden regeneration produces consistent results",
+      "rationale": "Prevents false CI failures due to floating-point precision differences"
+    }
+  },
+  
+  "performance": {
+    "PERF.FRAME_BUDGET": {
+      "title": "Real-time frame budget",
+      "description": "Interactive features must maintain <16ms frame time at 1080p",
+      "validation": "Performance benchmarks measure frame time under load",
+      "target": "60fps on mid-range hardware",
+      "rationale": "Ensures responsive user experience during interactive editing"
+    },
+    
+    "PERF.MEMORY_BUDGET": {
+      "title": "Memory usage constraints",
+      "description": "Features should not exceed reasonable memory overhead budgets",
+      "validation": "Memory profiling during typical usage scenarios",
+      "targets": {
+        "small_scene_mb": 100,
+        "large_scene_mb": 500,
+        "overhead_per_feature_mb": 50
+      },
+      "rationale": "Prevents memory bloat and enables use on modest hardware"
+    }
+  },
+  
+  "security": {
+    "SEC.PATH_VALIDATION": {
+      "title": "Path traversal protection",
+      "description": "File operations must validate paths against configured asset root",
+      "validation": "Security tests attempt various traversal patterns",
+      "functions": ["load", "render_image", "set_background"],
+      "rationale": "Prevents malicious JSON ops from accessing arbitrary files"
+    },
+    
+    "SEC.NO_SECRETS": {
+      "title": "No secrets in source code",
+      "description": "API keys, passwords, tokens must not be committed to repository",
+      "validation": "Pre-commit hooks scan for secret patterns",
+      "patterns": ["api_key", "password", "secret", "token", "auth"],
+      "rationale": "Prevents credential leaks and security vulnerabilities"
+    }
+  },
+  
+  "documentation": {
+    "DOC.API_COVERAGE": {
+      "title": "API documentation completeness",
+      "description": "Public headers must have complete documentation",
+      "validation": "Documentation coverage checker on public APIs",
+      "format": "Doxygen-compatible comments",
+      "rationale": "Enables effective SDK usage and maintenance"
+    },
+    
+    "DOC.ARCHITECTURE_CURRENT": {
+      "title": "Architecture documentation up to date",
+      "description": "Major changes must update architecture documentation",
+      "files": ["docs/architecture.md", "CLAUDE.md", "docs/rendering_arch.md"],
+      "rationale": "Maintains knowledge continuity for future development"
+    }
+  }
+}

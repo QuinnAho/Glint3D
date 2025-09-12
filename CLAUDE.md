@@ -17,7 +17,7 @@ cmake --build builds/desktop/cmake -j
 # 2. Open builds/desktop/cmake/glint.sln in Visual Studio 2022
 # 3. Or open builds/desktop/cmake/glint.vcxproj directly
 # 4. Build Configuration: Release|x64 or Debug|x64
-# 5. Run from repo root so shaders/ and assets/ paths resolve
+# 5. Run from repo root so engine/shaders/ and assets/ paths resolve
 # 
 # Note: Legacy engine/Project1.vcxproj has been removed.
 # Always use CMake-generated project files to ensure consistency.
@@ -89,7 +89,7 @@ platforms/web/src/
 - **Share Links**: URL-based scene state encoding for sharing
 
 ### Engine Integration Status ✅
-- **WASM Build**: Successfully building to `builds/web/emscripten/objviewer.*`
+- **WASM Build**: Successfully building to `builds/web/emscripten/glint.*`
 - **Asset Pipeline**: Automatic asset preloading via Emscripten
 - **API Bridge**: Complete JSON Ops v1 implementation
 - **File System**: Emscripten FS mounting for drag-and-drop and file import
@@ -205,7 +205,7 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 
 #### 5. UI Architecture
 - **Desktop UI**: ImGui panels integrated directly into Application
-- **Web UI**: React/Tailwind app (`web/`) communicating via JSON Ops bridge  
+- **Web UI**: React/Tailwind app (`platforms/web/`) communicating via JSON Ops bridge  
 - **UI abstraction**: `app_state.h` provides read-only state snapshot for UI layers
 - **Command pattern**: `app_commands.h` for UI → Application actions
 
@@ -574,26 +574,47 @@ See `engine/external/README.md` for detailed dependency documentation and integr
 
 ### Directory Structure
 ```
-engine/
-├── src/                    # Core C++ implementation
-│   ├── importers/         # Asset import plugins
-│   └── ui/                # Desktop UI layer (ImGui)  
-├── include/               # Header files
-├── shaders/               # OpenGL/WebGL shaders
-├── assets/                # Models, textures, examples
-└── Libraries/             # Third-party deps (GLFW, ImGui, GLM, stb)
-
-web/                       # React/Tailwind web interface
-├── src/sdk/viewer.ts      # Emscripten bridge wrapper
-└── public/engine/         # WASM build outputs
-
-builds/
-├── desktop/cmake/         # CMake desktop build
-├── web/emscripten/        # Emscripten web build  
-└── vs/x64/                # Visual Studio build outputs
-docs/                      # JSON Ops specification & schema
-examples/json-ops/         # Sample JSON Ops files (directional-light-test, spot-light-test)
-examples/golden/           # Golden images (directional-light-test.png, spot-light-test.png)
+Glint3D/
+├── engine/                     # Core C++ engine
+│   ├── src/                    # Core implementation (rendering, raytracing, loaders)
+│   │   ├── importers/         # Asset import plugins (OBJ, Assimp)
+│   │   ├── rhi/               # Render Hardware Interface (OpenGL/WebGL2 abstraction)
+│   │   └── ui/                # Desktop ImGui integration
+│   ├── include/               # Engine headers
+│   │   ├── glint3d/          # Public API headers (MaterialCore, RHI)
+│   │   └── rhi/              # Internal RHI headers
+│   ├── shaders/               # GLSL shaders (PBR, standard, post-processing)
+│   ├── resources/             # Build resources (Windows icon, RC files)
+│   └── Libraries/             # Third-party dependencies (GLFW, ImGui, GLM, stb)
+├── platforms/                  # Platform-specific implementations
+│   ├── desktop/               # Desktop platform integration
+│   └── web/                   # React/Tailwind web platform
+├── packages/                   # NPM packages and SDK components
+│   ├── ops-sdk/               # TypeScript SDK for JSON operations
+│   └── wasm-bindings/         # WASM/JavaScript bindings
+├── sdk/                        # Software Development Kits
+│   └── web/                   # Web SDK and TypeScript definitions  
+├── assets/                     # Runtime content
+│   ├── models/                # 3D models (OBJ, GLB, GLTF)
+│   ├── textures/              # Texture maps
+│   └── img/                   # Images and HDR environments
+├── examples/                   # Usage examples and demos
+│   └── json-ops/              # JSON Operations examples and test cases
+├── tests/                      # Test suites
+│   ├── unit/                  # C++ unit tests
+│   ├── integration/           # JSON Ops integration tests
+│   ├── golden/                # Visual regression testing (golden images)
+│   └── security/              # Security vulnerability tests
+├── schemas/                    # JSON schema definitions
+├── docs/                       # Documentation
+├── tools/                      # Development and build tools
+├── ai/                         # AI-assisted development configuration
+│   ├── config/                # AI constraints and requirements
+│   ├── tasks/                 # Task capsule management system
+│   └── ontology/              # Semantic definitions
+└── builds/                     # Build outputs (generated)
+    ├── desktop/cmake/         # CMake desktop builds
+    └── web/emscripten/        # Emscripten web builds
 ```
 
 ### Platform Differences

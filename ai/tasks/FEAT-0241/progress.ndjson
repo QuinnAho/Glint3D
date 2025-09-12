@@ -1,0 +1,8 @@
+{"ts":"2025-09-11T14:03:12Z","who":"human","kind":"task_created","task":"FEAT-0241","msg":"SSR-T refraction in raster preview task created"}
+{"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"pr_started","task":"FEAT-0241","pr":"PR1","msg":"Started MaterialCore + RHI headers implementation"}
+{"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"discovery","task":"FEAT-0241","msg":"Found existing MaterialCore and RHI implementations in codebase - created public API versions"}
+{"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"api_created","task":"FEAT-0241","pr":"PR1","msg":"Created engine/include/glint3d/material_core.h with unified BSDF struct"}
+{"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"api_created","task":"FEAT-0241","pr":"PR1","msg":"Reused engine/include/glint3d/rhi.h from FEAT-0242 work"}
+{"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"analysis","task":"FEAT-0241","msg":"Identified dual storage problem: SceneObject has both Material and PBR fields causing conversion drift"}
+{"ts":"2025-09-11T22:15:00Z","who":"ai","kind":"build_fix","task":"FEAT-0241","msg":"Fixed build issues: rayutils.cpp -> ray_utils.cpp and include path fixes"}
+{"ts":"2025-09-11T22:15:00Z","who":"ai","kind":"build_success","task":"FEAT-0241","msg":"Desktop build successful - new MaterialCore and RHI headers compile correctly"}

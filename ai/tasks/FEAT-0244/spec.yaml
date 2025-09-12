@@ -1,0 +1,93 @@
+id: FEAT-0244  
+title: Hybrid Auto Mode Pipeline Selection
+owner: ai
+status: planned
+created: "2025-09-11T14:30:00Z"
+priority: high
+
+description: >
+  Implement intelligent pipeline selection that automatically chooses rasterizer
+  for previews and raytracer for final renders based on material properties.
+  Eliminates the "Manual Mode Selection" problem where users must remember --raytrace.
+
+acceptance_criteria:
+  - "Auto mode analyzes scene materials and selects appropriate pipeline"
+  - "Transmissive materials (transmission > 0.01) trigger raytracing"
+  - "Opaque-only scenes use fast rasterizer for real-time interaction"
+  - "CLI supports --mode raster|ray|auto with auto as default"
+  - "UI indicates which pipeline is active and why"
+
+must_requirements:
+  - API.BACKWARD_COMPATIBILITY
+  - PERF.FRAME_BUDGET
+  - TEST.GOLDEN_SSIM
+  - DET.SEED_REPRO
+
+plan:
+  - id: PR1
+    title: "Define RenderMode enum and selection heuristics"
+    status: planned
+    files: ["engine/include/glint3d/render_mode.h"]
+  - id: PR2
+    title: "Implement material analysis for auto mode selection"
+    status: planned
+    files: ["engine/src/render_mode_selector.cpp"]
+  - id: PR3
+    title: "Add CLI --mode parameter parsing"
+    status: planned
+    files: ["engine/src/main.cpp", "engine/src/application.cpp"]
+  - id: PR4
+    title: "Update JSON Ops with mode selection support"
+    status: planned
+    files: ["engine/src/json_ops.cpp", "schemas/json_ops_v1.json"]
+  - id: PR5
+    title: "Add UI indicators for active pipeline"
+    status: planned
+    files: ["engine/src/ui/render_settings_panel.cpp", "platforms/web/src/components/Inspector.tsx"]
+
+file_whitelist:
+  - "engine/include/glint3d/render_mode.h"
+  - "engine/src/render_mode_selector.cpp"
+  - "engine/src/main.cpp"
+  - "engine/src/application.cpp"
+  - "engine/src/json_ops.cpp"
+  - "engine/src/ui/render_settings_panel.cpp"
+  - "platforms/web/src/components/Inspector.tsx"
+  - "schemas/json_ops_v1.json"
+  - "tests/unit/render_mode_selector_test.cpp"
+  - "tests/integration/auto_mode_test.cpp"
+  - "docs/hybrid_rendering.md"
+  - "ai/tasks/FEAT-0244/**"
+
+outputs:
+  - engine/include/glint3d/render_mode.h
+  - Auto mode selection algorithm
+  - Updated CLI with mode parameter
+  - UI pipeline indicators
+
+metrics:
+  selection_accuracy: 0.95    # 95% correct auto selections vs manual
+  mode_switch_time_ms: 100    # Fast mode switching
+  false_positive_rate: 0.05   # 5% unnecessary raytracing
+
+dependencies:
+  blocks: []
+  blocked_by: [FEAT-0243]  # Depends on MaterialCore for analysis
+
+selection_heuristics: >
+  Auto mode analyzes all materials in scene:
+  1. If any material has transmission > 0.01 AND (thickness > 0 OR ior > 1.05): use raytracing
+  2. If scene complexity > threshold AND interactive mode: use rasterizer
+  3. If render target (--render specified): use raytracing for quality
+  4. Default: rasterizer for real-time interaction
+
+current_problems:
+  - "Users must remember --raytrace flag for glass materials"
+  - "No indication of why renders look wrong (missing refraction)"
+  - "Pipeline selection is manual and error-prone"
+  - "No performance vs quality tradeoff automation"
+
+target_architecture: >
+  Intelligent system that automatically selects the best pipeline based on
+  material properties, scene complexity, and usage context (interactive vs final).
+  Clear UI feedback about pipeline selection rationale.

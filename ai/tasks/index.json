@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "version": "1.0",
+    "last_updated": "2025-09-11T14:30:00Z",
+    "active_task": "FEAT-0241"
+  },
+  "features": [
+    {
+      "id": "FEAT-0241",
+      "title": "SSR-T refraction in raster preview",
+      "status": "planned", 
+      "owner": "ai",
+      "priority": "high",
+      "depends_on": ["FEAT-0242", "FEAT-0243"],
+      "created": "2025-09-11T14:03:12Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0242",
+      "title": "RHI Abstraction Layer Implementation",
+      "status": "planned",
+      "owner": "ai", 
+      "priority": "critical",
+      "depends_on": [],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0243",
+      "title": "MaterialCore Unified BSDF System",
+      "status": "planned",
+      "owner": "ai",
+      "priority": "high", 
+      "depends_on": ["FEAT-0242"],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0244",
+      "title": "Hybrid Auto Mode Pipeline Selection",
+      "status": "planned",
+      "owner": "ai",
+      "priority": "high",
+      "depends_on": ["FEAT-0243"],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0245",
+      "title": "RenderGraph Pass System Implementation",
+      "status": "planned", 
+      "owner": "ai",
+      "priority": "medium",
+      "depends_on": ["FEAT-0242"],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0246", 
+      "title": "Deterministic Rendering and Golden Test Suite",
+      "status": "planned",
+      "owner": "ai",
+      "priority": "high",
+      "depends_on": ["FEAT-0243"],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    },
+    {
+      "id": "FEAT-0247",
+      "title": "Performance Profiling and Optimization Framework", 
+      "status": "planned",
+      "owner": "ai",
+      "priority": "medium",
+      "depends_on": ["FEAT-0242", "FEAT-0245"],
+      "created": "2025-09-11T14:30:00Z",
+      "estimated_prs": 5
+    }
+  ],
+  "requirements_catalog": {
+    "ARCH.NO_GL_OUTSIDE_RHI": "No direct OpenGL calls outside RHI abstraction layer",
+    "ARCH.ENGINE_CORE_ISOLATION": "Engine Core must not depend on UI frameworks",
+    "ARCH.UNIFIED_MATERIALS": "Single MaterialCore struct, no dual storage",
+    "API.PUBLIC_HEADERS_PATH": "Public headers must use absolute paths for includes", 
+    "API.BACKWARD_COMPATIBILITY": "Preserve existing API surface or provide migration path",
+    "DET.SEED_REPRO": "Deterministic rendering with seeded random numbers",
+    "DET.GOLDEN_STABILITY": "Reference images stable across platforms and drivers",
+    "TEST.GOLDEN_SSIM": "Visual regression tests with SSIM >= 0.995",
+    "TEST.UNIT_COVERAGE": "New public functions require unit tests with >= 80% coverage",
+    "TEST.CROSS_PLATFORM": "Desktop and web feature parity",
+    "PERF.FRAME_BUDGET": "Frame time must stay under 16ms at 1080p",
+    "PERF.MEMORY_BUDGET": "Memory usage within reasonable overhead budgets", 
+    "SEC.PATH_VALIDATION": "All file operations must validate paths against asset root"
+  },
+  "architectural_issues": {
+    "dual_material_storage": {
+      "description": "SceneObject has both PBR and legacy Material fields causing conversion drift",
+      "impact": "Inconsistent material behavior between raster and ray pipelines",
+      "addressed_by": ["FEAT-0243"]
+    },
+    "pipeline_fragmentation": {
+      "description": "Raster (no refraction) vs Ray (full physics) - users must know which to use",
+      "impact": "Poor UX, missed glass effects, manual mode selection",
+      "addressed_by": ["FEAT-0241", "FEAT-0244"]
+    },
+    "backend_lockin": {
+      "description": "Direct OpenGL calls scattered throughout engine, hard to port",
+      "impact": "Cannot add Vulkan/WebGPU backends without major refactoring",
+      "addressed_by": ["FEAT-0242"]
+    },
+    "no_pass_system": {
+      "description": "Interleaved rendering logic, hard to extend with new techniques",
+      "impact": "Adding SSR, SSAO, or new passes requires major surgery",
+      "addressed_by": ["FEAT-0245"]
+    },
+    "testing_gaps": {
+      "description": "Limited golden image coverage, no deterministic rendering",
+      "impact": "Visual regressions not caught, floating-point CI failures",
+      "addressed_by": ["FEAT-0246"]
+    },
+    "performance_blindness": {
+      "description": "No profiling framework, budget enforcement, or regression detection",
+      "impact": "Performance bottlenecks unknown, regressions detected by users",
+      "addressed_by": ["FEAT-0247"]
+    }
+  }
+}

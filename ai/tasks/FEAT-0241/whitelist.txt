@@ -1,0 +1,50 @@
+# File paths that FEAT-0241 is allowed to modify
+# Enforced by CI and pre-commit hooks
+
+# Core engine headers
+engine/include/glint3d/material_core.h
+engine/include/glint3d/rhi.h
+engine/include/glint3d/render_pass.h
+engine/include/scene_object.h
+
+# RHI implementation
+engine/src/rhi/**
+engine/include/rhi/**
+
+# Render system updates
+engine/src/render_system.cpp
+engine/src/render/ssr_pass.cpp
+engine/src/render/render_graph.cpp
+
+# Shader files
+engine/shaders/ssr_refraction.frag
+engine/shaders/ssr_refraction.vert
+engine/shaders/pbr.frag
+engine/shaders/material_uniforms.glsl
+
+# Raytracer migration
+engine/src/raytracer.cpp
+
+# JSON Ops integration
+engine/src/json_ops.cpp
+
+# Application integration
+engine/src/application.cpp
+
+# Documentation
+docs/rendering_arch_v1.md
+docs/materials.md
+docs/rhi_guide.md
+
+# Tests
+tests/unit/material_core_test.cpp
+tests/unit/rhi_test.cpp
+tests/integration/ssr_refraction_test.cpp
+tests/golden/scenes/glass_refraction.json
+tests/golden/references/glass_refraction.png
+
+# Task management
+ai/tasks/FEAT-0241/**
+
+# Schema updates
+schemas/json_ops_v1.json

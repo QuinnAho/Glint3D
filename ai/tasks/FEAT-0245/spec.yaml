@@ -1,0 +1,102 @@
+id: FEAT-0245
+title: RenderGraph Pass System Implementation 
+owner: ai
+status: planned
+created: "2025-09-11T14:30:00Z"
+priority: medium
+
+description: >
+  Replace interleaved rendering logic with clean pass-based architecture.
+  Addresses "No Pass System" problem by implementing modular RenderGraph
+  that makes the pipeline easier to extend and debug.
+
+acceptance_criteria:
+  - "RenderSystem uses pass-based architecture instead of monolithic rendering"
+  - "Passes are composable and can be reordered/disabled"
+  - "GPU resources managed automatically between passes"
+  - "Pass timing and debugging support built-in"
+  - "Existing rendering behavior preserved (SSIM >= 0.995)"
+
+must_requirements:
+  - ARCH.NO_GL_OUTSIDE_RHI
+  - API.PUBLIC_HEADERS_PATH
+  - TEST.GOLDEN_SSIM
+  - PERF.FRAME_BUDGET
+
+plan:
+  - id: PR1
+    title: "Define RenderPass base class and RenderGraph interface"
+    status: planned
+    files: ["engine/include/glint3d/render_pass.h", "engine/include/glint3d/render_graph.h"]
+  - id: PR2
+    title: "Implement core passes (GBuffer, Lighting, PostProcess)"
+    status: planned
+    files: ["engine/src/render/gbuffer_pass.cpp", "engine/src/render/lighting_pass.cpp"]
+  - id: PR3
+    title: "Add pass resource management and GPU state tracking"
+    status: planned
+    files: ["engine/src/render/render_graph.cpp"]
+  - id: PR4
+    title: "Migrate RenderSystem to use RenderGraph"
+    status: planned
+    files: ["engine/src/render_system.cpp"]
+  - id: PR5
+    title: "Add pass timing and debugging utilities"
+    status: planned
+    files: ["engine/src/render/pass_profiler.cpp", "engine/src/ui/render_profiler_panel.cpp"]
+
+file_whitelist:
+  - "engine/include/glint3d/render_pass.h"
+  - "engine/include/glint3d/render_graph.h"
+  - "engine/src/render/render_graph.cpp"
+  - "engine/src/render/gbuffer_pass.cpp"
+  - "engine/src/render/lighting_pass.cpp"
+  - "engine/src/render/post_pass.cpp"
+  - "engine/src/render/pass_profiler.cpp"
+  - "engine/src/render_system.cpp"
+  - "engine/src/ui/render_profiler_panel.cpp"
+  - "tests/unit/render_pass_test.cpp"
+  - "tests/integration/render_graph_test.cpp"
+  - "docs/render_graph_architecture.md"
+  - "ai/tasks/FEAT-0245/**"
+
+outputs:
+  - engine/include/glint3d/render_pass.h
+  - engine/include/glint3d/render_graph.h
+  - Core rendering passes implementation
+  - Pass profiling and debugging tools
+
+metrics:
+  pass_overhead_ms: 0.5      # Max overhead per pass
+  resource_binding_efficiency: 0.9  # 90% optimal resource usage
+  pass_reusability: 0.8      # 80% of passes reusable across pipelines
+
+dependencies:
+  blocks: [FEAT-0241]  # SSR-T pass depends on RenderGraph
+  blocked_by: [FEAT-0242]  # Depends on RHI for resource management
+
+pass_architecture: >
+  Raster Pipeline Passes:
+  1. GBufferPass - Geometry and material properties
+  2. LightingPass - Direct lighting computation  
+  3. SSRRefractionPass - Screen-space refraction (FEAT-0241)
+  4. PostProcessPass - Tone mapping, gamma correction
+  5. ReadbackPass - Final output to CPU/file
+  
+  Ray Pipeline Passes:
+  1. IntegratorPass - Ray tracing computation
+  2. DenoisePass - AI-based noise reduction
+  3. TonemapPass - HDR tone mapping
+  4. ReadbackPass - Final output
+
+current_problems:
+  - "Rendering logic interleaved throughout RenderSystem"
+  - "Hard to add new rendering techniques (SSR, SSAO, etc.)"
+  - "GPU state management scattered and error-prone"
+  - "No performance profiling of individual render stages"
+  - "Resource binding optimization difficult"
+
+target_architecture: >
+  Clean pass-based system where each pass has well-defined inputs/outputs,
+  automatic resource management, and composability. Easy to add new passes,
+  reorder pipeline, and profile performance bottlenecks.
