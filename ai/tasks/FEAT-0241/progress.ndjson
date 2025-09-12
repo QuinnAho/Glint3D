@@ -6,3 +6,10 @@
 {"ts":"2025-09-11T22:00:00Z","who":"ai","kind":"analysis","task":"FEAT-0241","msg":"Identified dual storage problem: SceneObject has both Material and PBR fields causing conversion drift"}
 {"ts":"2025-09-11T22:15:00Z","who":"ai","kind":"build_fix","task":"FEAT-0241","msg":"Fixed build issues: rayutils.cpp -> ray_utils.cpp and include path fixes"}
 {"ts":"2025-09-11T22:15:00Z","who":"ai","kind":"build_success","task":"FEAT-0241","msg":"Desktop build successful - new MaterialCore and RHI headers compile correctly"}
+{"ts":"2025-09-12T11:05:00Z","who":"ai","kind":"docs_added","task":"FEAT-0241","pr":"PR1","msg":"Added docs/materials.md and docs/rhi_guide.md for public headers"}
+{"ts":"2025-09-12T11:05:00Z","who":"ai","kind":"tests_added","task":"FEAT-0241","pr":"PR1","msg":"Added tests/unit/rhi_test.cpp covering RHI header defaults and types"}
+{"ts":"2025-09-12T11:05:00Z","who":"ai","kind":"pr_started","task":"FEAT-0241","pr":"PR2","msg":"Started PR2 by stubbing SSR pass and shader"}
+{"ts":"2025-09-12T11:10:00Z","who":"ai","kind":"assets_added","task":"FEAT-0241","pr":"PR2","msg":"Added ssr_refraction.vert stub and golden scene placeholder tests/golden/scenes/glass_refraction.json"}
+{"ts":"2025-09-12T11:20:00Z","who":"ai","kind":"audit","task":"FEAT-0241","msg":"Found Engine Core GL/GLFW usage: render_system.cpp gl*; application_core.cpp glfw*. Added RHI migration plan to README."}
+{"ts":"2025-09-12T11:28:00Z","who":"ai","kind":"api_updated","task":"FEAT-0241","pr":"PR2","msg":"Extended RHI with bindUniformBuffer() and updateBuffer(); updated docs and unit tests."}
+{"ts":"2025-09-12T11:36:00Z","who":"ai","kind":"impl_progress","task":"FEAT-0241","pr":"PR2","msg":"RenderSystem: added RHI dummy shadow texture (parallel to GL), setViewport on resize, and initial Material UBO binding (no behavior change)."}

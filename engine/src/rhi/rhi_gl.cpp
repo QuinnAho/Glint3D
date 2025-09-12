@@ -321,6 +321,30 @@ void RhiGL::bindTexture(TextureHandle texture, uint32_t slot) {
     glBindTexture(target, it->second.id);
 }
 
+void RhiGL::bindUniformBuffer(BufferHandle buffer, uint32_t slot) {
+    auto it = m_buffers.find(buffer);
+    if (it == m_buffers.end()) {
+        std::cerr << "[RhiGL] Invalid buffer handle\n";
+        return;
+    }
+    
+    // Bind uniform buffer to binding point
+    glBindBufferBase(GL_UNIFORM_BUFFER, slot, it->second.id);
+}
+
+void RhiGL::updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset) {
+    auto it = m_buffers.find(buffer);
+    if (it == m_buffers.end()) {
+        std::cerr << "[RhiGL] Invalid buffer handle\n";
+        return;
+    }
+    
+    GLenum target = bufferTypeToGL(it->second.desc.type);
+    glBindBuffer(target, it->second.id);
+    glBufferSubData(target, offset, size, data);
+    glBindBuffer(target, 0);
+}
+
 bool RhiGL::supportsCompute() const {
     return m_supportsCompute;
 }

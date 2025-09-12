@@ -1,4 +1,4 @@
-docs:       pending   # pending|pass|fail|skip
+docs:       pass      # pending|pass|fail|skip
 tests:      pending
 qa:         pending
 perf:       pending

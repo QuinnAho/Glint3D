@@ -117,6 +117,24 @@ RenderSystem::~RenderSystem()
     shutdown();
 }
 
+// File-scope RHI resources created alongside legacy GL placeholders
+static TextureHandle s_dummyShadowTexRhi = 0;
+static BufferHandle  s_materialUbo = 0;
+
+struct MaterialUboData {
+    glm::vec4 baseColor;
+    float metallic;
+    float roughness;
+    float ior;
+    float transmission;
+    float thickness;
+    float attenuationDistance;
+    float clearcoat;
+    float clearcoatRoughness;
+    glm::vec3 emissive;
+    float _pad0{0.0f};
+};
+
 bool RenderSystem::init(int windowWidth, int windowHeight)
 {
     // Initialize OpenGL state
@@ -216,6 +234,16 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
 #endif
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    // Create matching RHI dummy shadow texture (1x1 depth) for future migration
+    if (m_rhi && s_dummyShadowTexRhi == 0) {
+        TextureDesc td{};
+        td.type = TextureType::Texture2D;
+        td.format = TextureFormat::Depth24Stencil8;
+        td.width = 1; td.height = 1; td.mipLevels = 1;
+        td.debugName = "dummyShadowTexRhi";
+        s_dummyShadowTexRhi = m_rhi->createTexture(td);
+    }
+
     // Initialize sub-systems' matrices
     updateProjectionMatrix(windowWidth, windowHeight);
     updateViewMatrix();
@@ -239,6 +267,7 @@ void RenderSystem::shutdown()
     m_pbrShader.reset();
     m_gridShader.reset();
     if (m_dummyShadowTex) { glDeleteTextures(1, &m_dummyShadowTex); m_dummyShadowTex = 0; }
+    if (m_rhi && s_dummyShadowTexRhi != 0) { m_rhi->destroyTexture(s_dummyShadowTexRhi); s_dummyShadowTexRhi = 0; }
     destroyTargets();
 }
 
@@ -263,6 +292,7 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
     }
     if (m_recreateTargets) {
         createOrResizeTargets(m_fbWidth, m_fbHeight);
+        if (m_rhi) m_rhi->setViewport(0, 0, m_fbWidth, m_fbHeight);
         m_recreateTargets = false;
     }
     // Begin RHI frame
@@ -1187,6 +1217,26 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         // Use unified MaterialCore (eliminates dual storage)
         const auto& mc = obj.materialCore;
         if (m_rhi) {
+            // Begin migration: populate a material UBO (shader still reads legacy uniforms for now)
+            if (s_materialUbo == 0) {
+                BufferDesc bd{}; bd.type = BufferType::Uniform; bd.usage = BufferUsage::Dynamic; bd.size = sizeof(MaterialUboData); bd.debugName = "MaterialUbo";
+                s_materialUbo = m_rhi->createBuffer(bd);
+            }
+            if (s_materialUbo != 0) {
+                MaterialUboData u{};
+                u.baseColor = mc.baseColor;
+                u.metallic = mc.metallic;
+                u.roughness = mc.roughness;
+                u.ior = mc.ior;
+                u.transmission = mc.transmission;
+                u.thickness = mc.thickness;
+                u.attenuationDistance = mc.attenuationDistance;
+                u.clearcoat = mc.clearcoat;
+                u.clearcoatRoughness = mc.clearcoatRoughness;
+                u.emissive = mc.emissive;
+                m_rhi->updateBuffer(s_materialUbo, &u, sizeof(u));
+                m_rhi->bindUniformBuffer(s_materialUbo, 0);
+            }
             setUniformVec4("baseColorFactor", mc.baseColor);
             setUniformFloat("metallicFactor", mc.metallic);
             setUniformFloat("roughnessFactor", mc.roughness);

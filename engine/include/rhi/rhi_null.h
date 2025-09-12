@@ -30,6 +30,8 @@ public:
     void clear(const glm::vec4&, float, int) override {}
     void bindPipeline(PipelineHandle) override {}
     void bindTexture(TextureHandle, uint32_t) override {}
+    void bindUniformBuffer(BufferHandle, uint32_t) override {}
+    void updateBuffer(BufferHandle, const void*, size_t, size_t = 0) override {}
 
     bool supportsCompute() const override { return false; }
     bool supportsGeometryShaders() const override { return false; }

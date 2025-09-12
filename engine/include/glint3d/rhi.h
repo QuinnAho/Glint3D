@@ -133,6 +133,22 @@ public:
      * @param slot Texture unit slot (0-based)
      */
     virtual void bindTexture(TextureHandle texture, uint32_t slot) = 0;
+
+    /**
+     * @brief Bind a uniform buffer to a binding slot
+     * @param buffer Buffer handle created with BufferType::Uniform
+     * @param slot Binding slot (0-based), matches shader uniform block binding
+     */
+    virtual void bindUniformBuffer(BufferHandle buffer, uint32_t slot) = 0;
+
+    /**
+     * @brief Update a buffer's contents
+     * @param buffer Buffer handle
+     * @param data Pointer to source data
+     * @param size Number of bytes to write
+     * @param offset Byte offset in buffer (default 0)
+     */
+    virtual void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) = 0;
     
     // Capability queries for feature detection
     /**

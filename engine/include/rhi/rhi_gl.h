@@ -36,6 +36,8 @@ public:
     void clear(const glm::vec4& color, float depth, int stencil) override;
     void bindPipeline(PipelineHandle pipeline) override;
     void bindTexture(TextureHandle texture, uint32_t slot) override;
+    void bindUniformBuffer(BufferHandle buffer, uint32_t slot) override;
+    void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) override;
     
     bool supportsCompute() const override;
     bool supportsGeometryShaders() const override;

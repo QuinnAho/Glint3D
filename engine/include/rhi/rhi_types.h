@@ -161,3 +161,17 @@ struct ReadbackDesc {
     void* destination = nullptr;
     size_t destinationSize = 0;
 };
+
+// Render target descriptor (new)
+struct RenderTargetDesc {
+    int width = 0;
+    int height = 0;
+    int samples = 1;
+    // Color buffer
+    bool hasColor = true;
+    TextureFormat colorFormat = TextureFormat::RGBA8;
+    // Depth/stencil buffer
+    bool hasDepth = true;
+    TextureFormat depthFormat = TextureFormat::Depth24Stencil8;
+    std::string debugName;
+};

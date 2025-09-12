@@ -55,6 +55,10 @@ public:
     virtual void clear(const glm::vec4& color, float depth = 1.0f, int stencil = 0) = 0;
     virtual void bindPipeline(PipelineHandle pipeline) = 0;
     virtual void bindTexture(TextureHandle texture, uint32_t slot) = 0;
+
+    // Uniform buffers (new)
+    virtual void bindUniformBuffer(BufferHandle buffer, uint32_t slot) = 0;
+    virtual void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) = 0;
     
     // Query capabilities
     virtual bool supportsCompute() const = 0;
@@ -71,3 +75,12 @@ public:
 
 // Factory function
 std::unique_ptr<RHI> createRHI(RHI::Backend backend);
+
+// Render targets (new basic API)
+using RenderTargetHandle = uint32_t;
+
+struct RenderTargetDesc;
+
+// Extended interface (optional to implement in initial migration)
+// Implementations may treat handle 0 as default framebuffer
+class RHI; // forward
