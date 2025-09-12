@@ -9,7 +9,7 @@ Runs on **desktop (OpenGL/GLFW/ImGui)** and **web (WebGL2 via Emscripten)**, wit
 > Unlike heavy DCC tools, Glint3D focuses on **JSON Ops scripting**, **headless rendering**, and **shareable results**.  
 > **AI support** means external AI systems can easily drive rendering pipelines, generate datasets, or analyze outputs.
 
-#<img width="1918" height="1022" alt="487958014-339167ae-2f39-4b92-8111-5668ffe989cd" src="https://github.com/user-attachments/assets/b4c7f331-6831-4d86-9202-07d844bf2602" />
+<img width="1918" height="1022" alt="487958014-339167ae-2f39-4b92-8111-5668ffe989cd" src="https://github.com/user-attachments/assets/b4c7f331-6831-4d86-9202-07d844bf2602" />
 
 ---
 
