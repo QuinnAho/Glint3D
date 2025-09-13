@@ -79,8 +79,12 @@ public:
     void render(const SceneManager& scene, const Light& lights);
     
     // Offscreen rendering
+    // Legacy GL path: renders into a raw GL texture via FBO (kept for compatibility)
     bool renderToTexture(const SceneManager& scene, const Light& lights, 
                         GLuint textureId, int width, int height);
+    // RHI path: renders into an RHI TextureHandle using RHI render targets (preferred)
+    bool renderToTextureRHI(const SceneManager& scene, const Light& lights,
+                           TextureHandle textureHandle, int width, int height);
     bool renderToPNG(const SceneManager& scene, const Light& lights,
                     const std::string& path, int width, int height);
 

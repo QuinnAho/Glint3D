@@ -89,9 +89,13 @@ bool IBLSystem::init()
     if (m_initialized) return true;
 
     // Setup framebuffer for capturing cubemap faces
+    // TODO[FEAT-0253]: Legacy GL framebuffer setup
+    // These capture passes rely on raw GL FBO/RBO. Migrate to RHI render
+    // targets and draw passes, then remove direct GL framebuffer calls.
     glGenFramebuffers(1, &m_captureFramebuffer);
     glGenRenderbuffers(1, &m_captureRenderbuffer);
     
+    // TODO[FEAT-0253]: Legacy GL FBO bind (migrate to RHI bindRenderTarget)
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
@@ -104,6 +108,7 @@ bool IBLSystem::init()
     setupCube();
     setupQuad();
     
+    // TODO[FEAT-0253]: Legacy GL default FBO bind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     m_initialized = true;
@@ -443,14 +448,17 @@ bool IBLSystem::loadHDREnvironment(const std::string& hdrPath)
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
 
     glViewport(0, 0, 512, 512);
+    // TODO[FEAT-0253]: Legacy GL FBO bind in environment capture (migrate to RHI)
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
     
     for (unsigned int i = 0; i < 6; ++i) {
         m_equirectToCubemapShader->setMat4("view", captureViews[i]);
+        // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_environmentMap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderCube();
     }
+    // TODO[FEAT-0253]: Legacy GL default FBO bind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Generate mipmaps for the environment map
@@ -483,6 +491,7 @@ void IBLSystem::generateIrradianceMap()
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    // TODO[FEAT-0253]: Legacy GL FBO bind for irradiance (migrate to RHI)
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
@@ -506,10 +515,12 @@ void IBLSystem::generateIrradianceMap()
     
     for (unsigned int i = 0; i < 6; ++i) {
         m_irradianceShader->setMat4("view", captureViews[i]);
+        // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_irradianceMap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderCube();
     }
+    // TODO[FEAT-0253]: Legacy GL default FBO bind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // Restore original viewport
@@ -541,6 +552,7 @@ void IBLSystem::generatePrefilterMap()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_environmentMap);
 
+    // TODO[FEAT-0253]: Legacy GL FBO bind for prefilter (migrate to RHI)
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
     unsigned int maxMipLevels = 5;
     for (unsigned int mip = 0; mip < maxMipLevels; ++mip) {
@@ -564,11 +576,13 @@ void IBLSystem::generatePrefilterMap()
         
         for (unsigned int i = 0; i < 6; ++i) {
             m_prefilterShader->setMat4("view", captureViews[i]);
+            // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilterMap, mip);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             renderCube();
         }
     }
+    // TODO[FEAT-0253]: Legacy GL default FBO bind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // Restore original viewport
@@ -589,9 +603,11 @@ void IBLSystem::generateBRDFLUT()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    // TODO[FEAT-0253]: Legacy GL FBO bind for BRDF LUT (migrate to RHI)
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfLUT, 0);
 
     glViewport(0, 0, 512, 512);
@@ -599,6 +615,7 @@ void IBLSystem::generateBRDFLUT()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     renderQuad();
 
+    // TODO[FEAT-0253]: Legacy GL default FBO bind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // Restore original viewport

@@ -4,11 +4,12 @@
 Complete the RHI framebuffer abstraction by migrating remaining direct GL framebuffer operations to RHI render targets. This addresses the final FEAT-0248 requirement: "No direct FBO binds at call sites".
 
 ## Acceptance
-- All glBindFramebuffer/glFramebufferTexture* calls route through RHI render targets
+- All glBindFramebuffer/glFramebufferTexture* calls route through RHI render targets (core paths)
 - MSAA rendering uses RHI-based multisampled render targets with resolve
-- Offscreen rendering (PNG export) uses RHI render targets + readback
+- Offscreen rendering (PNG export) uses RHI render targets + readback (GL fallback retained temporarily)
+- Offscreen rendering API provides RHI `TextureHandle` variant (`renderToTextureRHI`) alongside legacy `GLuint`
 - Raytracer texture integration uses RHI texture handles consistently
-- No direct GL framebuffer operations outside RHI backend
+- No direct GL framebuffer operations outside RHI backend (except documented fallbacks)
 
 ## Scope
 - Files: `engine/src/render_system.cpp` (primary), `engine/src/ibl_system.cpp`

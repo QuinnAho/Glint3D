@@ -586,6 +586,12 @@ void RenderSystem::setIBLIntensity(float intensity)
 bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& lights,
                                   GLuint textureId, int width, int height)
 {
+    // TODO[FEAT-0253]: Legacy GL FBO path
+    // This function renders to a provided GL texture via direct FBO operations.
+    // It predates the RHI offscreen API and remains as a compatibility layer
+    // for call sites that provide a raw GLuint texture. Once call sites migrate
+    // to RHI textures + RenderTarget, replace this implementation with an RHI
+    // render path and delete the GL framebuffer code below.
     std::cerr << "[RenderSystem] renderToTexture called with textureId=" << textureId << ", width=" << width << ", height=" << height << std::endl;
     if (textureId == 0 || width <= 0 || height <= 0) {
         std::cerr << "[RenderSystem] renderToTexture: invalid parameters" << std::endl;
@@ -605,7 +611,10 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
     std::cerr << "[RenderSystem] m_samples=" << m_samples << std::endl;
     if (m_samples > 1) {
         std::cerr << "[RenderSystem] Using MSAA path" << std::endl;
-        // MSAA path: render into multisampled RBOs and resolve into provided texture
+        // TODO[FEAT-0253]: Legacy GL MSAA resolve path
+        // MSAA path: render into multisampled RBOs and resolve into provided texture.
+        // This will be replaced by RHI RenderTarget + resolve once call sites
+        // provide RHI texture handles instead of raw GL texture IDs.
         GLuint fboMSAA = 0, rboColorMSAA = 0, rboDepthMSAA = 0;
         GLuint fboResolve = 0;
 
@@ -708,7 +717,8 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         return true;
     } else {
         std::cerr << "[RenderSystem] Using non-MSAA path" << std::endl;
-        // Single-sample path (previous behavior)
+        // TODO[FEAT-0253]: Legacy GL single-sample path (previous behavior)
+        // Replace with RHI RenderTarget when callers migrate off raw GL texture IDs.
         // Create FBO
         GLuint fbo = 0;
         glGenFramebuffers(1, &fbo);
@@ -814,10 +824,9 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     GLint prevViewport[4] = {0, 0, 0, 0};
     glGetIntegerv(GL_VIEWPORT, prevViewport);
 
-    // Create color texture (RGBA8) via RHI
-    TextureHandle colorTexHandle = INVALID_HANDLE;
-    GLuint colorTex = 0;
+    // RHI-first path: render using the new RHI overload, then readback
     if (m_rhi) {
+        TextureHandle colorTexHandle = INVALID_HANDLE;
         TextureDesc td{};
         td.type = TextureType::Texture2D;
         td.format = TextureFormat::RGBA8;
@@ -825,52 +834,64 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
         td.generateMips = false;
         td.debugName = "renderToPNG_color";
         colorTexHandle = m_rhi->createTexture(td);
-        // Obtain GL id to attach to FBO (OpenGL backend only)
-        auto* gl = dynamic_cast<RhiGL*>(m_rhi.get());
-        if (gl) {
-            colorTex = gl->getGLTexture(colorTexHandle);
+
+        if (colorTexHandle != INVALID_HANDLE) {
+            bool okRhi = renderToTextureRHI(scene, lights, colorTexHandle, width, height);
+            if (okRhi) {
+                const int comp = 4;
+                const int rowStride = width * comp;
+                std::vector<std::uint8_t> pixels(height * rowStride);
+                ReadbackDesc rb{};
+                rb.sourceTexture = colorTexHandle;
+                rb.format = TextureFormat::RGBA8;
+                rb.x = 0; rb.y = 0; rb.width = width; rb.height = height;
+                rb.destination = pixels.data();
+                rb.destinationSize = pixels.size();
+                m_rhi->readback(rb);
+
+                // Flip vertically for conventional image orientation
+                std::vector<std::uint8_t> flipped(height * rowStride);
+                for (int y = 0; y < height; ++y) {
+                    std::memcpy(flipped.data() + (height - 1 - y) * rowStride,
+                                pixels.data() + y * rowStride,
+                                rowStride);
+                }
+
+                int writeOK = stbi_write_png(path.c_str(), width, height, comp, flipped.data(), rowStride);
+
+                // Restore GL framebuffer binding and viewport
+                glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+                m_rhi->destroyTexture(colorTexHandle);
+                return writeOK != 0;
+            } else {
+                // Cleanup and fall back to GL path
+                m_rhi->destroyTexture(colorTexHandle);
+            }
         }
-        // If RHI texture creation failed or dynamic cast failed, fall back to direct GL
-        if (gl == nullptr || colorTex == 0) {
-            std::cerr << "[RenderSystem] Dynamic cast " << (gl ? "succeeded" : "failed") << ", colorTex=" << colorTex << std::endl;
-            std::cerr << "[RenderSystem] RHI texture creation failed, falling back to direct GL" << std::endl;
-            if (colorTexHandle != INVALID_HANDLE) m_rhi->destroyTexture(colorTexHandle);
-            colorTexHandle = INVALID_HANDLE;
-            glGenTextures(1, &colorTex);
-            glBindTexture(GL_TEXTURE_2D, colorTex);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            std::cerr << "[RenderSystem] Fallback GL texture created: " << colorTex << std::endl;
-        }
-    } else {
-        glGenTextures(1, &colorTex);
-        glBindTexture(GL_TEXTURE_2D, colorTex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        // If RHI path failed, fall through to GL fallback below
     }
 
-    // Render scene into the texture
-    std::cerr << "[RenderSystem] About to render to texture, colorTex=" << colorTex << std::endl;
+    // GL fallback path: create a GL texture, render via legacy overload, and read back
+    GLuint colorTex = 0;
+    glGenTextures(1, &colorTex);
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    std::cerr << "[RenderSystem] About to render to texture (GL fallback), colorTex=" << colorTex << std::endl;
     bool ok = renderToTexture(scene, lights, colorTex, width, height);
     std::cerr << "[RenderSystem] renderToTexture returned " << (ok ? "true" : "false") << std::endl;
     if (!ok) {
-        if (m_rhi && colorTexHandle != INVALID_HANDLE) {
-            m_rhi->destroyTexture(colorTexHandle);
-        } else {
-            glDeleteTextures(1, &colorTex);
-        }
+        if (colorTex) glDeleteTextures(1, &colorTex);
         return false;
     }
 
-    // Read back pixels from the texture via a temporary FBO
     GLuint fbo = 0;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -878,7 +899,7 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
         glDeleteFramebuffers(1, &fbo);
-        glDeleteTextures(1, &colorTex);
+        if (colorTex) glDeleteTextures(1, &colorTex);
         return false;
     }
 
@@ -891,7 +912,6 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     std::vector<std::uint8_t> pixels(height * rowStride);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
-    // Flip vertically for conventional image orientation
     std::vector<std::uint8_t> flipped(height * rowStride);
     for (int y = 0; y < height; ++y) {
         std::memcpy(flipped.data() + (height - 1 - y) * rowStride,
@@ -899,28 +919,111 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
                     rowStride);
     }
 
-    // Write PNG
     int writeOK = stbi_write_png(path.c_str(), width, height, comp, flipped.data(), rowStride);
 
-    // Restore previous framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-    // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-
-    // Cleanup
-    glDeleteFramebuffers(1, &fbo);
-    if (m_rhi && colorTexHandle != INVALID_HANDLE) {
-        m_rhi->destroyTexture(colorTexHandle);
+    if (m_rhi) {
+        m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     } else {
+        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    }
+
+    glDeleteFramebuffers(1, &fbo);
+    if (colorTex) {
         glDeleteTextures(1, &colorTex);
     }
 
     return writeOK != 0;
 #endif
+}
+
+bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& lights,
+                                     TextureHandle textureHandle, int width, int height)
+{
+    // RHI variant: renders into an existing RHI texture by binding a render target
+    // - If MSAA is enabled, render to a multisampled render target and resolve into the texture
+    // - Otherwise, attach the provided texture directly as the render target color attachment
+    if (!m_rhi || textureHandle == INVALID_HANDLE || width <= 0 || height <= 0) {
+        std::cerr << "[RenderSystem] renderToTexture(RHI): invalid params or RHI unavailable\n";
+        return false;
+    }
+
+    // Preserve current framebuffer (GL) and viewport to restore; RHI has no query API
+    GLint prevViewport[4] = {0, 0, 0, 0};
+    glGetIntegerv(GL_VIEWPORT, prevViewport);
+    glm::mat4 prevProj = m_projectionMatrix;
+    updateProjectionMatrix(width, height);
+
+    bool ok = true;
+
+    if (m_samples > 1) {
+        // Create multisampled offscreen RT (renderbuffer-style attachments)
+        RenderTargetDesc msaaRt{};
+        msaaRt.width = width; msaaRt.height = height; msaaRt.samples = m_samples;
+        msaaRt.debugName = "renderToTexture_msaaRT";
+        RenderTargetAttachment ca{}; ca.type = AttachmentType::Color0; ca.texture = INVALID_HANDLE; msaaRt.colorAttachments.push_back(ca);
+#ifndef __EMSCRIPTEN__
+        RenderTargetAttachment da{}; da.type = AttachmentType::DepthStencil; da.texture = INVALID_HANDLE; msaaRt.depthAttachment = da;
+#else
+        RenderTargetAttachment da{}; da.type = AttachmentType::Depth; da.texture = INVALID_HANDLE; msaaRt.depthAttachment = da;
+#endif
+        RenderTargetHandle msaaHandle = m_rhi->createRenderTarget(msaaRt);
+        if (msaaHandle == INVALID_HANDLE) {
+            std::cerr << "[RenderSystem] renderToTexture(RHI): failed to create MSAA RT" << std::endl;
+            ok = false;
+        } else {
+            // Render to multisampled RT
+            m_rhi->bindRenderTarget(msaaHandle);
+            m_rhi->setViewport(0, 0, width, height);
+            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
+            if (m_renderMode == RenderMode::Raytrace) {
+                renderRaytraced(scene, lights);
+            } else {
+                renderRasterized(scene, lights);
+            }
+            // Resolve into provided non-MSAA texture
+            m_rhi->resolveRenderTarget(msaaHandle, textureHandle);
+            // Cleanup
+            m_rhi->bindRenderTarget(INVALID_HANDLE);
+            m_rhi->destroyRenderTarget(msaaHandle);
+        }
+    } else {
+        // Attach provided texture directly and render
+        RenderTargetDesc rt{};
+        rt.width = width; rt.height = height; rt.samples = 1; rt.debugName = "renderToTexture_RT";
+        RenderTargetAttachment ca{}; ca.type = AttachmentType::Color0; ca.texture = textureHandle; rt.colorAttachments.push_back(ca);
+#ifndef __EMSCRIPTEN__
+        RenderTargetAttachment da{}; da.type = AttachmentType::DepthStencil; da.texture = INVALID_HANDLE; rt.depthAttachment = da;
+#else
+        RenderTargetAttachment da{}; da.type = AttachmentType::Depth; da.texture = INVALID_HANDLE; rt.depthAttachment = da;
+#endif
+        RenderTargetHandle rtHandle = m_rhi->createRenderTarget(rt);
+        if (rtHandle == INVALID_HANDLE) {
+            std::cerr << "[RenderSystem] renderToTexture(RHI): failed to create RT with provided texture" << std::endl;
+            ok = false;
+        } else {
+            m_rhi->bindRenderTarget(rtHandle);
+            m_rhi->setViewport(0, 0, width, height);
+            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
+            if (m_renderMode == RenderMode::Raytrace) {
+                renderRaytraced(scene, lights);
+            } else {
+                renderRasterized(scene, lights);
+            }
+            m_rhi->bindRenderTarget(INVALID_HANDLE);
+            m_rhi->destroyRenderTarget(rtHandle);
+        }
+    }
+
+    // Restore projection and viewport
+    m_projectionMatrix = prevProj;
+    if (m_rhi) {
+        m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    } else {
+        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    }
+
+    return ok;
 }
 
 void RenderSystem::updateViewMatrix()

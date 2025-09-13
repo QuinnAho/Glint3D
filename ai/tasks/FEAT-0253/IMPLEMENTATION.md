@@ -1,6 +1,6 @@
 # FEAT-0253: RHI Framebuffer Migration - Implementation Documentation
 
-**Status**: ✅ Completed
+**Status**: Completed
 **Date**: 2025-09-13
 **Owner**: AI Assistant
 
@@ -200,10 +200,10 @@ RenderSystem → RHI Interface → Backend Implementation
 ## Testing & Verification
 
 ### Build Verification
-- ✅ Debug build compiles successfully
-- ✅ Release build compiles successfully
-- ✅ All existing functionality preserved
-- ✅ No runtime errors in basic rendering
+- Debug build compiles successfully
+- Release build compiles successfully
+- All existing functionality preserved
+- No runtime errors in basic rendering
 
 ### Manual Testing Performed
 ```bash
@@ -272,3 +272,23 @@ FEAT-0253 successfully completed the core RHI framebuffer migration, achieving t
 The remaining PNG export migration is intentionally deferred to future work, as it requires additional RHI API development and is not part of the critical real-time rendering path.
 
 **Result**: The Glint3D engine core is now backend-agnostic for its primary rendering operations, representing a major architectural milestone toward a truly cross-platform rendering system.
+
+## Follow-up Updates (Sept 13, 2025)
+
+- Offscreen PNG export now uses a primary RHI path with GL fallback.
+  - `renderToPNG()` creates an RHI `Texture` and `RenderTarget`, renders via RHI, and reads back via `RHI::readback()`.
+  - If the RHI path is unavailable, falls back to legacy GL FBO + `glReadPixels` path.
+  - Code is documented with TODO[FEAT-0253] markers for eventual removal of the GL fallback once call sites fully migrate.
+- Introduced a new API `RenderSystem::renderToTextureRHI(SceneManager, Light, TextureHandle, w, h)` that renders via RHI to an existing texture.
+  - Legacy GL offscreen rendering in `renderToTexture(GLuint, ...)` remains for compatibility and is explicitly marked as deprecated with TODO[FEAT-0253] comments.
+  - Call sites can incrementally migrate from `GLuint` to `TextureHandle` using the new method.
+- IBL system (`engine/src/ibl_system.cpp`) sections that build and bind GL framebuffers are now annotated with TODO[FEAT-0253] comments indicating intended migration to RHI render targets in a follow-up task.
+
+### Current TODO markers introduced
+- `engine/src/render_system.cpp`:
+  - `renderToTexture` MSAA and single-sample GL FBO paths.
+  - GL fallback branch in `renderToPNG`.
+- `engine/src/ibl_system.cpp`:
+  - GL framebuffer setup and per-pass attaches in environment capture, irradiance, prefilter, and BRDF LUT generation.
+
+These comments make future cleanup explicit and scoped to FEAT-0253 follow-ups.
