@@ -1,0 +1,4 @@
+{"ts":"2025-09-13T00:05:00Z","who":"ai","kind":"task_activated","task":"FEAT-0248","pr":"PR1","msg":"Activated FEAT-0248 as current; adopting WebGPU-shaped API (bind groups, encoders, queues)."}
+{"ts":"2025-09-13T00:06:00Z","who":"ai","kind":"architecture_update","task":"FEAT-0248","msg":"Backend plan set: wgpu-native preferred (desktop), Dawn optional; GLFW + webgpu.h for surface."}
+{"ts":"2025-09-13T00:06:30Z","who":"ai","kind":"toolchain_decision","task":"FEAT-0248","msg":"Shader toolchain: DXC + SPIRV-Tools + SPIRV-Reflect; SPIRV-Cross for GLSL/MSL."}
+{"ts":"2025-09-13T00:18:00Z","who":"ai","kind":"implementation","task":"FEAT-0248","pr":"PR1","msg":"Added WebGPU-shaped API surface: BindGroupLayout/BindGroup, CommandEncoder, RenderPassEncoder, Queue, ResourceState. Implemented GL + Null stubs and updated docs (rhi_guide.md, rhi_architecture.md)."}

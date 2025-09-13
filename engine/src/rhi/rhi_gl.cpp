@@ -264,6 +264,18 @@ RenderTargetHandle RhiGL::createRenderTarget(const RenderTargetDesc& desc) {
     return handle;
 }
 
+BindGroupLayoutHandle RhiGL::createBindGroupLayout(const BindGroupLayoutDesc& desc) {
+    BindGroupLayoutHandle h = m_nextBindGroupLayoutHandle++;
+    m_bindGroupLayouts[h] = GLBindGroupLayout{desc};
+    return h;
+}
+
+BindGroupHandle RhiGL::createBindGroup(const BindGroupDesc& desc) {
+    BindGroupHandle h = m_nextBindGroupHandle++;
+    m_bindGroups[h] = GLBindGroup{desc};
+    return h;
+}
+
 void RhiGL::destroyTexture(TextureHandle handle) {
     auto it = m_textures.find(handle);
     if (it != m_textures.end()) {
@@ -302,6 +314,14 @@ void RhiGL::destroyRenderTarget(RenderTargetHandle handle) {
         glDeleteFramebuffers(1, &it->second.fbo);
         m_renderTargets.erase(it);
     }
+}
+
+void RhiGL::destroyBindGroupLayout(BindGroupLayoutHandle handle) {
+    m_bindGroupLayouts.erase(handle);
+}
+
+void RhiGL::destroyBindGroup(BindGroupHandle handle) {
+    m_bindGroups.erase(handle);
 }
 
 void RhiGL::setViewport(int x, int y, int width, int height) {
@@ -385,6 +405,14 @@ void RhiGL::bindRenderTarget(RenderTargetHandle renderTarget) {
         glBindFramebuffer(GL_FRAMEBUFFER, it->second.fbo);
         m_currentRenderTarget = renderTarget;
     }
+}
+
+std::unique_ptr<CommandEncoder> RhiGL::createCommandEncoder(const char* debugName) {
+    return std::make_unique<SimpleCommandEncoderGL>(*this, debugName ? debugName : "");
+}
+
+Queue& RhiGL::getQueue() {
+    return m_queue;
 }
 
 bool RhiGL::supportsCompute() const {
@@ -721,4 +749,78 @@ bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
     
     glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
     return true;
+}
+
+// ===== Simple WebGPU-shaped adapters =====
+
+RhiGL::SimpleRenderPassEncoderGL::SimpleRenderPassEncoderGL(RhiGL& rhi, const RenderPassDesc& desc)
+    : m_rhi(rhi), m_desc(desc), m_active(true) {
+    // Bind target or build from attachments
+    if (desc.target != INVALID_HANDLE) {
+        m_rhi.bindRenderTarget(desc.target);
+    } else {
+        // Fallback: if a color attachment with texture is provided and matches an existing RT, ignore for now
+        // In GL path we require a RenderTarget; callers should pass one for now.
+        m_rhi.bindRenderTarget(INVALID_HANDLE);
+    }
+
+    // Clear/load based on first color attachment
+    if (!desc.colorAttachments.empty()) {
+        const auto& ca = desc.colorAttachments[0];
+        if (ca.loadOp == LoadOp::Clear) {
+            m_rhi.clear(ca.clearColor, m_desc.depthStencil.depthClear, (int)m_desc.depthStencil.stencilClear);
+        }
+    } else if (desc.depthStencil.texture != INVALID_HANDLE && desc.depthStencil.depthLoadOp == LoadOp::Clear) {
+        m_rhi.clear(glm::vec4(0,0,0,0), m_desc.depthStencil.depthClear, (int)m_desc.depthStencil.stencilClear);
+    }
+
+    if (desc.width > 0 && desc.height > 0) {
+        m_rhi.setViewport(0, 0, desc.width, desc.height);
+    }
+}
+
+void RhiGL::SimpleRenderPassEncoderGL::setPipeline(PipelineHandle pipeline) { m_rhi.bindPipeline(pipeline); }
+
+void RhiGL::SimpleRenderPassEncoderGL::setBindGroup(uint32_t index, BindGroupHandle group) {
+    m_rhi.applyBindGroup(index, group);
+}
+
+void RhiGL::SimpleRenderPassEncoderGL::setViewport(int x, int y, int width, int height) {
+    m_rhi.setViewport(x, y, width, height);
+}
+
+void RhiGL::SimpleRenderPassEncoderGL::draw(const DrawDesc& desc) { m_rhi.draw(desc); }
+
+void RhiGL::SimpleRenderPassEncoderGL::end() { m_active = false; }
+
+RhiGL::SimpleCommandEncoderGL::SimpleCommandEncoderGL(RhiGL& rhi, const char* name)
+    : m_rhi(rhi), m_name(name ? name : "") {}
+
+RenderPassEncoder* RhiGL::SimpleCommandEncoderGL::beginRenderPass(const RenderPassDesc& desc) {
+    m_activePass = std::make_unique<SimpleRenderPassEncoderGL>(m_rhi, desc);
+    return m_activePass.get();
+}
+
+void RhiGL::SimpleCommandEncoderGL::finish() {
+    // Immediate mode: nothing to do; ensure pass ended
+    if (m_activePass) { m_activePass->end(); m_activePass.reset(); }
+}
+
+void RhiGL::SimpleQueueGL::submit(CommandEncoder& encoder) {
+    // GL path executes immediately; just call finish to satisfy lifecycle
+    encoder.finish();
+}
+
+void RhiGL::applyBindGroup(uint32_t /*index*/, BindGroupHandle group) {
+    auto it = m_bindGroups.find(group);
+    if (it == m_bindGroups.end()) return;
+    const auto& bg = it->second.desc;
+    for (const auto& e : bg.entries) {
+        if (e.buffer.buffer != INVALID_HANDLE) {
+            bindUniformBuffer(e.buffer.buffer, e.binding);
+        }
+        if (e.texture.texture != INVALID_HANDLE) {
+            bindTexture(e.texture.texture, e.binding);
+        }
+    }
 }

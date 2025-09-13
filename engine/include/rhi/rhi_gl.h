@@ -29,12 +29,16 @@ public:
     ShaderHandle createShader(const ShaderDesc& desc) override;
     PipelineHandle createPipeline(const PipelineDesc& desc) override;
     RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override;
+    BindGroupLayoutHandle createBindGroupLayout(const BindGroupLayoutDesc& desc) override;
+    BindGroupHandle createBindGroup(const BindGroupDesc& desc) override;
     
     void destroyTexture(TextureHandle handle) override;
     void destroyBuffer(BufferHandle handle) override;
     void destroyShader(ShaderHandle handle) override;
     void destroyPipeline(PipelineHandle handle) override;
     void destroyRenderTarget(RenderTargetHandle handle) override;
+    void destroyBindGroupLayout(BindGroupLayoutHandle handle) override;
+    void destroyBindGroup(BindGroupHandle handle) override;
     
     void setViewport(int x, int y, int width, int height) override;
     void clear(const glm::vec4& color, float depth, int stencil) override;
@@ -43,6 +47,8 @@ public:
     void bindUniformBuffer(BufferHandle buffer, uint32_t slot) override;
     void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) override;
     void bindRenderTarget(RenderTargetHandle renderTarget) override;
+    std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) override;
+    Queue& getQueue() override;
     
     bool supportsCompute() const override;
     bool supportsGeometryShaders() const override;
@@ -60,6 +66,41 @@ public:
     GLuint getGLShader(ShaderHandle handle) const;
 
 private:
+    // Simple WebGPU-shaped adapters for GL immediate mode
+    class SimpleRenderPassEncoderGL : public RenderPassEncoder {
+    public:
+        SimpleRenderPassEncoderGL(RhiGL& rhi, const RenderPassDesc& desc);
+        ~SimpleRenderPassEncoderGL() override = default;
+        void setPipeline(PipelineHandle pipeline) override;
+        void setBindGroup(uint32_t index, BindGroupHandle group) override;
+        void setViewport(int x, int y, int width, int height) override;
+        void draw(const DrawDesc& desc) override;
+        void end() override;
+    private:
+        RhiGL& m_rhi;
+        RenderPassDesc m_desc;
+        bool m_active = false;
+    };
+
+    class SimpleCommandEncoderGL : public CommandEncoder {
+    public:
+        SimpleCommandEncoderGL(RhiGL& rhi, const char* name);
+        ~SimpleCommandEncoderGL() override = default;
+        RenderPassEncoder* beginRenderPass(const RenderPassDesc& desc) override;
+        void finish() override;
+    private:
+        RhiGL& m_rhi;
+        std::unique_ptr<SimpleRenderPassEncoderGL> m_activePass;
+        std::string m_name;
+    };
+
+    class SimpleQueueGL : public Queue {
+    public:
+        explicit SimpleQueueGL(RhiGL& rhi) : m_rhi(rhi) {}
+        void submit(CommandEncoder& encoder) override;
+    private:
+        RhiGL& m_rhi;
+    };
     struct GLTexture {
         GLuint id = 0;
         TextureDesc desc;
@@ -92,6 +133,10 @@ private:
     std::unordered_map<ShaderHandle, GLShader> m_shaders;
     std::unordered_map<PipelineHandle, GLPipeline> m_pipelines;
     std::unordered_map<RenderTargetHandle, GLRenderTarget> m_renderTargets;
+    struct GLBindGroupLayout { BindGroupLayoutDesc desc; };
+    struct GLBindGroup { BindGroupDesc desc; };
+    std::unordered_map<BindGroupLayoutHandle, GLBindGroupLayout> m_bindGroupLayouts;
+    std::unordered_map<BindGroupHandle, GLBindGroup> m_bindGroups;
     
     // Handle generation
     uint32_t m_nextTextureHandle = 1;
@@ -99,6 +144,8 @@ private:
     uint32_t m_nextShaderHandle = 1;
     uint32_t m_nextPipelineHandle = 1;
     uint32_t m_nextRenderTargetHandle = 1;
+    uint32_t m_nextBindGroupLayoutHandle = 1;
+    uint32_t m_nextBindGroupHandle = 1;
     
     // Current state
     PipelineHandle m_currentPipeline = INVALID_HANDLE;
@@ -110,6 +157,9 @@ private:
     bool m_supportsTessellation = false;
     int m_maxTextureUnits = 16;
     int m_maxSamples = 1;
+
+    // Queue instance
+    SimpleQueueGL m_queue{*this};
     
     // Helper methods
     GLenum textureFormatToGL(TextureFormat format) const;
@@ -123,4 +173,5 @@ private:
     void setupVertexArray(GLuint vao, const PipelineDesc& desc);
     GLenum attachmentTypeToGL(AttachmentType type) const;
     bool setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc);
+    void applyBindGroup(uint32_t index, BindGroupHandle group);
 };

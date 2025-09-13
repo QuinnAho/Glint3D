@@ -20,8 +20,13 @@ The Render Hardware Interface (RHI) is transitioning to a WebGPU-shaped API to e
 
 ## Backend Plan
 - Primary backend (now): OpenGL. The GL backend adapts the WebGPU-shaped frontend to current GL calls.
-- Next backend: WebGPU (wgpu-native/Dawn). Vulkan backend is deferred.
+- Next backend: WebGPU (wgpu-native preferred, Dawn optional). Vulkan backend is deferred.
 - Null backend: Retained for testing and CI.
+
+## Backends & API Layer
+- WebGPU (desktop): Prefer `wgpu-native` (C API aligned with WebGPU) for straightforward desktop integration and an easy path to browser builds.
+- WebGPU (alternative): Support Google Dawn (C++ WebGPU) if C++ integration or Chromium toolchain benefits are desired.
+- Surface creation: Use GLFW for windowing (already present) and `webgpu.h` helpers to create the surface/swap chain where needed.
 
 ## API Shape Principles
 - Bind groups define all shader-visible resources; no direct `glUniform*` calls.
@@ -48,3 +53,33 @@ The Render Hardware Interface (RHI) is transitioning to a WebGPU-shaped API to e
 - Remove Vulkan-first language in planning; Vulkan is deferred until after WebGPU backend.
 - Documentation and tests should use the WebGPU terminology where applicable (bind groups, passes, queues).
 
+## Shader Toolchain (Lock-In Now)
+- Compiler: DXC for HLSL to DXIL/SPIR-V.
+- Validation/Reflection: SPIRV-Tools for validation; SPIRV-Reflect to extract reflection and auto-generate BindGroupLayouts and binding offsets.
+- Cross-compilation: SPIRV-Cross to GLSL/MSL where required (to keep GL and Apple paths happy).
+- Outcome: BindGroupLayout descriptors are generated from compiled shaders, feeding the RHI pipeline and uniform system.
+
+## Texture & Transcoding (Web Parity)
+- Use Basis Universal / KTX2 (UASTC/ETC1S) with libktx.
+- Single source texture packaged as KTX2 can be transcoded to GPU-friendly compressed formats on desktop and web.
+
+## Debugging & Profiling
+- Frame capture: RenderDoc (GL, Vulkan, D3D12; compatible with Dawn/wgpu through native backends).
+- CPU profiling: Tracy or Microprofile for CPU timelines.
+- GPU timers: Add where supported per backend to profile passes.
+- Browser: Chrome WebGPU capture when running via Web backend for command/pipeline inspection.
+
+## Test & Golden Pipeline
+- Unit tests: GoogleTest (or Catch2).
+- Image I/O: stb_image/stb_image_write for PNG load/save.
+- Golden comparisons: SSIM/PSNR compare in CI (ImageMagick or a small SSIM implementation).
+
+## Window/Surface & UI Interop
+- GLFW remains the window system with WebGPU surface via `webgpu.h` helpers.
+- Dear ImGui: use `imgui_impl_opengl3` now and plan for `imgui_impl_wgpu` when WebGPU backend is available.
+- RHI Interop: expose `getNativeTextureHandle()` to allow UI backends to bind textures directly when needed.
+
+## Current Status (FEAT-0248 PR1)
+- Public headers expose WebGPU-shaped types: `BindGroupLayout`, `BindGroup`, `CommandEncoder`, `RenderPassEncoder`, `Queue`, and `ResourceState`.
+- OpenGL backend provides thin adapter classes (`SimpleCommandEncoderGL`, `SimpleRenderPassEncoderGL`, `SimpleQueueGL`) that map encoder calls to existing immediate-mode GL operations.
+- Null backend stubs implemented to satisfy API and enable headless tests.

@@ -13,6 +13,10 @@ using BufferHandle = uint32_t;
 using ShaderHandle = uint32_t;
 using PipelineHandle = uint32_t;
 using RenderTargetHandle = uint32_t;
+using BindGroupLayoutHandle = uint32_t;
+using BindGroupHandle = uint32_t;
+using PipelineLayoutHandle = uint32_t;
+using SamplerHandle = uint32_t;
 
 constexpr uint32_t INVALID_HANDLE = 0;
 
@@ -24,6 +28,18 @@ struct RhiInit {
     bool enableSRGB = true;
     int samples = 1; // MSAA samples
     const char* applicationName = "Glint3D";
+};
+
+// Resource states (WebGPU-shaped)
+enum class ResourceState : uint32_t {
+    Undefined = 0,
+    RenderTarget,
+    DepthStencil,
+    ShaderRead,
+    ShaderWrite,
+    CopySrc,
+    CopyDst,
+    Present
 };
 
 // Texture formats - keep compatible with existing engine usage
@@ -95,6 +111,9 @@ inline ShaderStage operator&(ShaderStage a, ShaderStage b) {
     return static_cast<ShaderStage>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
 }
 
+// Visibility bitset helpers
+inline uint32_t shaderStageBits(ShaderStage s) { return static_cast<uint32_t>(s); }
+
 // Texture descriptor
 struct TextureDesc {
     TextureType type = TextureType::Texture2D;
@@ -116,6 +135,51 @@ struct BufferDesc {
     BufferUsage usage = BufferUsage::Static;
     size_t size = 0;
     const void* initialData = nullptr;
+    std::string debugName;
+};
+
+// Bind group layout (WebGPU-shaped)
+enum class BindingType : uint32_t {
+    UniformBuffer,
+    StorageBuffer,
+    Sampler,
+    SampledTexture,
+    StorageTexture
+};
+
+struct BindGroupLayoutEntry {
+    uint32_t binding = 0;
+    BindingType type = BindingType::UniformBuffer;
+    uint32_t visibility = shaderStageBits(ShaderStage::Vertex) | shaderStageBits(ShaderStage::Fragment);
+};
+
+struct BindGroupLayoutDesc {
+    std::vector<BindGroupLayoutEntry> entries;
+    std::string debugName;
+};
+
+// Bind group (resource set) description
+struct BufferBinding {
+    BufferHandle buffer = INVALID_HANDLE;
+    size_t offset = 0;
+    size_t size = 0; // 0 means whole buffer from offset
+};
+
+struct TextureBinding {
+    TextureHandle texture = INVALID_HANDLE;
+    SamplerHandle sampler = INVALID_HANDLE;
+};
+
+struct BindGroupEntry {
+    uint32_t binding = 0;
+    // One of the below will be used depending on layout type
+    BufferBinding buffer;
+    TextureBinding texture;
+};
+
+struct BindGroupDesc {
+    BindGroupLayoutHandle layout = INVALID_HANDLE;
+    std::vector<BindGroupEntry> entries;
     std::string debugName;
 };
 
@@ -212,6 +276,35 @@ struct RenderTargetDesc {
     int width = 0;
     int height = 0;
     int samples = 1; // MSAA samples
+    std::string debugName;
+};
+
+// Render pass description (WebGPU-shaped)
+enum class LoadOp { Load, Clear };
+enum class StoreOp { Store, Discard };
+
+struct ColorAttachmentDesc {
+    TextureHandle texture = INVALID_HANDLE; // bound as color attachment view
+    glm::vec4 clearColor = glm::vec4(0, 0, 0, 1);
+    LoadOp loadOp = LoadOp::Clear;
+    StoreOp storeOp = StoreOp::Store;
+};
+
+struct DepthStencilAttachmentDesc {
+    TextureHandle texture = INVALID_HANDLE; // bound as depth/stencil view
+    float depthClear = 1.0f;
+    uint32_t stencilClear = 0;
+    LoadOp depthLoadOp = LoadOp::Clear;
+    StoreOp depthStoreOp = StoreOp::Store;
+};
+
+struct RenderPassDesc {
+    // Either specify a prebuilt render target handle, or direct attachments
+    RenderTargetHandle target = INVALID_HANDLE; // if set, overrides attachments below
+    std::vector<ColorAttachmentDesc> colorAttachments;
+    DepthStencilAttachmentDesc depthStencil;
+    int width = 0;
+    int height = 0;
     std::string debugName;
 };
 

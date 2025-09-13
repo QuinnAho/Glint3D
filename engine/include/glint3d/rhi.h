@@ -7,6 +7,11 @@
 
 namespace glint3d {
 
+// Forward declarations for WebGPU-shaped frontend
+class CommandEncoder;
+class RenderPassEncoder;
+class Queue;
+
 /**
  * @brief Render Hardware Interface (RHI) - Thin abstraction for GPU operations
  * 
@@ -105,6 +110,12 @@ public:
      * @return Handle to created render target, or INVALID_HANDLE on failure
      */
     virtual RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) = 0;
+
+    // WebGPU-shaped resource grouping
+    virtual BindGroupLayoutHandle createBindGroupLayout(const BindGroupLayoutDesc& desc) = 0;
+    virtual BindGroupHandle createBindGroup(const BindGroupDesc& desc) = 0;
+    virtual void destroyBindGroupLayout(BindGroupLayoutHandle handle) = 0;
+    virtual void destroyBindGroup(BindGroupHandle handle) = 0;
     
     // Resource destruction - RAII style cleanup
     virtual void destroyTexture(TextureHandle handle) = 0;
@@ -163,6 +174,10 @@ public:
      * @param renderTarget Render target handle, or INVALID_HANDLE for default framebuffer
      */
     virtual void bindRenderTarget(RenderTargetHandle renderTarget) = 0;
+
+    // Encoders/Queue (WebGPU-shaped)
+    virtual std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) = 0;
+    virtual Queue& getQueue() = 0;
     
     // Capability queries for feature detection
     /**
@@ -213,6 +228,31 @@ public:
      * @return Debug string with driver version, extensions, etc.
      */
     virtual std::string getDebugInfo() const = 0;
+};
+
+// Command recording API (WebGPU-shaped)
+class RenderPassEncoder {
+public:
+    virtual ~RenderPassEncoder() = default;
+    virtual void setPipeline(PipelineHandle pipeline) = 0;
+    virtual void setBindGroup(uint32_t index, BindGroupHandle group) = 0;
+    virtual void setViewport(int x, int y, int width, int height) = 0;
+    virtual void draw(const DrawDesc& desc) = 0;
+    virtual void end() = 0;
+};
+
+class CommandEncoder {
+public:
+    virtual ~CommandEncoder() = default;
+    virtual RenderPassEncoder* beginRenderPass(const RenderPassDesc& desc) = 0;
+    virtual void resourceBarrier(TextureHandle, ResourceState /*before*/, ResourceState /*after*/) { /* optional */ }
+    virtual void finish() = 0; // finalize recorded commands
+};
+
+class Queue {
+public:
+    virtual ~Queue() = default;
+    virtual void submit(CommandEncoder& encoder) = 0;
 };
 
 /**

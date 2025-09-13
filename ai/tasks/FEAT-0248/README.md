@@ -1,7 +1,7 @@
 # FEAT-0248 — RHI API Shape (BindGroups/Encoders/Queues)
 
 ## Intent
-Adopt a WebGPU-shaped RHI frontend to guarantee desktop/web parity: introduce PipelineLayout, BindGroupLayout, BindGroup, CommandEncoder, RenderPassEncoder, Queue, Fence, and ResourceState.
+Adopt a WebGPU-shaped RHI frontend to guarantee desktop/web parity: introduce PipelineLayout, BindGroupLayout, BindGroup, CommandEncoder, RenderPassEncoder, Queue, Fence, and ResourceState. This prepares the GL backend to mirror WebGPU semantics and enables a wgpu-native/Dawn backend later.
 
 ## Acceptance
 - All GL call sites route through CommandEncoder/RenderPassEncoder
@@ -20,3 +20,4 @@ Adopt a WebGPU-shaped RHI frontend to guarantee desktop/web parity: introduce Pi
 - Spec: `ai/tasks/FEAT-0248/spec.yaml`
 - Passes: `ai/tasks/FEAT-0248/passes.yaml`
 - Whitelist: `ai/tasks/FEAT-0248/whitelist.txt`
+ - Architecture: `docs/rhi_architecture.md`

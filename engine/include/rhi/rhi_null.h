@@ -23,12 +23,16 @@ public:
     ShaderHandle createShader(const ShaderDesc& desc) override { (void)desc; return ++m_nextHandle; }
     PipelineHandle createPipeline(const PipelineDesc& desc) override { (void)desc; return ++m_nextHandle; }
     RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override { (void)desc; return ++m_nextHandle; }
+    BindGroupLayoutHandle createBindGroupLayout(const BindGroupLayoutDesc& desc) override { (void)desc; return ++m_nextHandle; }
+    BindGroupHandle createBindGroup(const BindGroupDesc& desc) override { (void)desc; return ++m_nextHandle; }
 
     void destroyTexture(TextureHandle) override {}
     void destroyBuffer(BufferHandle) override {}
     void destroyShader(ShaderHandle) override {}
     void destroyPipeline(PipelineHandle) override {}
     void destroyRenderTarget(RenderTargetHandle) override {}
+    void destroyBindGroupLayout(BindGroupLayoutHandle) override {}
+    void destroyBindGroup(BindGroupHandle) override {}
 
     void setViewport(int, int, int, int) override {}
     void clear(const glm::vec4&, float, int) override {}
@@ -37,6 +41,8 @@ public:
     void bindUniformBuffer(BufferHandle, uint32_t) override {}
     void updateBuffer(BufferHandle, const void*, size_t, size_t = 0) override {}
     void bindRenderTarget(RenderTargetHandle) override {}
+    std::unique_ptr<CommandEncoder> createCommandEncoder(const char* = nullptr) override;
+    Queue& getQueue() override { return m_queue; }
 
     bool supportsCompute() const override { return false; }
     bool supportsGeometryShaders() const override { return false; }
@@ -51,6 +57,28 @@ public:
     uint32_t getDrawCallCount() const { return m_drawCalls; }
 
 private:
+    class NullPass : public RenderPassEncoder {
+    public:
+        void setPipeline(PipelineHandle) override {}
+        void setBindGroup(uint32_t, BindGroupHandle) override {}
+        void setViewport(int, int, int, int) override {}
+        void draw(const DrawDesc&) override {}
+        void end() override {}
+    };
+
+    class NullEncoder : public CommandEncoder {
+    public:
+        RenderPassEncoder* beginRenderPass(const RenderPassDesc&) override { return &m_pass; }
+        void finish() override {}
+    private:
+        NullPass m_pass;
+    };
+
+    class NullQueue : public Queue {
+    public:
+        void submit(CommandEncoder& encoder) override { encoder.finish(); }
+    };
     uint32_t m_nextHandle = 1;
     uint32_t m_drawCalls = 0;
+    NullQueue m_queue;
 };
