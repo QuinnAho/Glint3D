@@ -1,0 +1,43 @@
+id: FEAT-0251
+title: Compute Pipeline + Storage Buffers
+owner: ai
+status: planned
+created: "2025-09-13T00:00:00Z"
+priority: high
+
+description: >
+  Add compute pipeline support (pipeline, bind groups, dispatch) and storage buffers (read/write)
+  aligned with WebGPU. Implement in GL backend via appropriate extensions/paths.
+
+acceptance_criteria:
+  - "ComputePipeline and dispatch supported in RHI"
+  - "Storage buffers (read/write) in bind groups"
+  - "Unit tests cover basic compute + buffer readback"
+
+must_requirements:
+  - TEST.CROSS_PLATFORM
+  - API.PUBLIC_HEADERS_PATH
+
+plan:
+  - id: PR1
+    title: "Introduce ComputePipeline and storage buffer types"
+    status: planned
+    files: ["engine/include/glint3d/rhi*.h", "engine/src/rhi/**"]
+  - id: PR2
+    title: "GL backend compute path"
+    status: planned
+    files: ["engine/src/rhi/rhi-gl.cpp", "tests/unit/rhi_test.cpp"]
+
+file_whitelist:
+  - "engine/src/rhi/**"
+  - "engine/include/glint3d/rhi*.h"
+  - "tests/unit/rhi_test.cpp"
+  - "docs/rhi_architecture.md"
+
+outputs:
+  - engine/include/glint3d/rhi.h
+  - docs/rhi_architecture.md
+
+dependencies:
+  blocked_by: [FEAT-0248]
+

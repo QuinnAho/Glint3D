@@ -1,10 +1,12 @@
 #include "render_pass.h"
-#include "rhi/rhi_types.h"
+#include <glint3d/rhi_types.h>
 #include "scene_manager.h"
 #include "light.h"
 #include "raytracer.h"
 #include <algorithm>
 #include <iostream>
+
+using namespace glint3d;
 
 // RenderGraph implementation
 RenderGraph::RenderGraph(RHI* rhi) : m_rhi(rhi) {}

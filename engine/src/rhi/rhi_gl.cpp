@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sstream>
 
+using namespace glint3d;
+
 RhiGL::RhiGL() = default;
 RhiGL::~RhiGL() = default;
 
@@ -247,6 +249,21 @@ PipelineHandle RhiGL::createPipeline(const PipelineDesc& desc) {
     return handle;
 }
 
+RenderTargetHandle RhiGL::createRenderTarget(const RenderTargetDesc& desc) {
+    GLRenderTarget glRenderTarget;
+    glRenderTarget.desc = desc;
+    
+    glGenFramebuffers(1, &glRenderTarget.fbo);
+    if (!setupRenderTarget(glRenderTarget.fbo, desc)) {
+        glDeleteFramebuffers(1, &glRenderTarget.fbo);
+        return INVALID_HANDLE;
+    }
+    
+    RenderTargetHandle handle = m_nextRenderTargetHandle++;
+    m_renderTargets[handle] = glRenderTarget;
+    return handle;
+}
+
 void RhiGL::destroyTexture(TextureHandle handle) {
     auto it = m_textures.find(handle);
     if (it != m_textures.end()) {
@@ -276,6 +293,14 @@ void RhiGL::destroyPipeline(PipelineHandle handle) {
     if (it != m_pipelines.end()) {
         glDeleteVertexArrays(1, &it->second.vao);
         m_pipelines.erase(it);
+    }
+}
+
+void RhiGL::destroyRenderTarget(RenderTargetHandle handle) {
+    auto it = m_renderTargets.find(handle);
+    if (it != m_renderTargets.end()) {
+        glDeleteFramebuffers(1, &it->second.fbo);
+        m_renderTargets.erase(it);
     }
 }
 
@@ -343,6 +368,23 @@ void RhiGL::updateBuffer(BufferHandle buffer, const void* data, size_t size, siz
     glBindBuffer(target, it->second.id);
     glBufferSubData(target, offset, size, data);
     glBindBuffer(target, 0);
+}
+
+void RhiGL::bindRenderTarget(RenderTargetHandle renderTarget) {
+    if (renderTarget == INVALID_HANDLE) {
+        // Bind default framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        m_currentRenderTarget = INVALID_HANDLE;
+    } else {
+        auto it = m_renderTargets.find(renderTarget);
+        if (it == m_renderTargets.end()) {
+            std::cerr << "[RhiGL] Invalid render target handle\n";
+            return;
+        }
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, it->second.fbo);
+        m_currentRenderTarget = renderTarget;
+    }
 }
 
 bool RhiGL::supportsCompute() const {
@@ -605,4 +647,78 @@ void RhiGL::setupVertexArray(GLuint vao, const PipelineDesc& desc) {
     }
     
     glBindVertexArray(0);
+}
+
+std::string RhiGL::getDebugInfo() const {
+    std::ostringstream info;
+    info << "OpenGL RHI Debug Info:\n";
+    info << "  Vendor: " << (const char*)glGetString(GL_VENDOR) << "\n";
+    info << "  Renderer: " << (const char*)glGetString(GL_RENDERER) << "\n";
+    info << "  Version: " << (const char*)glGetString(GL_VERSION) << "\n";
+    info << "  GLSL Version: " << (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION) << "\n";
+    info << "  Max Texture Units: " << getMaxTextureUnits() << "\n";
+    info << "  Max Samples: " << getMaxSamples() << "\n";
+    return info.str();
+}
+
+GLenum RhiGL::attachmentTypeToGL(AttachmentType type) const {
+    switch (type) {
+        case AttachmentType::Color0: return GL_COLOR_ATTACHMENT0;
+        case AttachmentType::Color1: return GL_COLOR_ATTACHMENT1;
+        case AttachmentType::Color2: return GL_COLOR_ATTACHMENT2;
+        case AttachmentType::Color3: return GL_COLOR_ATTACHMENT3;
+        case AttachmentType::Color4: return GL_COLOR_ATTACHMENT4;
+        case AttachmentType::Color5: return GL_COLOR_ATTACHMENT5;
+        case AttachmentType::Color6: return GL_COLOR_ATTACHMENT6;
+        case AttachmentType::Color7: return GL_COLOR_ATTACHMENT7;
+        case AttachmentType::Depth: return GL_DEPTH_ATTACHMENT;
+        case AttachmentType::DepthStencil: return GL_DEPTH_STENCIL_ATTACHMENT;
+        default: return GL_COLOR_ATTACHMENT0;
+    }
+}
+
+bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
+    GLint prevFBO;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    
+    // Attach color attachments
+    for (const auto& attachment : desc.colorAttachments) {
+        auto texIt = m_textures.find(attachment.texture);
+        if (texIt == m_textures.end()) {
+            std::cerr << "[RhiGL] Invalid texture handle for render target attachment\n";
+            glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+            return false;
+        }
+        
+        GLenum attachPoint = attachmentTypeToGL(attachment.type);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D, 
+                              texIt->second.id, attachment.mipLevel);
+    }
+    
+    // Attach depth attachment if specified
+    if (desc.depthAttachment.texture != INVALID_HANDLE) {
+        auto texIt = m_textures.find(desc.depthAttachment.texture);
+        if (texIt == m_textures.end()) {
+            std::cerr << "[RhiGL] Invalid depth texture handle for render target\n";
+            glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+            return false;
+        }
+        
+        GLenum attachPoint = attachmentTypeToGL(desc.depthAttachment.type);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D,
+                              texIt->second.id, desc.depthAttachment.mipLevel);
+    }
+    
+    // Check framebuffer completeness
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "[RhiGL] Framebuffer not complete: " << status << "\n";
+        glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+        return false;
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+    return true;
 }

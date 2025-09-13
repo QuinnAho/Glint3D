@@ -7,9 +7,9 @@
 #include "gl_platform.h"
 #include "gizmo.h"
 // RHI types for pipeline handles
-#include "rhi/rhi.h"
-// Forward declare RHI to avoid heavy include in header
-class RHI;
+#include <glint3d/rhi.h>
+
+using namespace glint3d;
 
 // Forward declarations
 class SceneManager;
@@ -173,7 +173,7 @@ public:
     void setIBLIntensity(float intensity);
     
     // RHI access (for SceneManager to create buffers)
-    class RHI* getRHI() const { return m_rhi.get(); }
+    RHI* getRHI() const { return m_rhi.get(); }
     
     // Gizmo/selection configuration
     void setGizmoMode(GizmoMode mode) { m_gizmoMode = mode; }
@@ -227,6 +227,7 @@ private:
     GLuint m_screenQuadVAO = 0;
     GLuint m_screenQuadVBO = 0;
     GLuint m_raytraceTexture = 0;
+    TextureHandle m_raytraceTextureRhi = INVALID_HANDLE;
     std::unique_ptr<Shader> m_screenQuadShader;
     int m_raytraceWidth = 512;
     int m_raytraceHeight = 512;
@@ -256,6 +257,7 @@ private:
     
     // Fallback shadow map to satisfy shaders that sample shadowMap
     GLuint m_dummyShadowTex = 0;
+    TextureHandle m_dummyShadowTexRhi = INVALID_HANDLE;
     
     // Statistics
     RenderStats m_stats;

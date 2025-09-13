@@ -8,10 +8,11 @@
 #include "ibl_system.h"
 #include "raytracer.h"
 #include "shader.h"
+#include "texture.h"
 #include "material_core.h"
 #include "material_binding.h"
-#include "rhi/rhi.h"
-#include "rhi/rhi_types.h"
+#include <glint3d/rhi.h>
+#include <glint3d/rhi_types.h>
 #include "rhi/rhi_gl.h"
 #include "gl_platform.h"
 #include <iostream>
@@ -23,6 +24,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+
+using namespace glint3d;
 
 std::string RenderSystem::loadTextFile(const std::string& path)
 {
@@ -68,7 +71,7 @@ void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
     bool hasNormals = (obj.rhiVboNormals != INVALID_HANDLE);
     bool hasUVs = (obj.rhiVboUVs != INVALID_HANDLE);
     PipelineHandle& target = usePbr ? obj.rhiPipelinePbr : obj.rhiPipelineBasic;
-    if (target != INVALID_HANDLE) return;
+    if (target != INVALID_HANDLE) { m_rhi->bindPipeline(target); return; }
 
     PipelineDesc pd{};
     pd.topology = PrimitiveTopology::Triangles;
@@ -143,17 +146,19 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
 #ifndef __EMSCRIPTEN__
     if (m_framebufferSRGBEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
 #endif
-    glViewport(0, 0, windowWidth, windowHeight);
-    glClearColor(m_backgroundColor.r, m_backgroundColor.g, m_backgroundColor.b, 1.0f);
-
     // Minimal RHI init (OpenGL backend)
     if (!m_rhi) {
         m_rhi = createRHI(RHI::Backend::OpenGL);
         if (m_rhi) {
             RhiInit init{}; init.windowWidth = windowWidth; init.windowHeight = windowHeight; init.enableSRGB = m_framebufferSRGBEnabled;
             m_rhi->init(init);
-            m_rhi->setViewport(0, 0, windowWidth, windowHeight);
         }
+    }
+    
+    // Use RHI for viewport and clear color instead of direct GL
+    if (m_rhi) {
+        m_rhi->setViewport(0, 0, windowWidth, windowHeight);
+        // Note: glClearColor is now handled in render loop via m_rhi->clear()
     }
 
     // Load shaders (legacy wrapper still present for non-RHI paths)
@@ -176,6 +181,9 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     m_screenQuadShader = std::make_unique<Shader>();
     if (!m_screenQuadShader->load("engine/shaders/rayscreen.vert", "engine/shaders/rayscreen.frag"))
         std::cerr << "[RenderSystem] Failed to load rayscreen shader.\n";
+
+    // Register RHI with Texture so cache can create matching RHI textures
+    if (m_rhi) { Texture::setRHI(m_rhi.get()); }
 
     // Init helpers
     if (m_grid) m_grid->init(m_gridShader.get(), 200, 1.0f);
@@ -216,26 +224,54 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     if (m_gizmo) m_gizmo->init();
 
     // Create a 1x1 depth texture as a dummy shadow map to satisfy shaders
-    glGenTextures(1, &m_dummyShadowTex);
-    glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-    // Allocate 1x1 depth = 1.0
     float depthOne = 1.0f;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1, 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &depthOne);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
+    if (m_rhi) {
+        // Use RHI path
+        TextureDesc desc{};
+        desc.type = TextureType::Texture2D;
+        desc.format = TextureFormat::Depth32F;
+        desc.width = 1;
+        desc.height = 1;
+        desc.depth = 1;
+        desc.mipLevels = 1;
+        desc.initialData = &depthOne;
+        desc.initialDataSize = sizeof(float);
+        desc.debugName = "DummyShadowTexture";
+        
+        m_dummyShadowTexRhi = m_rhi->createTexture(desc);
+        if (m_dummyShadowTexRhi != INVALID_HANDLE) {
+            std::cerr << "[RenderSystem] Created dummy shadow texture via RHI: " << m_dummyShadowTexRhi << std::endl;
+        } else {
+            std::cerr << "[RenderSystem] Failed to create dummy shadow texture via RHI, falling back to GL" << std::endl;
+        }
+    }
+    
+    // Fallback or parallel GL path for compatibility
+    if (m_dummyShadowTexRhi == INVALID_HANDLE) {
+        glGenTextures(1, &m_dummyShadowTex);
+        glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1, 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &depthOne);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 #ifndef __EMSCRIPTEN__
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = {1.f,1.f,1.f,1.f};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        float borderColor[] = {1.f,1.f,1.f,1.f};
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 #else
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 #endif
-    glBindTexture(GL_TEXTURE_2D, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        std::cerr << "[RenderSystem] Created dummy shadow texture via GL: " << m_dummyShadowTex << std::endl;
+    }
 
-    // Create matching RHI dummy shadow texture (1x1 depth) for future migration
-    if (m_rhi && s_dummyShadowTexRhi == 0) {
+    // Update global RHI dummy shadow texture
+    if (m_rhi && m_dummyShadowTexRhi != INVALID_HANDLE) {
+        s_dummyShadowTexRhi = m_dummyShadowTexRhi;
+    } else if (m_rhi && s_dummyShadowTexRhi == 0) {
+        // Fallback creation if member creation failed
         TextureDesc td{};
         td.type = TextureType::Texture2D;
         td.format = TextureFormat::Depth24Stencil8;
@@ -304,9 +340,11 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+    // Use RHI for clearing (RHI should always be initialized at this point)
     if (m_rhi) {
         m_rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
     } else {
+        // Fallback for edge cases where RHI failed to initialize
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
@@ -376,9 +414,14 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
                     setUniformVec3("objectColor", glm::vec3(0.2f, 0.7f, 1.0f)); // cyan-ish
                     setUniformVec3("viewPos", m_camera.position);
                     // Force bright ambient and no direct lights
-                    glActiveTexture(GL_TEXTURE0 + 7);
-                    glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-                    setUniformInt("shadowMap", 7);
+                    if (m_rhi && s_dummyShadowTexRhi != 0) {
+                        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
+                        setUniformInt("shadowMap", 7);
+                    } else {
+                        glActiveTexture(GL_TEXTURE0 + 7);
+                        glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
+                        setUniformInt("shadowMap", 7);
+                    }
                     setUniformMat4("lightSpaceMatrix", glm::mat4(1.0f));
                     // Material ambient = 1, other params not used in flat ambient-only path
                     setUniformVec3("material.ambient", glm::vec3(1.0f));
@@ -418,7 +461,12 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
                     DrawDesc dd{};
                     dd.pipeline = (obj.rhiPipelineBasic != INVALID_HANDLE) ? obj.rhiPipelineBasic : m_basicPipeline;
                     bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
-                    if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+                    if (hasIndex) {
+                        dd.indexBuffer = obj.rhiEbo;
+                        dd.indexCount = obj.objLoader.getIndexCount();
+                    } else {
+                        dd.vertexCount = obj.objLoader.getVertCount();
+                    }
                     m_rhi->draw(dd);
                 } else {
                     glBindVertexArray(obj.VAO);
@@ -584,14 +632,24 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
             if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
             m_projectionMatrix = prevProj;
-            glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
             return false;
         }
 
-        // Render to MSAA framebuffer
-        glViewport(0, 0, width, height);
-        glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Render to MSAA framebuffer - use RHI for viewport and clear
+        if (m_rhi) {
+            m_rhi->setViewport(0, 0, width, height);
+            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
+        } else {
+            glViewport(0, 0, width, height);
+            glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
 
         if (m_renderMode == RenderMode::Raytrace) {
             renderRaytraced(scene, lights);
@@ -614,7 +672,12 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
             if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
             m_projectionMatrix = prevProj;
-            glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
             return false;
         }
 
@@ -633,7 +696,12 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
 
         m_projectionMatrix = prevProj;
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+        // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
         return true;
     } else {
         std::cerr << "[RenderSystem] Using non-MSAA path" << std::endl;
@@ -689,7 +757,12 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             if (rboDepth != 0) glDeleteRenderbuffers(1, &rboDepth);
             if (fbo != 0) glDeleteFramebuffers(1, &fbo);
             m_projectionMatrix = prevProj;
-            glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
             return false;
         }
 
@@ -708,7 +781,12 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         // Restore projection, framebuffer and viewport
         m_projectionMatrix = prevProj;
         glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+        // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
 
         // Cleanup
         glDeleteRenderbuffers(1, &rboDepth);
@@ -823,7 +901,12 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 
     // Restore previous framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    // Restore viewport via RHI
+            if (m_rhi) {
+                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            } else {
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            }
 
     // Cleanup
     glDeleteFramebuffers(1, &fbo);
@@ -1177,14 +1260,20 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     // Set common uniforms
     setupCommonUniforms(s);
 
-    // Matrices
-    s->setMat4("model", obj.modelMatrix);
-    s->setMat4("view", m_viewMatrix);
-    s->setMat4("projection", m_projectionMatrix);
-
-    // Camera and shading
-    s->setVec3("viewPos", m_camera.position);
-    s->setInt("shadingMode", (int)m_shadingMode);
+    // Matrices and camera/shading
+    if (m_rhi) {
+        setUniformMat4("model", obj.modelMatrix);
+        setUniformMat4("view", m_viewMatrix);
+        setUniformMat4("projection", m_projectionMatrix);
+        setUniformVec3("viewPos", m_camera.position);
+        setUniformInt("shadingMode", (int)m_shadingMode);
+    } else {
+        s->setMat4("model", obj.modelMatrix);
+        s->setMat4("view", m_viewMatrix);
+        s->setMat4("projection", m_projectionMatrix);
+        s->setVec3("viewPos", m_camera.position);
+        s->setInt("shadingMode", (int)m_shadingMode);
+    }
 
     if (s == m_basicShader.get()) {
         // Post-processing uniforms for standard shader
@@ -1272,28 +1361,57 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         }
         
         int unit = 0;
-        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); if (m_rhi) setUniformInt("baseColorTex", unit); else s->setInt("baseColorTex", unit); unit++; }
-        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); if (m_rhi) setUniformInt("normalTex", unit); else s->setInt("normalTex", unit); unit++; }
-        if (obj.mrTex) { obj.mrTex->bind(unit); if (m_rhi) setUniformInt("mrTex", unit); else s->setInt("mrTex", unit); }
+        if (obj.baseColorTex) {
+            if (m_rhi && obj.baseColorTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
+                setUniformInt("baseColorTex", unit);
+            } else {
+                obj.baseColorTex->bind(unit);
+                if (!m_rhi) s->setInt("baseColorTex", unit); else setUniformInt("baseColorTex", unit);
+            }
+            unit++;
+        }
+        if (obj.normalTex && obj.VBO_tangents != 0) {
+            if (m_rhi && obj.normalTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
+                setUniformInt("normalTex", unit);
+            } else {
+                obj.normalTex->bind(unit);
+                if (!m_rhi) s->setInt("normalTex", unit); else setUniformInt("normalTex", unit);
+            }
+            unit++;
+        }
+        if (obj.mrTex) {
+            if (m_rhi && obj.mrTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
+                setUniformInt("mrTex", unit);
+            } else {
+                obj.mrTex->bind(unit);
+                if (!m_rhi) s->setInt("mrTex", unit); else setUniformInt("mrTex", unit);
+            }
+        }
     }
 
     // Lights (sets globalAmbient, lights[], numLights)
     if (m_rhi) {
-        GLuint prog = 0;
-        if (auto* glrhi = dynamic_cast<RhiGL*>(m_rhi.get())) {
-            ShaderHandle sh = (s == m_pbrShader.get()) ? m_pbrShaderRhi : m_basicShaderRhi;
-            prog = glrhi->getGLShader(sh);
-        }
-        if (prog) lights.applyLights(prog);
+        // Use currently bound program (bound via ensureObjectPipeline)
+        GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+        if (prog) lights.applyLights(static_cast<GLuint>(prog));
     } else {
         lights.applyLights(s->getID());
     }
 
     // Bind dummy shadow map and identity lightSpaceMatrix to avoid undefined sampling
-    glActiveTexture(GL_TEXTURE0 + 7);
-    glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-    s->setInt("shadowMap", 7);
-    s->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
+    if (m_rhi && s_dummyShadowTexRhi != 0) {
+        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
+        setUniformInt("shadowMap", 7);
+        setUniformMat4("lightSpaceMatrix", glm::mat4(1.0f));
+    } else {
+        glActiveTexture(GL_TEXTURE0 + 7);
+        glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
+        s->setInt("shadowMap", 7);
+        s->setMat4("lightSpaceMatrix", glm::mat4(1.0f));
+    }
 
     if (s == m_basicShader.get()) {
         // Texturing or solid color
@@ -1347,7 +1465,12 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
                                                : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
         // Use indexed draw if either legacy GL EBO exists or RHI index buffer was created
         bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
-        if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+        if (hasIndex) {
+            dd.indexBuffer = obj.rhiEbo;
+            dd.indexCount = obj.objLoader.getIndexCount();
+        } else {
+            dd.vertexCount = obj.objLoader.getVertCount();
+        }
         m_rhi->draw(dd);
     } else {
         if (obj.EBO != 0) {
@@ -1498,6 +1621,29 @@ void RenderSystem::initScreenQuad()
 
 void RenderSystem::initRaytraceTexture()
 {
+    if (m_rhi) {
+        // Use RHI path for raytracing texture
+        TextureDesc desc{};
+        desc.type = TextureType::Texture2D;
+        desc.format = TextureFormat::RGB32F;
+        desc.width = m_raytraceWidth;
+        desc.height = m_raytraceHeight;
+        desc.depth = 1;
+        desc.mipLevels = 1;
+        desc.initialData = nullptr;
+        desc.initialDataSize = 0;
+        desc.debugName = "RaytraceTexture";
+        
+        m_raytraceTextureRhi = m_rhi->createTexture(desc);
+        if (m_raytraceTextureRhi != INVALID_HANDLE) {
+            std::cout << "[RenderSystem] Raytracing texture initialized via RHI (" << m_raytraceWidth << "x" << m_raytraceHeight << "): " << m_raytraceTextureRhi << "\n";
+            return;
+        } else {
+            std::cerr << "[RenderSystem] Failed to create raytracing texture via RHI, falling back to GL" << std::endl;
+        }
+    }
+    
+    // GL fallback path
     glGenTextures(1, &m_raytraceTexture);
     glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
     
@@ -1511,7 +1657,7 @@ void RenderSystem::initRaytraceTexture()
     
     glBindTexture(GL_TEXTURE_2D, 0);
     
-    std::cout << "[RenderSystem] Raytracing texture initialized (" << m_raytraceWidth << "x" << m_raytraceHeight << ")\n";
+    std::cout << "[RenderSystem] Raytracing texture initialized via GL (" << m_raytraceWidth << "x" << m_raytraceHeight << "): " << m_raytraceTexture << "\n";
 }
 
 void RenderSystem::renderDebugElements(const SceneManager& scene, const Light& lights)
@@ -1777,9 +1923,35 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
         }
         
         int unit = 0;
-        if (obj.baseColorTex) { obj.baseColorTex->bind(unit); if (m_rhi) setUniformInt("baseColorTex", unit); else shader->setInt("baseColorTex", unit); unit++; }
-        if (obj.normalTex && obj.VBO_tangents != 0) { obj.normalTex->bind(unit); if (m_rhi) setUniformInt("normalTex", unit); else shader->setInt("normalTex", unit); unit++; }
-        if (obj.mrTex) { obj.mrTex->bind(unit); if (m_rhi) setUniformInt("mrTex", unit); else shader->setInt("mrTex", unit); }
+        if (obj.baseColorTex) {
+            if (m_rhi && obj.baseColorTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
+                setUniformInt("baseColorTex", unit);
+            } else {
+                obj.baseColorTex->bind(unit);
+                if (!m_rhi) shader->setInt("baseColorTex", unit); else setUniformInt("baseColorTex", unit);
+            }
+            unit++;
+        }
+        if (obj.normalTex && obj.VBO_tangents != 0) {
+            if (m_rhi && obj.normalTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
+                setUniformInt("normalTex", unit);
+            } else {
+                obj.normalTex->bind(unit);
+                if (!m_rhi) shader->setInt("normalTex", unit); else setUniformInt("normalTex", unit);
+            }
+            unit++;
+        }
+        if (obj.mrTex) {
+            if (m_rhi && obj.mrTex->rhiHandle() != glint3d::INVALID_HANDLE) {
+                m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
+                setUniformInt("mrTex", unit);
+            } else {
+                obj.mrTex->bind(unit);
+                if (!m_rhi) shader->setInt("mrTex", unit); else setUniformInt("mrTex", unit);
+            }
+        }
     }
     // Simple blending for transmissive materials (approx; SSR pending)
     bool blendingEnabled = false;
@@ -1799,7 +1971,12 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
         dd.pipeline = (shader == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
                                                     : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
         bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
-        if (hasIndex) dd.indexCount = obj.objLoader.getIndexCount(); else dd.vertexCount = obj.objLoader.getVertCount();
+        if (hasIndex) {
+            dd.indexBuffer = obj.rhiEbo;
+            dd.indexCount = obj.objLoader.getIndexCount();
+        } else {
+            dd.vertexCount = obj.objLoader.getVertCount();
+        }
         m_rhi->draw(dd);
     } else {
         glBindVertexArray(obj.VAO);

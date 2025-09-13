@@ -1,0 +1,44 @@
+id: FEAT-0252
+title: WebGPU Backend (wgpu-native)
+owner: ai
+status: planned
+created: "2025-09-13T00:00:00Z"
+priority: critical
+
+description: >
+  Implement a WebGPU backend using wgpu-native (and/or Dawn) targeting desktop and
+  enabling future web builds. Ensure API parity with the WebGPU-shaped RHI frontend.
+
+acceptance_criteria:
+  - "WebGPU backend compiles and runs core scenes"
+  - "GL vs WebGPU image diff < epsilon on 10–20 golden scenes"
+  - "Pass/encoder/bind group semantics match frontend expectations"
+
+must_requirements:
+  - TEST.CROSS_PLATFORM
+  - TEST.GOLDEN_SSIM
+  - PERF.FRAME_BUDGET
+
+plan:
+  - id: PR1
+    title: "Backend skeleton + device/queue"
+    status: planned
+    files: ["engine/src/rhi/**", "engine/include/glint3d/rhi*.h", "tests/unit/rhi_test.cpp"]
+  - id: PR2
+    title: "Pipelines, bind groups, and passes"
+    status: planned
+    files: ["engine/src/rhi/**", "tests/unit/rhi_test.cpp"]
+
+file_whitelist:
+  - "engine/src/rhi/**"
+  - "engine/include/glint3d/rhi*.h"
+  - "tests/unit/rhi_test.cpp"
+  - "docs/rhi_architecture.md"
+
+outputs:
+  - engine/src/rhi/rhi-wgpu.cpp
+  - docs/rhi_architecture.md
+
+dependencies:
+  blocked_by: [FEAT-0248, FEAT-0249, FEAT-0250, FEAT-0251]
+

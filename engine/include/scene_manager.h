@@ -9,9 +9,11 @@
 #include "objloader.h"
 #include "texture.h"
 #include "shader.h"
-#include "rhi/rhi.h"
-#include "rhi/rhi_types.h"
+#include <glint3d/rhi.h>
+#include <glint3d/rhi_types.h>
 #include "material_core.h"
+
+using namespace glint3d;
 
 struct SceneObject
 {

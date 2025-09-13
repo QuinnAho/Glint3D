@@ -2,6 +2,8 @@
 #include "scene_manager.h"
 #include "gl_platform.h"
 
+using namespace glint3d;
+
 namespace rhi {
 
 void setupSceneObjectGL(SceneObject& obj) {

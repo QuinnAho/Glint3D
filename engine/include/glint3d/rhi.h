@@ -99,11 +99,19 @@ public:
      */
     virtual PipelineHandle createPipeline(const PipelineDesc& desc) = 0;
     
+    /**
+     * @brief Create a render target (framebuffer) with attachments
+     * @param desc Render target descriptor with color/depth attachments
+     * @return Handle to created render target, or INVALID_HANDLE on failure
+     */
+    virtual RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) = 0;
+    
     // Resource destruction - RAII style cleanup
     virtual void destroyTexture(TextureHandle handle) = 0;
     virtual void destroyBuffer(BufferHandle handle) = 0;
     virtual void destroyShader(ShaderHandle handle) = 0;
     virtual void destroyPipeline(PipelineHandle handle) = 0;
+    virtual void destroyRenderTarget(RenderTargetHandle handle) = 0;
     
     // GPU state management
     /**
@@ -149,6 +157,12 @@ public:
      * @param offset Byte offset in buffer (default 0)
      */
     virtual void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) = 0;
+    
+    /**
+     * @brief Bind a render target for subsequent draw commands
+     * @param renderTarget Render target handle, or INVALID_HANDLE for default framebuffer
+     */
+    virtual void bindRenderTarget(RenderTargetHandle renderTarget) = 0;
     
     // Capability queries for feature detection
     /**

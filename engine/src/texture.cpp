@@ -1,4 +1,5 @@
 #include "texture.h"
+#include <glint3d/rhi.h>
 #include <iostream>
 #include <algorithm>
 #include <cctype>
@@ -20,12 +21,19 @@ static std::string toLowerExt(const std::string& path)
     return ext;
 }
 
+glint3d::RHI* Texture::s_rhi = nullptr;
+
 Texture::Texture() : m_textureID(0) {}
 
 Texture::~Texture()
 {
     if (m_textureID)
         glDeleteTextures(1, &m_textureID);
+    // Destroy matching RHI texture if present
+    if (m_rhiTex != glint3d::INVALID_HANDLE && s_rhi) {
+        s_rhi->destroyTexture(m_rhiTex);
+        m_rhiTex = glint3d::INVALID_HANDLE;
+    }
 }
 
 bool Texture::loadFromFile(const std::string& filepath, bool flipY)

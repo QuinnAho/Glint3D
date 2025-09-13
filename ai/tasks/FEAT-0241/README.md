@@ -7,8 +7,19 @@ The core architectural change introduces a unified MaterialCore struct (single s
 
 ## AI-Editable: Status
 - Overall: in_progress
-- Current PR: PR2 (started)
-- Last Updated: 2025-09-12T11:20:00Z
+- Current PR: PR1 (in_progress)
+- Last Updated: 2025-09-12T17:25:00Z
+
+## AI-Editable: Acceptance & Must-Requirements Status
+- Acceptance: Opaque scenes unchanged — Pending validation (golden tests not run yet)
+- Acceptance: SSR-T for transmissive materials — Planned (PR3)
+- Acceptance: Auto mode selection — Planned (PR5)
+- Acceptance: RHI abstraction in Engine Core — In progress; GL/GLFW calls still present
+- Must: ARCH.NO_GL_OUTSIDE_RHI — Not yet satisfied (see `render_system.cpp`, `application_core.cpp`)
+- Must: API.PUBLIC_HEADERS_PATH — Satisfied (`engine/include/glint3d/**`)
+- Must: DET.SEED_REPRO — Satisfied/unchanged (deterministic seed path intact)
+- Must: TEST.GOLDEN_SSIM — Pending (integration test placeholder present)
+- Must: PERF.FRAME_BUDGET — Pending measurement post-SSR implementation
 
 ## AI-Editable: Checklist (mirror of spec.yaml acceptance_criteria)
 - [ ] Opaque scenes unchanged (SSIM ≥ 0.995 vs goldens) — Future PRs (PR3–PR5)

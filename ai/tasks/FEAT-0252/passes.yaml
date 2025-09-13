@@ -1,0 +1,11 @@
+checks:
+  - id: wgpu_backend_skeleton
+    description: "WebGPU backend file skeleton present"
+    includes: ["engine/src/rhi/**"]
+    pattern: "rhi-wgpu|wgpu::|Dawn|WebGPU"
+
+  - id: golden_diff_config
+    description: "Config mentions image diff validation for WebGPU"
+    includes: ["ai/tasks/FEAT-0252/**", "docs/rhi_architecture.md"]
+    pattern: "image diff|epsilon|golden"
+

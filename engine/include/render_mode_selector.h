@@ -8,6 +8,10 @@
 class SceneManager;
 class RenderGraph;
 
+namespace glint3d {
+    class RHI;
+}
+
 // Rendering pipeline modes
 enum class RenderMode { 
     Raster,     // OpenGL rasterization (fast, SSR approximation)
@@ -114,9 +118,9 @@ private:
 // Pipeline builder that creates appropriate render graphs based on mode
 class PipelineBuilder {
 public:
-    static std::unique_ptr<RenderGraph> createRasterPipeline(class RHI* rhi);
-    static std::unique_ptr<RenderGraph> createRayPipeline(class RHI* rhi);
-    static std::unique_ptr<RenderGraph> createHybridPipeline(class RHI* rhi);
+    static std::unique_ptr<RenderGraph> createRasterPipeline(glint3d::RHI* rhi);
+    static std::unique_ptr<RenderGraph> createRayPipeline(glint3d::RHI* rhi);
+    static std::unique_ptr<RenderGraph> createHybridPipeline(glint3d::RHI* rhi);
     
     // Configure pipeline for specific scenarios
     static void configureForPreview(RenderGraph* graph);

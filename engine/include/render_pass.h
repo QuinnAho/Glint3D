@@ -4,7 +4,9 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
-#include "rhi/rhi.h"
+#include <glint3d/rhi.h>
+
+using namespace glint3d;
 
 // Forward declarations
 class SceneManager;

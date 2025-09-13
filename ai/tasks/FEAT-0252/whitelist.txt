@@ -1,0 +1,5 @@
+engine/src/rhi/**
+engine/include/glint3d/rhi*.h
+tests/unit/rhi_test.cpp
+docs/rhi_architecture.md
+docs/rhi_guide.md

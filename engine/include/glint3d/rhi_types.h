@@ -12,6 +12,7 @@ using TextureHandle = uint32_t;
 using BufferHandle = uint32_t;
 using ShaderHandle = uint32_t;
 using PipelineHandle = uint32_t;
+using RenderTargetHandle = uint32_t;
 
 constexpr uint32_t INVALID_HANDLE = 0;
 
@@ -180,6 +181,38 @@ struct ReadbackDesc {
     int width = 0, height = 0;
     void* destination = nullptr;
     size_t destinationSize = 0;
+};
+
+// Render target attachment types
+enum class AttachmentType {
+    Color0,
+    Color1,
+    Color2,
+    Color3,
+    Color4,
+    Color5,
+    Color6,
+    Color7,
+    Depth,
+    DepthStencil
+};
+
+// Render target attachment descriptor
+struct RenderTargetAttachment {
+    AttachmentType type = AttachmentType::Color0;
+    TextureHandle texture = INVALID_HANDLE;
+    int mipLevel = 0;
+    int arrayLayer = 0; // For texture arrays/cubemaps
+};
+
+// Render target descriptor
+struct RenderTargetDesc {
+    std::vector<RenderTargetAttachment> colorAttachments;
+    RenderTargetAttachment depthAttachment;
+    int width = 0;
+    int height = 0;
+    int samples = 1; // MSAA samples
+    std::string debugName;
 };
 
 } // namespace glint3d

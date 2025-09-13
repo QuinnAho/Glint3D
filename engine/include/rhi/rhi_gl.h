@@ -1,10 +1,12 @@
 #pragma once
 
-#include "rhi.h"
-#include "rhi_types.h"
+#include <glint3d/rhi.h>
+#include <glint3d/rhi_types.h>
 #include "../gl_platform.h"
 #include <unordered_map>
 #include <vector>
+
+using namespace glint3d;
 
 // OpenGL implementation of RHI
 class RhiGL : public RHI {
@@ -26,11 +28,13 @@ public:
     BufferHandle createBuffer(const BufferDesc& desc) override;
     ShaderHandle createShader(const ShaderDesc& desc) override;
     PipelineHandle createPipeline(const PipelineDesc& desc) override;
+    RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override;
     
     void destroyTexture(TextureHandle handle) override;
     void destroyBuffer(BufferHandle handle) override;
     void destroyShader(ShaderHandle handle) override;
     void destroyPipeline(PipelineHandle handle) override;
+    void destroyRenderTarget(RenderTargetHandle handle) override;
     
     void setViewport(int x, int y, int width, int height) override;
     void clear(const glm::vec4& color, float depth, int stencil) override;
@@ -38,6 +42,7 @@ public:
     void bindTexture(TextureHandle texture, uint32_t slot) override;
     void bindUniformBuffer(BufferHandle buffer, uint32_t slot) override;
     void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) override;
+    void bindRenderTarget(RenderTargetHandle renderTarget) override;
     
     bool supportsCompute() const override;
     bool supportsGeometryShaders() const override;
@@ -47,6 +52,7 @@ public:
     
     Backend getBackend() const override { return Backend::OpenGL; }
     const char* getBackendName() const override { return "OpenGL"; }
+    std::string getDebugInfo() const override;
     
     // OpenGL-specific methods
     GLuint getGLTexture(TextureHandle handle) const;
@@ -75,20 +81,28 @@ private:
         PipelineDesc desc;
     };
     
+    struct GLRenderTarget {
+        GLuint fbo = 0;
+        RenderTargetDesc desc;
+    };
+    
     // Resource storage
     std::unordered_map<TextureHandle, GLTexture> m_textures;
     std::unordered_map<BufferHandle, GLBuffer> m_buffers;
     std::unordered_map<ShaderHandle, GLShader> m_shaders;
     std::unordered_map<PipelineHandle, GLPipeline> m_pipelines;
+    std::unordered_map<RenderTargetHandle, GLRenderTarget> m_renderTargets;
     
     // Handle generation
     uint32_t m_nextTextureHandle = 1;
     uint32_t m_nextBufferHandle = 1;
     uint32_t m_nextShaderHandle = 1;
     uint32_t m_nextPipelineHandle = 1;
+    uint32_t m_nextRenderTargetHandle = 1;
     
     // Current state
     PipelineHandle m_currentPipeline = INVALID_HANDLE;
+    RenderTargetHandle m_currentRenderTarget = INVALID_HANDLE;
     
     // OpenGL capabilities
     bool m_supportsCompute = false;
@@ -107,4 +121,6 @@ private:
     bool compileShader(GLuint& program, const ShaderDesc& desc);
     void queryCapabilities();
     void setupVertexArray(GLuint vao, const PipelineDesc& desc);
+    GLenum attachmentTypeToGL(AttachmentType type) const;
+    bool setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc);
 };

@@ -12,6 +12,8 @@
 #include <rapidjson/prettywriter.h>
 #include <cmath>
 
+using namespace glint3d;
+
 SceneManager::SceneManager() 
 {
 }

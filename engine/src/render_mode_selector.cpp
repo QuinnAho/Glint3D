@@ -1,10 +1,12 @@
 #include "render_mode_selector.h"
 #include "scene_manager.h"
 #include "render_pass.h"
-#include "rhi/rhi.h"
+#include <glint3d/rhi.h>
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+
+using namespace glint3d;
 
 RenderModeSelector::RenderModeSelector() = default;
 

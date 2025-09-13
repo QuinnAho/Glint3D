@@ -1,6 +1,8 @@
 #pragma once
-#include "rhi/rhi.h"
+#include <glint3d/rhi.h>
 #include <cstdint>
+
+using namespace glint3d;
 
 class RhiNull : public RHI {
 public:
@@ -20,11 +22,13 @@ public:
     BufferHandle createBuffer(const BufferDesc& desc) override { (void)desc; return ++m_nextHandle; }
     ShaderHandle createShader(const ShaderDesc& desc) override { (void)desc; return ++m_nextHandle; }
     PipelineHandle createPipeline(const PipelineDesc& desc) override { (void)desc; return ++m_nextHandle; }
+    RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override { (void)desc; return ++m_nextHandle; }
 
     void destroyTexture(TextureHandle) override {}
     void destroyBuffer(BufferHandle) override {}
     void destroyShader(ShaderHandle) override {}
     void destroyPipeline(PipelineHandle) override {}
+    void destroyRenderTarget(RenderTargetHandle) override {}
 
     void setViewport(int, int, int, int) override {}
     void clear(const glm::vec4&, float, int) override {}
@@ -32,6 +36,7 @@ public:
     void bindTexture(TextureHandle, uint32_t) override {}
     void bindUniformBuffer(BufferHandle, uint32_t) override {}
     void updateBuffer(BufferHandle, const void*, size_t, size_t = 0) override {}
+    void bindRenderTarget(RenderTargetHandle) override {}
 
     bool supportsCompute() const override { return false; }
     bool supportsGeometryShaders() const override { return false; }
@@ -41,6 +46,7 @@ public:
 
     Backend getBackend() const override { return Backend::Null; }
     const char* getBackendName() const override { return "NullRHI"; }
+    std::string getDebugInfo() const override { return "NullRHI for testing"; }
 
     uint32_t getDrawCallCount() const { return m_drawCalls; }
 

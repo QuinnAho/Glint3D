@@ -38,6 +38,25 @@ if (rhi && rhi->init(init)) {
 }
 ```
 
+## Textures and Legacy Integration
+
+When running with an active RHI backend, the legacy `Texture` class now carries an optional matching RHI texture handle. On load, `TextureCache` will create an RHI texture (if an RHI instance has been registered) using decoded CPU pixels via `ImageIO` and store the handle in the `Texture` instance. Render paths can then bind via RHI:
+
+```cpp
+if (tex && tex->rhiHandle() != glint3d::INVALID_HANDLE) {
+    m_rhi->bindTexture(tex->rhiHandle(), unit);
+} else {
+    tex->bind(unit); // legacy GL path
+}
+```
+
+Register the active RHI after initialization (e.g., in `RenderSystem`):
+
+```cpp
+// After m_rhi->init(...)
+Texture::setRHI(m_rhi.get());
+```
+
 ## Constraints
 - No direct `gl*` or `glfw*` calls in Engine Core; use RHI (platform/windowing remains in platform layer).
 - Preserve existing opaque rendering behavior; SSR‑T integration comes in later PRs.

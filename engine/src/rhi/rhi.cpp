@@ -1,7 +1,9 @@
-#include "rhi/rhi.h"
+#include <glint3d/rhi.h>
 #include "rhi/rhi_gl.h"
 #include "rhi/rhi_null.h"
 #include <memory>
+
+namespace glint3d {
 
 std::unique_ptr<RHI> createRHI(RHI::Backend backend) {
     switch (backend) {
@@ -20,3 +22,5 @@ std::unique_ptr<RHI> createRHI(RHI::Backend backend) {
             return nullptr;
     }
 }
+
+} // namespace glint3d
