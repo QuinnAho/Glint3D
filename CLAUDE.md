@@ -164,12 +164,14 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 
 ## Architecture Overview
 
-### Highlights (v0.3.0)
-- Lights: Point, Directional, and Spot supported end-to-end (engine, shaders, UI, JSON ops). Spot has inverse-square attenuation and smooth cone falloff.
-- UI: Add/select/delete lights; per-light enable, intensity; type-specific edits (position, direction, cones for spot). Directional and spot indicators are rendered in the viewport.
-- JSON Ops: `add_light` supports `type: point|directional|spot` with fields `position`, `direction`, and `inner_deg`/`outer_deg` for spot. Schema is in `schemas/json_ops_v1.json`.
-- CI: Golden image comparison on Linux via ImageMagick (SSIM). Includes a workflow_dispatch job to regenerate candidate goldens.
-- Shadows: Temporarily disabled in shaders for deterministic CI until a proper shadow map path is implemented. Re-enable later via a `useShadows` uniform.
+### Highlights (v0.3.0 + RHI Updates)
+- **✅ RHI Modernization**: FEAT-0248 completed - WebGPU-shaped API with CommandEncoder, RenderPassEncoder, Queue, BindGroups. All uniform operations now route through RHI abstraction.
+- **Lights**: Point, Directional, and Spot supported end-to-end (engine, shaders, UI, JSON ops). Spot has inverse-square attenuation and smooth cone falloff.
+- **UI**: Add/select/delete lights; per-light enable, intensity; type-specific edits (position, direction, cones for spot). Directional and spot indicators are rendered in the viewport.
+- **JSON Ops**: `add_light` supports `type: point|directional|spot` with fields `position`, `direction`, and `inner_deg`/`outer_deg` for spot. Schema is in `schemas/json_ops_v1.json`.
+- **CI**: Golden image comparison on Linux via ImageMagick (SSIM). Includes a workflow_dispatch job to regenerate candidate goldens.
+- **Cross-Platform Graphics**: Engine core successfully decoupled from direct OpenGL calls, prepared for WebGPU backend.
+- **Shadows**: Temporarily disabled in shaders for deterministic CI until a proper shadow map path is implemented. Re-enable later via a `useShadows` uniform.
 
 ### Core Application Structure
 - **Application class** (`application.h/cpp`): Main application lifecycle, OpenGL context, scene management
@@ -796,17 +798,19 @@ When implementing new features, consider the upcoming graphics API transition:
 4. **Cross-Platform Design**: Ensure compatibility patterns that translate across APIs
 5. **Performance Patterns**: Avoid OpenGL-specific optimizations that won't carry forward
 
-### Current RHI Status
-- **Abstraction Layer**: Foundation exists for multi-API support
-- **Shader System**: Designed for cross-compilation (GLSL → HLSL/SPIR-V ready)
-- **Engine Core**: Already decoupled from specific graphics API dependencies
-- **Asset Pipeline**: Designed to support future rendering techniques
+### Current RHI Status (Updated 2025-09-13)
+- **✅ WebGPU-Shaped API**: FEAT-0248 completed - CommandEncoder, RenderPassEncoder, Queue, BindGroups implemented
+- **✅ Uniform System**: All `glUniform*` calls now route through RHI uniform helpers (Shader, Material, Light, Gizmo classes)
+- **✅ Cross-Platform Ready**: OpenGL backend functional, WebGPU backend foundation prepared
+- **🔄 Framebuffer Migration**: FEAT-0253 in progress - migrating MSAA/offscreen rendering to RHI render targets
+- **Engine Core**: Successfully decoupled from direct OpenGL calls (except RHI backend)
 
-### Implementation Priority
-- Phase 1: Complete current OpenGL/WebGL2 feature parity
-- Phase 2: RHI expansion and Vulkan/WebGPU prototyping  
-- Phase 3: Neural rendering technique integration
-- Phase 4: Performance optimization and advanced pipeline features
+### Implementation Priority (Updated)
+- ✅ Phase 1: WebGPU-shaped RHI API surface (FEAT-0248) - **COMPLETED**
+- 🔄 Phase 1.5: Complete framebuffer abstraction (FEAT-0253) - **IN PROGRESS**
+- Phase 2: Full uniform buffer object migration (FEAT-0249) + MSAA resolve (FEAT-0250)
+- Phase 3: WebGPU backend implementation (FEAT-0252)
+- Phase 4: Advanced features (compute, neural rendering, performance optimization)
 
 ---
 

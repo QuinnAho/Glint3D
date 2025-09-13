@@ -1,4 +1,8 @@
 #include "axisrenderer.h"
+#include <glint3d/rhi.h>
+
+// Static RHI instance for uniform bridging
+glint3d::RHI* AxisRenderer::s_rhi = nullptr;
 
 AxisRenderer::AxisRenderer() : VAO(0), VBO(0), shaderProgram(0) {}
 
@@ -49,13 +53,22 @@ void AxisRenderer::init() {
 
 void AxisRenderer::render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix) {
     glUseProgram(shaderProgram);
-    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
 
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    // Route uniforms through RHI for WebGPU compatibility
+    if (s_rhi) {
+        s_rhi->setUniformMat4("model", modelMatrix);
+        s_rhi->setUniformMat4("view", viewMatrix);
+        s_rhi->setUniformMat4("projection", projectionMatrix);
+    } else {
+        // Fallback to direct GL calls
+        GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
+        GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
+        GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
+
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    }
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_LINES, 0, 6);
@@ -66,4 +79,9 @@ void AxisRenderer::cleanup() {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteProgram(shaderProgram);
+}
+
+void AxisRenderer::setRHI(glint3d::RHI* rhi)
+{
+    s_rhi = rhi;
 }

@@ -47,6 +47,19 @@ public:
     void bindUniformBuffer(BufferHandle buffer, uint32_t slot) override;
     void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) override;
     void bindRenderTarget(RenderTargetHandle renderTarget) override;
+    void resolveRenderTarget(RenderTargetHandle srcRenderTarget, TextureHandle dstTexture,
+                           const int* srcRect = nullptr, const int* dstRect = nullptr) override;
+    void resolveToDefaultFramebuffer(RenderTargetHandle srcRenderTarget,
+                                   const int* srcRect = nullptr, const int* dstRect = nullptr) override;
+
+    // Legacy uniform helpers (transitional bridge to proper UBOs)
+    void setUniformMat4(const char* name, const glm::mat4& value) override;
+    void setUniformVec3(const char* name, const glm::vec3& value) override;
+    void setUniformVec4(const char* name, const glm::vec4& value) override;
+    void setUniformFloat(const char* name, float value) override;
+    void setUniformInt(const char* name, int value) override;
+    void setUniformBool(const char* name, bool value) override;
+
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) override;
     Queue& getQueue() override;
     

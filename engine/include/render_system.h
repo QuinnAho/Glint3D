@@ -293,9 +293,14 @@ private:
     bool  m_recreateTargets = false;
     int   m_fbWidth = 0;
     int   m_fbHeight = 0;
-    GLuint m_msaaFBO = 0;
-    GLuint m_msaaColorRBO = 0;
-    GLuint m_msaaDepthRBO = 0;
+
+    // RHI-based MSAA resources (replacing GL FBO/RBO objects)
+    RenderTargetHandle m_msaaRenderTarget = INVALID_HANDLE;
+
+    // Legacy GL objects (deprecated, use RHI render targets instead)
+    GLuint m_msaaFBO = 0;  // TODO: Remove after full migration
+    GLuint m_msaaColorRBO = 0;  // TODO: Remove after full migration
+    GLuint m_msaaDepthRBO = 0;  // TODO: Remove after full migration
 
     // Internal helpers
     void createOrResizeTargets(int width, int height);

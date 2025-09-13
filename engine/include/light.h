@@ -4,6 +4,9 @@
 #include <glm/glm.hpp>
 #include "gl_platform.h"
 
+// Forward declaration
+namespace glint3d { class RHI; }
+
 enum class LightType {
     POINT = 0,
     DIRECTIONAL = 1,
@@ -36,7 +39,13 @@ public:
     void addSpotLight(const glm::vec3& position, const glm::vec3& direction,
                       const glm::vec3& color, float intensity,
                       float innerConeDeg, float outerConeDeg);
+
+    // Legacy GL-based method (deprecated, use applyLightsRHI instead)
     void applyLights(GLuint shaderProgram) const;
+
+    // RHI-based light uniform application
+    void applyLightsRHI(glint3d::RHI* rhi) const;
+
     size_t getLightCount() const;
 
     // New functions for indicator visualization

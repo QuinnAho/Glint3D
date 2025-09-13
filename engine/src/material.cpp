@@ -1,6 +1,7 @@
 #include "material.h"
 #include "gl_platform.h"
 #include <glm/gtc/type_ptr.hpp>
+#include <glint3d/rhi.h>
 
 
 Material::Material(
@@ -36,4 +37,18 @@ void Material::apply(GLuint shaderProgram, const std::string& uniformName) const
     glUniform3fv(locSpecular, 1, glm::value_ptr(specular));
     glUniform3fv(locAmbient, 1, glm::value_ptr(ambient));
     glUniform1f(locShine, shininess);
+}
+
+void Material::applyRHI(glint3d::RHI* rhi, const std::string& uniformName) const {
+    if (!rhi) return;
+
+    // Apply material properties via RHI uniform helpers
+    rhi->setUniformVec3((uniformName + ".diffuse").c_str(), diffuse);
+    rhi->setUniformVec3((uniformName + ".specular").c_str(), specular);
+    rhi->setUniformVec3((uniformName + ".ambient").c_str(), ambient);
+    rhi->setUniformFloat((uniformName + ".shininess").c_str(), shininess);
+    rhi->setUniformFloat((uniformName + ".roughness").c_str(), roughness);
+    rhi->setUniformFloat((uniformName + ".metallic").c_str(), metallic);
+    rhi->setUniformFloat((uniformName + ".ior").c_str(), ior);
+    rhi->setUniformFloat((uniformName + ".transmission").c_str(), transmission);
 }

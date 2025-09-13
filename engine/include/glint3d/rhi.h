@@ -175,6 +175,68 @@ public:
      */
     virtual void bindRenderTarget(RenderTargetHandle renderTarget) = 0;
 
+    /**
+     * @brief Resolve a multisampled render target to a non-multisampled texture
+     * @param srcRenderTarget Source multisampled render target
+     * @param dstTexture Destination texture (must be non-multisampled)
+     * @param srcRect Source rectangle (x, y, width, height), or nullptr for full resolve
+     * @param dstRect Destination rectangle, or nullptr to match srcRect
+     */
+    virtual void resolveRenderTarget(RenderTargetHandle srcRenderTarget, TextureHandle dstTexture,
+                                   const int* srcRect = nullptr, const int* dstRect = nullptr) = 0;
+
+    /**
+     * @brief Resolve multisampled render target to default framebuffer
+     * @param srcRenderTarget Source multisampled render target
+     * @param srcRect Source rectangle, or nullptr for full resolve
+     * @param dstRect Destination rectangle in default framebuffer
+     */
+    virtual void resolveToDefaultFramebuffer(RenderTargetHandle srcRenderTarget,
+                                           const int* srcRect = nullptr, const int* dstRect = nullptr) = 0;
+
+    // Legacy uniform helpers (transitional - creates dynamic UBOs behind the scenes)
+    /**
+     * @brief Set a mat4 uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Matrix value to set
+     */
+    virtual void setUniformMat4(const char* name, const glm::mat4& value) = 0;
+
+    /**
+     * @brief Set a vec3 uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Vector value to set
+     */
+    virtual void setUniformVec3(const char* name, const glm::vec3& value) = 0;
+
+    /**
+     * @brief Set a vec4 uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Vector value to set
+     */
+    virtual void setUniformVec4(const char* name, const glm::vec4& value) = 0;
+
+    /**
+     * @brief Set a float uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Float value to set
+     */
+    virtual void setUniformFloat(const char* name, float value) = 0;
+
+    /**
+     * @brief Set an int uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Integer value to set
+     */
+    virtual void setUniformInt(const char* name, int value) = 0;
+
+    /**
+     * @brief Set a bool uniform via dynamic uniform buffer (legacy bridge)
+     * @param name Uniform name in currently bound shader
+     * @param value Boolean value to set
+     */
+    virtual void setUniformBool(const char* name, bool value) = 0;
+
     // Encoders/Queue (WebGPU-shaped)
     virtual std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) = 0;
     virtual Queue& getQueue() = 0;

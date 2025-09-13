@@ -41,6 +41,17 @@ public:
     void bindUniformBuffer(BufferHandle, uint32_t) override {}
     void updateBuffer(BufferHandle, const void*, size_t, size_t = 0) override {}
     void bindRenderTarget(RenderTargetHandle) override {}
+    void resolveRenderTarget(RenderTargetHandle, TextureHandle, const int* = nullptr, const int* = nullptr) override {}
+    void resolveToDefaultFramebuffer(RenderTargetHandle, const int* = nullptr, const int* = nullptr) override {}
+
+    // Legacy uniform helpers (no-ops for null backend)
+    void setUniformMat4(const char*, const glm::mat4&) override {}
+    void setUniformVec3(const char*, const glm::vec3&) override {}
+    void setUniformVec4(const char*, const glm::vec4&) override {}
+    void setUniformFloat(const char*, float) override {}
+    void setUniformInt(const char*, int) override {}
+    void setUniformBool(const char*, bool) override {}
+
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* = nullptr) override;
     Queue& getQueue() override { return m_queue; }
 

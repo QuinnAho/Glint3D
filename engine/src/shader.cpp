@@ -4,6 +4,10 @@
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
+#include <glint3d/rhi.h>
+
+// Static RHI instance for uniform bridging
+glint3d::RHI* Shader::s_rhi = nullptr;
 
 Shader::Shader() : m_programID(0) {}
 
@@ -75,6 +79,11 @@ void Shader::use() const
 GLuint Shader::getID() const
 {
     return m_programID;
+}
+
+void Shader::setRHI(glint3d::RHI* rhi)
+{
+    s_rhi = rhi;
 }
 
 std::string Shader::loadShaderFromFile(const std::string& path)
@@ -172,33 +181,58 @@ GLuint Shader::compileShader(const std::string& source, GLenum type)
     return shader;
 }
 
-// Uniform helpers
+// Uniform helpers - routed through RHI for WebGPU compatibility
 void Shader::setMat4(const std::string& name, const glm::mat4& mat) const
 {
-    glUniformMatrix4fv(glGetUniformLocation(m_programID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+    if (s_rhi) {
+        s_rhi->setUniformMat4(name.c_str(), mat);
+    } else {
+        // Fallback to direct GL for compatibility
+        glUniformMatrix4fv(glGetUniformLocation(m_programID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+    }
 }
 
 void Shader::setVec3(const std::string& name, const glm::vec3& vec) const
 {
-    glUniform3fv(glGetUniformLocation(m_programID, name.c_str()), 1, glm::value_ptr(vec));
+    if (s_rhi) {
+        s_rhi->setUniformVec3(name.c_str(), vec);
+    } else {
+        glUniform3fv(glGetUniformLocation(m_programID, name.c_str()), 1, glm::value_ptr(vec));
+    }
 }
 
 void Shader::setVec4(const std::string& name, const glm::vec4& vec) const
 {
-    glUniform4fv(glGetUniformLocation(m_programID, name.c_str()), 1, glm::value_ptr(vec));
+    if (s_rhi) {
+        s_rhi->setUniformVec4(name.c_str(), vec);
+    } else {
+        glUniform4fv(glGetUniformLocation(m_programID, name.c_str()), 1, glm::value_ptr(vec));
+    }
 }
 
 void Shader::setFloat(const std::string& name, float value) const
 {
-    glUniform1f(glGetUniformLocation(m_programID, name.c_str()), value);
+    if (s_rhi) {
+        s_rhi->setUniformFloat(name.c_str(), value);
+    } else {
+        glUniform1f(glGetUniformLocation(m_programID, name.c_str()), value);
+    }
 }
 
 void Shader::setInt(const std::string& name, int value) const
 {
-    glUniform1i(glGetUniformLocation(m_programID, name.c_str()), value);
+    if (s_rhi) {
+        s_rhi->setUniformInt(name.c_str(), value);
+    } else {
+        glUniform1i(glGetUniformLocation(m_programID, name.c_str()), value);
+    }
 }
 
 void Shader::setBool(const std::string& name, bool value) const
 {
-    glUniform1i(glGetUniformLocation(m_programID, name.c_str()), (int)value);
+    if (s_rhi) {
+        s_rhi->setUniformBool(name.c_str(), value);
+    } else {
+        glUniform1i(glGetUniformLocation(m_programID, name.c_str()), (int)value);
+    }
 }

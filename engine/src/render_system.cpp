@@ -2,7 +2,7 @@
 #include "scene_manager.h"
 #include "light.h"
 #include "axisrenderer.h"
-#include "grid.h" 
+#include "grid.h"
 #include "gizmo.h"
 #include "skybox.h"
 #include "ibl_system.h"
@@ -37,32 +37,33 @@ std::string RenderSystem::loadTextFile(const std::string& path)
 
 void RenderSystem::setUniformMat4(const char* name, const glm::mat4& m)
 {
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
-    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniformMatrix4fv(loc, 1, GL_FALSE, &m[0][0]);
+    if (!m_rhi) return;
+    m_rhi->setUniformMat4(name, m);
 }
 void RenderSystem::setUniformVec3(const char* name, const glm::vec3& v)
 {
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
-    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform3fv(loc, 1, &v[0]);
+    if (!m_rhi) return;
+    m_rhi->setUniformVec3(name, v);
 }
 void RenderSystem::setUniformVec4(const char* name, const glm::vec4& v)
 {
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
-    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform4fv(loc, 1, &v[0]);
+    if (!m_rhi) return;
+    m_rhi->setUniformVec4(name, v);
 }
 void RenderSystem::setUniformFloat(const char* name, float v)
 {
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
-    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform1f(loc, v);
+    if (!m_rhi) return;
+    m_rhi->setUniformFloat(name, v);
 }
 void RenderSystem::setUniformInt(const char* name, int v)
 {
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog); if (!prog) return;
-    GLint loc = glGetUniformLocation(prog, name); if (loc >= 0) glUniform1i(loc, v);
+    if (!m_rhi) return;
+    m_rhi->setUniformInt(name, v);
 }
 void RenderSystem::setUniformBool(const char* name, bool v)
 {
-    setUniformInt(name, v ? 1 : 0);
+    if (!m_rhi) return;
+    m_rhi->setUniformBool(name, v);
 }
 
 void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
@@ -183,7 +184,12 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
         std::cerr << "[RenderSystem] Failed to load rayscreen shader.\n";
 
     // Register RHI with Texture so cache can create matching RHI textures
-    if (m_rhi) { Texture::setRHI(m_rhi.get()); }
+    if (m_rhi) {
+        Texture::setRHI(m_rhi.get());
+        Shader::setRHI(m_rhi.get()); // Route shader uniforms through RHI
+        Gizmo::setRHI(m_rhi.get()); // Route gizmo uniforms through RHI
+        AxisRenderer::setRHI(m_rhi.get()); // Route axis renderer uniforms through RHI
+    }
 
     // Init helpers
     if (m_grid) m_grid->init(m_gridShader.get(), 200, 1.0f);
@@ -335,10 +341,12 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
     if (m_rhi) m_rhi->beginFrame();
 
     // Bind target for rendering
-    if (m_samples > 1 && m_msaaFBO != 0) {
-        glBindFramebuffer(GL_FRAMEBUFFER, m_msaaFBO);
+    if (m_samples > 1 && m_rhi && m_msaaRenderTarget != INVALID_HANDLE) {
+        m_rhi->bindRenderTarget(m_msaaRenderTarget);
     } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // Bind default framebuffer (RHI handles null render target as default)
+        if (m_rhi) m_rhi->bindRenderTarget(INVALID_HANDLE);
+        else glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
     // Use RHI for clearing (RHI should always be initialized at this point)
     if (m_rhi) {
@@ -522,13 +530,8 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
     updateRenderStats(scene);
 
     // Resolve MSAA render to default framebuffer if enabled
-    if (m_samples > 1 && m_msaaFBO != 0) {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, m_msaaFBO);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-        glBlitFramebuffer(0, 0, m_fbWidth, m_fbHeight,
-                          0, 0, m_fbWidth, m_fbHeight,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    if (m_samples > 1 && m_rhi && m_msaaRenderTarget != INVALID_HANDLE) {
+        m_rhi->resolveToDefaultFramebuffer(m_msaaRenderTarget);
     }
 
     // End RHI frame
@@ -2014,6 +2017,13 @@ void RenderSystem::cleanupRaytracing()
 
 void RenderSystem::destroyTargets()
 {
+    // Destroy RHI render target first
+    if (m_rhi && m_msaaRenderTarget != INVALID_HANDLE) {
+        m_rhi->destroyRenderTarget(m_msaaRenderTarget);
+        m_msaaRenderTarget = INVALID_HANDLE;
+    }
+
+    // Legacy GL cleanup (TODO: Remove after full migration)
     if (m_msaaColorRBO) { glDeleteRenderbuffers(1, &m_msaaColorRBO); m_msaaColorRBO = 0; }
     if (m_msaaDepthRBO) { glDeleteRenderbuffers(1, &m_msaaDepthRBO); m_msaaDepthRBO = 0; }
     if (m_msaaFBO) { glDeleteFramebuffers(1, &m_msaaFBO); m_msaaFBO = 0; }
@@ -2024,22 +2034,56 @@ void RenderSystem::createOrResizeTargets(int width, int height)
     // Destroy existing
     destroyTargets();
 
-    if (m_samples <= 1) {
+    if (m_samples <= 1 || !m_rhi) {
         // No offscreen MSAA path needed
         return;
     }
 
-    // Create MSAA FBO
+    // Create RHI-based MSAA render target
+    RenderTargetDesc rtDesc;
+    rtDesc.width = width;
+    rtDesc.height = height;
+    rtDesc.samples = m_samples;
+    rtDesc.debugName = "MSAA Primary Render Target";
+
+    // Add color attachment (RGBA8 renderbuffer-style)
+    RenderTargetAttachment colorAttach;
+    colorAttach.type = AttachmentType::Color0;
+    colorAttach.texture = INVALID_HANDLE; // RHI will create renderbuffer automatically
+    rtDesc.colorAttachments.push_back(colorAttach);
+
+    // Add depth attachment
+    RenderTargetAttachment depthAttach;
+#ifndef __EMSCRIPTEN__
+    depthAttach.type = AttachmentType::DepthStencil;
+#else
+    depthAttach.type = AttachmentType::Depth;
+#endif
+    depthAttach.texture = INVALID_HANDLE; // RHI will create renderbuffer automatically
+    rtDesc.depthAttachment = depthAttach;
+
+    // Create the render target through RHI
+    m_msaaRenderTarget = m_rhi->createRenderTarget(rtDesc);
+
+    if (m_msaaRenderTarget == INVALID_HANDLE) {
+        std::cerr << "[RenderSystem] Failed to create MSAA render target, disabling MSAA\n";
+        m_samples = 1;
+        return;
+    }
+
+    std::cout << "[RenderSystem] Created RHI MSAA render target (" << width << "x" << height
+              << ", " << m_samples << "x samples): " << m_msaaRenderTarget << std::endl;
+
+    // Legacy path (TODO: Remove after full migration)
+    // Keep creating GL objects temporarily for compatibility during transition
     glGenFramebuffers(1, &m_msaaFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, m_msaaFBO);
 
-    // Color RBO
     glGenRenderbuffers(1, &m_msaaColorRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, m_msaaColorRBO);
     glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_RGBA8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, m_msaaColorRBO);
 
-    // Depth/Stencil RBO
     glGenRenderbuffers(1, &m_msaaDepthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, m_msaaDepthRBO);
 #ifndef __EMSCRIPTEN__
@@ -2050,9 +2094,7 @@ void RenderSystem::createOrResizeTargets(int width, int height)
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_msaaDepthRBO);
 #endif
 
-    // Validate
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        // Cleanup and disable MSAA path on failure
         destroyTargets();
         m_samples = 1;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

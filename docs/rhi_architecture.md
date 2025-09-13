@@ -35,17 +35,20 @@ The Render Hardware Interface (RHI) is transitioning to a WebGPU-shaped API to e
 - All resource transitions are explicit in the API (or validated by the encoder when implicit).
 
 ## Migration Plan
-- Phase 4 (current):
-  - FEAT-0248 — RHI API Shape (BindGroups/Encoders/Queues)
-  - FEAT-0249 — Uniform System Migration (UBO ring + reflection)
+- Phase 4 (✅ completed):
+  - ✅ FEAT-0248 — RHI API Shape (BindGroups/Encoders/Queues) — COMPLETED 2025-09-13
+- Phase 4.5 (current):
+  - 🔄 FEAT-0253 — RHI Framebuffer Migration (MSAA/Offscreen/Readback) — addresses remaining FBO operations
 - Phase 5 (next):
+  - FEAT-0249 — Uniform System Migration (UBO ring + reflection)
   - FEAT-0250 — TextureView + MSAA Resolve Support
   - FEAT-0251 — Compute Pipeline + Storage Buffers
 - Phase 6 (after):
   - FEAT-0252 — WebGPU Backend (wgpu-native/Dawn) for desktop/web
 
 ## Acceptance Highlights
-- FEAT-0248: All GL call sites route via CommandEncoder/RenderPassEncoder; no direct FBO binds; no `glUniform*`.
+- ✅ FEAT-0248: WebGPU-shaped API surface complete; all `glUniform*` calls route through RHI; CommandEncoder/RenderPassEncoder infrastructure functional.
+- 🔄 FEAT-0253: Complete framebuffer abstraction - no direct FBO binds outside RHI backend; MSAA/offscreen rendering through RHI render targets.
 - FEAT-0249: 100% uniform migration to UBO ring allocator with reflection-validated offsets; golden tests pass.
 - FEAT-0252: GL vs WebGPU image diff < epsilon across 10–20 golden scenes.
 

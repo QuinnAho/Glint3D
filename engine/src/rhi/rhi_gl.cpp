@@ -407,6 +407,89 @@ void RhiGL::bindRenderTarget(RenderTargetHandle renderTarget) {
     }
 }
 
+void RhiGL::resolveRenderTarget(RenderTargetHandle srcRenderTarget, TextureHandle dstTexture,
+                              const int* srcRect, const int* dstRect) {
+    auto srcIt = m_renderTargets.find(srcRenderTarget);
+    auto dstIt = m_textures.find(dstTexture);
+
+    if (srcIt == m_renderTargets.end()) {
+        std::cerr << "[RhiGL] Invalid source render target handle for resolve\n";
+        return;
+    }
+    if (dstIt == m_textures.end()) {
+        std::cerr << "[RhiGL] Invalid destination texture handle for resolve\n";
+        return;
+    }
+
+    const auto& srcRT = srcIt->second;
+    const auto& dstTex = dstIt->second;
+
+    // Create temporary framebuffer for destination texture
+    GLuint tempFBO;
+    glGenFramebuffers(1, &tempFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, tempFBO);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstTex.id, 0);
+
+    // Bind source as read framebuffer
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, srcRT.fbo);
+
+    // Determine rectangles
+    int srcX = 0, srcY = 0, srcW = srcRT.desc.width, srcH = srcRT.desc.height;
+    int dstX = 0, dstY = 0, dstW = srcW, dstH = srcH;
+
+    if (srcRect) {
+        srcX = srcRect[0]; srcY = srcRect[1]; srcW = srcRect[2]; srcH = srcRect[3];
+    }
+    if (dstRect) {
+        dstX = dstRect[0]; dstY = dstRect[1]; dstW = dstRect[2]; dstH = dstRect[3];
+    }
+
+    // Perform resolve
+    glBlitFramebuffer(srcX, srcY, srcX + srcW, srcY + srcH,
+                     dstX, dstY, dstX + dstW, dstY + dstH,
+                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    // Cleanup
+    glDeleteFramebuffers(1, &tempFBO);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
+void RhiGL::resolveToDefaultFramebuffer(RenderTargetHandle srcRenderTarget,
+                                      const int* srcRect, const int* dstRect) {
+    auto srcIt = m_renderTargets.find(srcRenderTarget);
+    if (srcIt == m_renderTargets.end()) {
+        std::cerr << "[RhiGL] Invalid source render target handle for default resolve\n";
+        return;
+    }
+
+    const auto& srcRT = srcIt->second;
+
+    // Bind source as read, default as draw
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, srcRT.fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+    // Determine rectangles
+    int srcX = 0, srcY = 0, srcW = srcRT.desc.width, srcH = srcRT.desc.height;
+    int dstX = 0, dstY = 0, dstW = srcW, dstH = srcH;
+
+    if (srcRect) {
+        srcX = srcRect[0]; srcY = srcRect[1]; srcW = srcRect[2]; srcH = srcRect[3];
+    }
+    if (dstRect) {
+        dstX = dstRect[0]; dstY = dstRect[1]; dstW = dstRect[2]; dstH = dstRect[3];
+    }
+
+    // Perform resolve
+    glBlitFramebuffer(srcX, srcY, srcX + srcW, srcY + srcH,
+                     dstX, dstY, dstX + dstW, dstY + dstH,
+                     GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    // Restore previous framebuffer bindings
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
 std::unique_ptr<CommandEncoder> RhiGL::createCommandEncoder(const char* debugName) {
     return std::make_unique<SimpleCommandEncoderGL>(*this, debugName ? debugName : "");
 }
@@ -823,4 +906,50 @@ void RhiGL::applyBindGroup(uint32_t /*index*/, BindGroupHandle group) {
             bindTexture(e.texture.texture, e.binding);
         }
     }
+}
+
+// Legacy uniform helpers - transitional bridge to proper UBOs
+// TODO: Convert to dynamic UBO system for true RHI compliance
+void RhiGL::setUniformMat4(const char* name, const glm::mat4& value) {
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name);
+    if (loc >= 0) glUniformMatrix4fv(loc, 1, GL_FALSE, &value[0][0]);
+}
+
+void RhiGL::setUniformVec3(const char* name, const glm::vec3& value) {
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name);
+    if (loc >= 0) glUniform3fv(loc, 1, &value[0]);
+}
+
+void RhiGL::setUniformVec4(const char* name, const glm::vec4& value) {
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name);
+    if (loc >= 0) glUniform4fv(loc, 1, &value[0]);
+}
+
+void RhiGL::setUniformFloat(const char* name, float value) {
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name);
+    if (loc >= 0) glUniform1f(loc, value);
+}
+
+void RhiGL::setUniformInt(const char* name, int value) {
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    if (!prog) return;
+    GLint loc = glGetUniformLocation(prog, name);
+    if (loc >= 0) glUniform1i(loc, value);
+}
+
+void RhiGL::setUniformBool(const char* name, bool value) {
+    setUniformInt(name, value ? 1 : 0);
 }

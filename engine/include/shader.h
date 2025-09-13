@@ -6,6 +6,9 @@
 #include <sstream>
 #include <iostream>
 
+// Forward declaration
+namespace glint3d { class RHI; }
+
 class Shader
 {
 public:
@@ -25,8 +28,12 @@ public:
 
     GLuint getID() const;
 
+    // RHI bridge for transitional period
+    static void setRHI(glint3d::RHI* rhi);
+
 private:
     GLuint m_programID;
+    static glint3d::RHI* s_rhi; // Static RHI reference for uniform bridging
 
     std::string loadShaderFromFile(const std::string& path);
     GLuint compileShader(const std::string& source, GLenum type);

@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <glint3d/rhi.h>
 
 std::string intToString(int value) {
     std::ostringstream ss;
@@ -115,6 +116,36 @@ void Light::applyLights(GLuint shaderProgram) const
     }
 }
 
+void Light::applyLightsRHI(glint3d::RHI* rhi) const
+{
+    if (!rhi) return;
+
+    // Send the global ambient
+    rhi->setUniformVec4("globalAmbient", m_globalAmbient);
+
+    // Send light count
+    rhi->setUniformInt("numLights", static_cast<int>(m_lights.size()));
+
+    // Apply each light via RHI uniform helpers
+    for (size_t i = 0; i < m_lights.size(); i++)
+    {
+        std::string baseName = "lights[" + std::to_string(i) + "]";
+
+        float intensity = (m_lights[i].enabled) ? m_lights[i].intensity : 0.0f;
+
+        rhi->setUniformInt((baseName + ".type").c_str(), static_cast<int>(m_lights[i].type));
+        rhi->setUniformVec3((baseName + ".position").c_str(), m_lights[i].position);
+        rhi->setUniformVec3((baseName + ".direction").c_str(), m_lights[i].direction);
+        rhi->setUniformVec3((baseName + ".color").c_str(), m_lights[i].color);
+        rhi->setUniformFloat((baseName + ".intensity").c_str(), intensity);
+
+        // Spot cone angles (pass cosines of radians)
+        float innerRad = glm::radians(m_lights[i].innerConeDeg);
+        float outerRad = glm::radians(m_lights[i].outerConeDeg);
+        rhi->setUniformFloat((baseName + ".innerCutoff").c_str(), cosf(innerRad));
+        rhi->setUniformFloat((baseName + ".outerCutoff").c_str(), cosf(outerRad));
+    }
+}
 
 size_t Light::getLightCount() const
 {

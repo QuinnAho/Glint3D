@@ -6,6 +6,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "colors.h"
 
+// Forward declaration
+namespace glint3d { class RHI; }
+
 class Material {
 public:
     glm::vec3 diffuse;
@@ -28,5 +31,9 @@ public:
         float transmission = 0.0f
     );
 
+    // Legacy GL-based method (deprecated, use applyRHI instead)
     void apply(GLuint shaderProgram, const std::string& uniformName = "material") const;
+
+    // RHI-based material uniform application
+    void applyRHI(glint3d::RHI* rhi, const std::string& uniformName = "material") const;
 };

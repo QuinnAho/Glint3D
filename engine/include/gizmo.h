@@ -7,6 +7,9 @@
 
 #include "ray.h"
 
+// Forward declaration
+namespace glint3d { class RHI; }
+
 enum class GizmoMode { Translate = 0, Rotate = 1, Scale = 2 };
 enum class GizmoAxis { None = 0, X = 1, Y = 2, Z = 3 };
 
@@ -36,8 +39,12 @@ public:
                   float& outS,
                   glm::vec3& outAxisDir) const;
 
+    // RHI bridge for transitional period
+    static void setRHI(glint3d::RHI* rhi);
+
 private:
     GLuint m_vao = 0;
     GLuint m_vbo = 0;
     GLuint m_prog = 0;
+    static glint3d::RHI* s_rhi; // Static RHI reference for uniform bridging
 };

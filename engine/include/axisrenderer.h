@@ -6,6 +6,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
+// Forward declaration
+namespace glint3d { class RHI; }
+
 class AxisRenderer {
 private:
     GLuint VAO, VBO, shaderProgram;
@@ -36,6 +39,12 @@ public:
     void init();
     void render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix);
     void cleanup();
+
+    // RHI bridge for transitional period
+    static void setRHI(glint3d::RHI* rhi);
+
+private:
+    static glint3d::RHI* s_rhi; // Static RHI reference for uniform bridging
 };
 
 #endif

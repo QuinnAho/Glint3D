@@ -2,6 +2,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
+#include <glint3d/rhi.h>
+
+// Static RHI instance for uniform bridging
+glint3d::RHI* Gizmo::s_rhi = nullptr;
 
 static const char* kVS = R"GLSL(
 #version 330 core
@@ -64,6 +68,11 @@ void Gizmo::cleanup(){
     m_vao = m_vbo = m_prog = 0;
 }
 
+void Gizmo::setRHI(glint3d::RHI* rhi)
+{
+    s_rhi = rhi;
+}
+
 void Gizmo::render(const glm::mat4& view,
                    const glm::mat4& proj,
                    const glm::vec3& origin,
@@ -77,12 +86,20 @@ void Gizmo::render(const glm::mat4& view,
     R[1] = glm::vec4(orientation[1], 0.0f);
     R[2] = glm::vec4(orientation[2], 0.0f);
     glm::mat4 M = glm::translate(glm::mat4(1.0f), origin) * R * glm::scale(glm::mat4(1.0f), glm::vec3(scale));
-    GLint locM = glGetUniformLocation(m_prog, "uModel");
-    GLint locV = glGetUniformLocation(m_prog, "uView");
-    GLint locP = glGetUniformLocation(m_prog, "uProj");
-    glUniformMatrix4fv(locM,1,GL_FALSE,glm::value_ptr(M));
-    glUniformMatrix4fv(locV,1,GL_FALSE,glm::value_ptr(view));
-    glUniformMatrix4fv(locP,1,GL_FALSE,glm::value_ptr(proj));
+    // Route uniforms through RHI for WebGPU compatibility
+    if (s_rhi) {
+        s_rhi->setUniformMat4("uModel", M);
+        s_rhi->setUniformMat4("uView", view);
+        s_rhi->setUniformMat4("uProj", proj);
+    } else {
+        // Fallback to direct GL calls
+        GLint locM = glGetUniformLocation(m_prog, "uModel");
+        GLint locV = glGetUniformLocation(m_prog, "uView");
+        GLint locP = glGetUniformLocation(m_prog, "uProj");
+        glUniformMatrix4fv(locM,1,GL_FALSE,glm::value_ptr(M));
+        glUniformMatrix4fv(locV,1,GL_FALSE,glm::value_ptr(view));
+        glUniformMatrix4fv(locP,1,GL_FALSE,glm::value_ptr(proj));
+    }
 
     // To highlight active axis, we draw all axes, then overdraw the active axis thicker via glLineWidth
     // Always on top
