@@ -721,7 +721,7 @@ Glint3D/
 - Small, atomic commits; use imperative tense (`add`, `fix`, `refactor`)
 - PR checklist:
   - [ ] Compiles on Desktop + Web
-  - [ ] Docs updated (JSON Ops schema, README, RELEASE.md if needed)
+  - [ ] Docs updated (JSON Ops schema, README, release.md if needed)
   - [ ] Tests added/updated
   - [ ] No platform-specific code leaked into Engine Core
 
@@ -805,7 +805,7 @@ tests/scripts/run_golden_tests.sh      # Visual regression tests
 ## Release & Versioning
 - **Engine**: tag semver releases (e.g., `v0.3.0`)
 - **JSON Ops**: schema versioned; bump minor for additive ops, major for breaking
-- **Web UI**: pinned to engine version in `RELEASE.md`
+- **Web UI**: pinned to engine version in `release.md`
 
 ---
 

@@ -163,7 +163,7 @@ Located in: `engine/src/refraction.cpp`
 ## Planned Architecture Refactor (v0.4.0)
 
 **Status**: Design complete, implementation planned  
-**Documents**: See `docs/REFACTORING_GUIDE.md` for detailed implementation plan
+**Documents**: See `docs/refactoring_guide.md` for detailed implementation plan
 
 ### Problems with Current System
 - **Dual Material Storage**: PBR + legacy causing sync issues and conversion drift
@@ -192,4 +192,4 @@ Located in: `engine/src/refraction.cpp`
 - ✅ Easy to add new backends (Vulkan, WebGPU)
 - ✅ Modular pass system for new effects
 
-See `docs/REFACTORING_GUIDE.md` for complete implementation details and task breakdown.
+See `docs/refactoring_guide.md` for complete implementation details and task breakdown.

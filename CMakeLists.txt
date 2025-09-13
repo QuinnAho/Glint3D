@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 # Modern vcpkg integration via manifest mode
 # Users should install vcpkg globally and set CMAKE_TOOLCHAIN_FILE
-# See setup instructions in SETUP.md
+# See setup instructions in setup.md
 
 project(glint C CXX)
 
