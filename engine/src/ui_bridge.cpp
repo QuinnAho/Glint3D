@@ -1145,19 +1145,26 @@ std::string UIBridge::buildShareLink() const
         matOp.AddMember("target", Value(obj.name.c_str(), allocator), allocator);
         Value mat(kObjectType);
         // Color from MaterialCore baseColor if set, else legacy diffuse
+        // 🚨 DEPRECATED HYBRID: Mix of MaterialCore + legacy Material for UI compatibility
+        // TODO CLEANUP: Use MaterialCore exclusively for UI material serialization:
+        //   - Replace obj.material.* with obj.materialCore.* throughout
+        //   - Remove fallback logic for obj.material.diffuse vs materialCore.baseColor
+        //   - Convert specular/ambient to MaterialCore equivalents
         Value colorArr(kArrayType);
         glm::vec3 color = glm::vec3(obj.materialCore.baseColor);
         if (color == glm::vec3(1.0f) && obj.material.diffuse != glm::vec3(1.0f)) {
-            color = obj.material.diffuse;
+            color = obj.material.diffuse;  // 🚨 DEPRECATED fallback
         }
         colorArr.PushBack(color.x, allocator);
         colorArr.PushBack(color.y, allocator);
         colorArr.PushBack(color.z, allocator);
         mat.AddMember("color", colorArr, allocator);
-        // Roughness / Metallic if available
-        mat.AddMember("roughness", obj.material.roughness, allocator);
-        mat.AddMember("metallic", obj.material.metallic, allocator);
-        // Specular / Ambient (legacy phong)
+
+        // 🚨 DEPRECATED: Using legacy material properties - switch to MaterialCore
+        mat.AddMember("roughness", obj.material.roughness, allocator);  // TODO: obj.materialCore.roughness
+        mat.AddMember("metallic", obj.material.metallic, allocator);    // TODO: obj.materialCore.metallic
+
+        // 🚨 DEPRECATED: Legacy phong properties - convert or remove
         Value specArr(kArrayType); specArr.PushBack(obj.material.specular.x, allocator); specArr.PushBack(obj.material.specular.y, allocator); specArr.PushBack(obj.material.specular.z, allocator);
         mat.AddMember("specular", specArr, allocator);
         Value ambArr(kArrayType); ambArr.PushBack(obj.material.ambient.x, allocator); ambArr.PushBack(obj.material.ambient.y, allocator); ambArr.PushBack(obj.material.ambient.z, allocator);

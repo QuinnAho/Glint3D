@@ -359,61 +359,62 @@ bool JsonOpsExecutor::apply(const std::string& json, std::string& error)
             if (!obj.HasMember("material") || !obj["material"].IsObject()) { error = "set_material: missing 'material'"; return false; }
             const auto& matObj = obj["material"];
 
-            // Update material properties using unified MaterialCore
+            // Update material properties using unified MaterialCore only
+            SceneObject* mutableObj = const_cast<SceneObject*>(targetObj);
+
             if (matObj.HasMember("color") && matObj["color"].IsArray()) {
                 glm::vec3 color;
                 if (!getVec3(matObj["color"], color)) { error = "set_material: bad 'color'"; return false; }
-                const_cast<SceneObject*>(targetObj)->color = color;
-                const_cast<SceneObject*>(targetObj)->materialCore.baseColor = glm::vec4(color, 1.0f);
-                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
-                const_cast<SceneObject*>(targetObj)->material.diffuse = color;
+                mutableObj->color = color;
+                mutableObj->materialCore.baseColor = glm::vec4(color, 1.0f);
             }
 
             if (matObj.HasMember("roughness") && matObj["roughness"].IsNumber()) {
                 float roughness = (float)matObj["roughness"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->materialCore.roughness = roughness;
-                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
-                const_cast<SceneObject*>(targetObj)->material.roughness = roughness;
+                mutableObj->materialCore.roughness = roughness;
             }
 
             if (matObj.HasMember("metallic") && matObj["metallic"].IsNumber()) {
                 float metallic = (float)matObj["metallic"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->materialCore.metallic = metallic;
-                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
-                const_cast<SceneObject*>(targetObj)->material.metallic = metallic;
+                mutableObj->materialCore.metallic = metallic;
             }
 
             if (matObj.HasMember("ior") && matObj["ior"].IsNumber()) {
                 float ior = (float)matObj["ior"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->materialCore.ior = ior;
-                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
-                const_cast<SceneObject*>(targetObj)->material.ior = ior;
+                mutableObj->materialCore.ior = ior;
             }
 
             if (matObj.HasMember("transmission") && matObj["transmission"].IsNumber()) {
                 float transmission = (float)matObj["transmission"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->materialCore.transmission = transmission;
-                // Legacy compatibility for raytracer (FEAT-0241 PR4 will eliminate)
-                const_cast<SceneObject*>(targetObj)->material.transmission = transmission;
+                mutableObj->materialCore.transmission = transmission;
             }
 
             if (matObj.HasMember("thickness") && matObj["thickness"].IsNumber()) {
                 float thickness = (float)matObj["thickness"].GetDouble();
-                const_cast<SceneObject*>(targetObj)->materialCore.thickness = thickness;
-                // Note: thickness is MaterialCore-only, no legacy equivalent
+                mutableObj->materialCore.thickness = thickness;
             }
 
+            // Legacy properties - update MaterialCore and it will convert when needed
             if (matObj.HasMember("specular") && matObj["specular"].IsArray()) {
                 glm::vec3 specular;
                 if (!getVec3(matObj["specular"], specular)) { error = "set_material: bad 'specular'"; return false; }
-                const_cast<SceneObject*>(targetObj)->material.specular = specular;
+                // Map specular to metallic approximation: bright specular = metallic
+                float metallicFromSpec = (specular.r + specular.g + specular.b) / 3.0f;
+                mutableObj->materialCore.metallic = std::max(mutableObj->materialCore.metallic, metallicFromSpec);
             }
 
             if (matObj.HasMember("ambient") && matObj["ambient"].IsArray()) {
                 glm::vec3 ambient;
                 if (!getVec3(matObj["ambient"], ambient)) { error = "set_material: bad 'ambient'"; return false; }
-                const_cast<SceneObject*>(targetObj)->material.ambient = ambient;
+                // Ambient affects the base color darkness - blend with existing base color
+                glm::vec3 baseRGB = glm::vec3(mutableObj->materialCore.baseColor);
+                mutableObj->materialCore.baseColor = glm::vec4(baseRGB * (1.0f + glm::length(ambient) * 0.1f), mutableObj->materialCore.baseColor.a);
             }
+
+            // 🚨 DEPRECATED SYNC: Auto-update legacy material from MaterialCore
+            // TODO CLEANUP: Remove this line when legacy Material field is removed from SceneObject
+            // CLEANUP TASK: Update serialization systems to use MaterialCore directly
+            mutableObj->materialCore.toLegacyMaterial(mutableObj->material);
 
             return true;
         }

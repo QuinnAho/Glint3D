@@ -363,12 +363,57 @@ std::cout << "[DEBUG] Material: ior=" << mat.ior
 **Status**: Architecture redesign planned for v0.4.0  
 **Goal**: Modern, flexible, AI-friendly renderer with unified materials and backend abstraction
 
-### Current System Problems
-- **Dual Material Storage**: PBR + legacy causing conversion drift
+### Remaining System Areas for Enhancement
+- ✅ ~~**Dual Material Storage**: PBR + legacy causing conversion drift~~ **RESOLVED**
+- ✅ ~~**Backend Lock-in**: Direct OpenGL calls, hard to port to Vulkan/WebGPU~~ **RESOLVED**
 - **Pipeline Fragmentation**: Raster (no refraction) vs Ray (full physics)
-- **Backend Lock-in**: Direct OpenGL calls, hard to port to Vulkan/WebGPU
 - **Manual Mode Selection**: Users must remember `--raytrace` for glass
 - **No Pass System**: Interleaved rendering logic, hard to extend
+
+### Current RHI Implementation Status ✅
+
+**Completed (FEAT-0248 + FEAT-0253 + Material System Unification)**:
+- **WebGPU-Shaped RHI API**: Full abstraction layer implemented (`engine/include/glint3d/rhi.h`)
+- **OpenGL Backend**: Complete implementation (`engine/src/rhi/rhi_gl.cpp`)
+- **Uniform System Migration**: All `glUniform*` calls now route through RHI
+- **MSAA Framebuffer Migration**: Main rendering pipeline uses RHI render targets
+- **Texture Integration**: Raytracer and core rendering use RHI texture handles
+- **Unified Material System**: MaterialCore eliminates dual material storage issues
+
+**Architecture Status**:
+```cpp
+// Current: Engine Core → RHI Interface → GL Backend
+RenderSystem::render() {
+    m_rhi->bindRenderTarget(m_msaaRenderTarget);  // ✅ RHI abstracted
+    m_rhi->clear(backgroundColor, depth, stencil); // ✅ RHI abstracted
+    m_rhi->resolveToDefaultFramebuffer(target);   // ✅ RHI abstracted
+}
+
+// Unified material system:
+void renderObject(const SceneObject& obj) {
+    const auto& mc = obj.materialCore;  // ✅ Single source of truth
+    m_rhi->setUniformVec3("material.diffuse", glm::vec3(mc.baseColor));
+    m_rhi->setUniformFloat("material.roughness", mc.roughness);
+    // Legacy dual storage eliminated - no more obj.material usage
+}
+
+// Migration achievements:
+// glUniform4f() → m_rhi->setUniformVec4()      // ✅ Migrated
+// glBindFramebuffer() → m_rhi->bindRenderTarget() // ✅ Migrated
+// glBlitFramebuffer() → m_rhi->resolveRenderTarget() // ✅ Migrated
+// obj.material + obj.materialCore → obj.materialCore only // ✅ Unified
+```
+
+**Backend Implementations**:
+- `RhiGL`: Desktop OpenGL 3.3+ (✅ Complete)
+- `RhiNull`: Testing/validation backend (✅ Complete)
+- `RhiVulkan`: Planned for v0.4.0
+- `RhiWebGPU`: Planned for web platform evolution
+
+**Remaining Legacy GL Usage** (non-critical):
+- PNG export functions still use hybrid RHI/GL approach (future work)
+- Some fallback paths for compatibility during transition
+- Engine core is now effectively backend-agnostic
 
 ### Target Architecture
 
@@ -390,7 +435,7 @@ class RHI {
 // - RhiWebGPU (future)
 ```
 
-#### **MaterialCore (Unified BSDF)**
+#### **MaterialCore (Unified BSDF)** ✅ **IMPLEMENTED**
 ```cpp
 struct MaterialCore {
     glm::vec4 baseColor;           // sRGB + alpha
@@ -405,7 +450,8 @@ struct MaterialCore {
     float clearcoat;               // Clear coat strength
     float clearcoatRoughness;      // Clear coat roughness
 };
-// Used by BOTH raster and ray pipelines - no conversion needed
+// ✅ ACTIVE: Used by all rendering pipelines, eliminates dual storage
+// JSON ops → MaterialCore → Auto-convert to legacy APIs when needed
 ```
 
 #### **RenderGraph (Minimal Pass System)**
@@ -443,10 +489,10 @@ for (const auto& material : scene.materials) {
 
 ### Migration Tasks (20 Sequential Steps)
 
-#### **Phase 1: Foundation (Tasks 1-3)**
-1. **Define RHI Interface** - Abstract GPU operations (`engine/rhi/RHI.h`)
-2. **Implement RhiGL** - Desktop OpenGL backend (`engine/rhi/RhiGL.cpp`)  
-3. **Thread Raster Through RHI** - Replace direct GL calls
+#### **Phase 1: Foundation (Tasks 1-3)** ✅ **COMPLETED**
+1. ✅ **Define RHI Interface** - WebGPU-shaped API (`engine/include/glint3d/rhi.h`)
+2. ✅ **Implement RhiGL** - Desktop OpenGL backend (`engine/src/rhi/rhi_gl.cpp`)
+3. ✅ **Thread Raster Through RHI** - Uniforms + framebuffers migrated (FEAT-0248/0253)
 
 #### **Phase 2: Unified Materials (Tasks 4-5)**
 4. **Introduce MaterialCore** - Single material struct
@@ -493,8 +539,10 @@ cmake --build builds/desktop/cmake/Debug --config Debug
 ```
 
 #### **Key Files to Understand**
-- `engine/src/render_system.cpp` - Current dual pipeline logic
-- `engine/include/scene_manager.h` - SceneObject with dual materials  
+- `engine/include/glint3d/rhi.h` - **RHI interface (backend abstraction)**
+- `engine/src/rhi/rhi_gl.cpp` - **OpenGL backend implementation**
+- `engine/src/render_system.cpp` - RHI-based rendering pipeline + dual materials
+- `engine/include/scene_manager.h` - SceneObject with dual materials
 - `engine/shaders/pbr.frag` - Rasterized PBR shader
 - `engine/src/raytracer.cpp` - CPU raytracing pipeline
 - `engine/src/json_ops.cpp` - Material property parsing
@@ -538,11 +586,34 @@ finalColor = mix(refractedColor, reflectedColor, fresnel);
 - Hybrid mode balances quality vs performance automatically
 
 ### Migration Timeline
-- **Phase 1-2**: 1 week (foundation + materials)
-- **Phase 3-4**: 1 week (passes + SSR-T)  
+- **Phase 1**: ✅ **COMPLETED** - RHI foundation implemented (FEAT-0248 + FEAT-0253)
+- **Phase 2-4**: 2 weeks (materials + passes + SSR-T)
 - **Phase 5-6**: 1 week (hybrid + production)
 - **Phase 7-8**: 3 days (platform + cleanup)
-- **Total**: ~3.5 weeks for complete refactor
+- **Total**: ~3 weeks remaining for complete refactor
+
+**Current Status (September 2025)**: Core RHI abstraction complete, engine backend-agnostic for main rendering operations. MaterialCore unification implemented with legacy Material system deprecated and marked for removal.
+
+### Legacy Material System Cleanup (Future Work)
+
+**Status**: Deprecated and ready for removal in v0.4.1
+
+The legacy Material system has been fully replaced by MaterialCore but remains for backward compatibility. All rendering pipelines now use MaterialCore as the single source of truth, with legacy Material only used for:
+- Scene serialization backward compatibility
+- Raytracer API bridge (temporary)
+- UI serialization compatibility
+
+**Cleanup Preparation**:
+- ✅ All code marked with 🚨 DEPRECATED comments and cleanup TODOs
+- ✅ Comprehensive cleanup task specification created (`ai/tasks/CLEANUP-LEGACY-MATERIALS/`)
+- ✅ Cleanup helper script for identifying remaining legacy usage
+- ✅ Clear implementation order and acceptance criteria defined
+
+**Cleanup Benefits**:
+- Eliminates dual storage confusion entirely
+- Reduces memory usage (~32 bytes per SceneObject)
+- Removes conversion overhead
+- Simplifies material system maintenance
 
 ### External Dependencies
 

@@ -1,7 +1,7 @@
 id: FEAT-0253
 title: RHI Framebuffer Migration (MSAA/Offscreen/Readback)
 owner: ai
-status: planned
+status: completed
 created: "2025-09-13T15:50:00Z"
 priority: critical
 

@@ -43,12 +43,17 @@ struct SceneObject
     bool      isStatic = false;
     glm::vec3 color{ 1.0f };
     
-    // Unified material system - eliminates dual storage problem
+    // ✅ Unified material system - single source of truth (ACTIVE)
     MaterialCore materialCore;
-    
-    // Legacy material - deprecated, kept temporarily for migration compatibility
-    // TODO: Remove after full raytracer migration to MaterialCore (FEAT-0241 PR4)
-    Material  material;
+
+    // 🚨 DEPRECATED: Legacy material - scheduled for removal in v0.4.1
+    // Only used for: serialization compatibility, legacy API bridges
+    // TODO CLEANUP: Remove this field and update:
+    //   - SceneManager::toJson() to export MaterialCore directly
+    //   - ui_bridge.cpp material serialization
+    //   - Any remaining raytracer API calls
+    // REMOVAL TARGET: After implementing native MaterialCore serialization
+    Material material;
 };
 
 class SceneManager 

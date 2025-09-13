@@ -1172,18 +1172,22 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
         if (obj.objLoader.getVertCount() == 0) continue; // Skip objects with no geometry
         
         // Load object into raytracer with its transform and material
+        // Calculate reflectivity from unified MaterialCore
+        const auto& mc = obj.materialCore;
         float reflectivity = 0.1f; // Default reflectivity
-        
+
         // For metallic materials, use metallic value as reflectivity multiplier
-        if (obj.material.metallic > 0.1f) {
-            reflectivity = 0.3f + (obj.material.metallic * 0.7f); // Range 0.3 to 1.0 based on metallic
+        if (mc.metallic > 0.1f) {
+            reflectivity = 0.3f + (mc.metallic * 0.7f); // Range 0.3 to 1.0 based on metallic
         }
-        // Legacy: high specular values also indicate reflective materials
-        else if (obj.material.specular.r > 0.8f || obj.material.specular.g > 0.8f || obj.material.specular.b > 0.8f) {
-            reflectivity = 0.5f; // Higher reflectivity for shiny materials
-        }
-        
-        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, obj.material);
+
+        // 🚨 DEPRECATED CONVERSION: MaterialCore → legacy Material for raytracer API
+        // TODO CLEANUP: Update Raytracer::loadModel() to accept MaterialCore directly
+        // CLEANUP TASK: Modify raytracer.h signature and eliminate this conversion
+        Material legacyMat;
+        mc.toLegacyMaterial(legacyMat);
+
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, legacyMat);
     }
 
     // Create output buffer for raytraced image
@@ -1208,10 +1212,20 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     }
     
     // Upload raytraced image to texture
-    glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight, 
-                    GL_RGB, GL_FLOAT, raytraceBuffer.data());
-    glBindTexture(GL_TEXTURE_2D, 0);
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
+        // Use RHI to update texture data
+        m_rhi->updateBuffer(INVALID_HANDLE, raytraceBuffer.data(), raytraceBuffer.size() * sizeof(glm::vec3));
+        // TODO: Implement texture update via RHI - for now fall back to GL
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
+                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
+                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
     
     // Clear the screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1226,8 +1240,12 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     m_screenQuadShader->setInt("toneMappingMode", static_cast<int>(m_tonemap));
     
     // Bind the raytraced texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
+        m_rhi->bindTexture(m_raytraceTextureRhi, 0);
+    } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+    }
     m_screenQuadShader->setInt("rayTex", 0);
     
     // Draw the screen quad
@@ -1289,21 +1307,22 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
             s->setFloat("gamma", m_gamma);
             s->setInt("toneMappingMode", static_cast<int>(m_tonemap));
         }
-        // Material for standard shader
+        // Standard shader uniforms using unified MaterialCore
+        const auto& mc = obj.materialCore;
         if (m_rhi) {
-            setUniformVec3("material.diffuse",  obj.material.diffuse);
-            setUniformVec3("material.specular", obj.material.specular);
-            setUniformVec3("material.ambient",  obj.material.ambient);
-            setUniformFloat("material.shininess", obj.material.shininess);
-            setUniformFloat("material.roughness", obj.material.roughness);
-            setUniformFloat("material.metallic",  obj.material.metallic);
+            setUniformVec3("material.diffuse",  glm::vec3(mc.baseColor));
+            setUniformVec3("material.specular", glm::vec3(mc.metallic > 0.5f ? mc.baseColor : glm::vec4(1.0f)));
+            setUniformVec3("material.ambient",  glm::vec3(mc.baseColor) * 0.1f);
+            setUniformFloat("material.shininess", (1.0f - mc.roughness) * 128.0f);
+            setUniformFloat("material.roughness", mc.roughness);
+            setUniformFloat("material.metallic",  mc.metallic);
         } else {
-            s->setVec3("material.diffuse",  obj.material.diffuse);
-            s->setVec3("material.specular", obj.material.specular);
-            s->setVec3("material.ambient",  obj.material.ambient);
-            s->setFloat("material.shininess", obj.material.shininess);
-            s->setFloat("material.roughness", obj.material.roughness);
-            s->setFloat("material.metallic",  obj.material.metallic);
+            s->setVec3("material.diffuse",  glm::vec3(mc.baseColor));
+            s->setVec3("material.specular", glm::vec3(mc.metallic > 0.5f ? mc.baseColor : glm::vec4(1.0f)));
+            s->setVec3("material.ambient",  glm::vec3(mc.baseColor) * 0.1f);
+            s->setFloat("material.shininess", (1.0f - mc.roughness) * 128.0f);
+            s->setFloat("material.roughness", mc.roughness);
+            s->setFloat("material.metallic",  mc.metallic);
         }
     } else {
         // Use unified MaterialCore (eliminates dual storage)
@@ -1554,18 +1573,15 @@ void RenderSystem::updateRenderStats(const SceneManager& scene)
     std::unordered_map<std::string, int, MatKeyHash> matCounts;
     matCounts.reserve(objects.size());
     auto makeMatKey = [](const SceneObject& o) -> std::string {
-        // Build a compact string key from material + PBR factors presence of textures
+        // Build compact string key from unified MaterialCore + texture presence
         char buf[256];
-        const auto& m = o.material;
+        const auto& mc = o.materialCore;
         // Reduce precision to keep keys compact; 2 decimals is enough for grouping
         snprintf(buf, sizeof(buf),
-                 "D%.2f,%.2f,%.2f|S%.2f,%.2f,%.2f|A%.2f,%.2f,%.2f|Ns%.2f|R%.2f|M%.2f|BCF%.2f,%.2f,%.2f,%.2f|mr%.2f|rf%.2f|ior%.2f|t%d%d%d",
-                 m.diffuse.x, m.diffuse.y, m.diffuse.z,
-                 m.specular.x, m.specular.y, m.specular.z,
-                 m.ambient.x, m.ambient.y, m.ambient.z,
-                 m.shininess, m.roughness, m.metallic,
-                 o.materialCore.baseColor.x, o.materialCore.baseColor.y, o.materialCore.baseColor.z, o.materialCore.baseColor.w,
-                 o.materialCore.metallic, o.materialCore.roughness, o.materialCore.ior,
+                 "BC%.2f,%.2f,%.2f,%.2f|M%.2f|R%.2f|IOR%.2f|T%.2f|E%.2f,%.2f,%.2f|t%d%d%d",
+                 mc.baseColor.x, mc.baseColor.y, mc.baseColor.z, mc.baseColor.w,
+                 mc.metallic, mc.roughness, mc.ior, mc.transmission,
+                 mc.emissive.x, mc.emissive.y, mc.emissive.z,
                  o.baseColorTex ? 1 : 0, o.normalTex ? 1 : 0, o.mrTex ? 1 : 0);
         return std::string(buf);
     };
@@ -1873,21 +1889,22 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
     }
     
     if (shader == m_basicShader.get()) {
-        // Standard shader material uniforms
+        // Standard shader uniforms using unified MaterialCore
+        const auto& mc = obj.materialCore;
         if (m_rhi) {
-            setUniformVec3("material.diffuse",  obj.material.diffuse);
-            setUniformVec3("material.specular", obj.material.specular);
-            setUniformVec3("material.ambient",  obj.material.ambient);
-            setUniformFloat("material.shininess", obj.material.shininess);
-            setUniformFloat("material.roughness", obj.material.roughness);
-            setUniformFloat("material.metallic",  obj.material.metallic);
+            setUniformVec3("material.diffuse",  glm::vec3(mc.baseColor));
+            setUniformVec3("material.specular", glm::vec3(mc.metallic > 0.5f ? mc.baseColor : glm::vec4(1.0f)));
+            setUniformVec3("material.ambient",  glm::vec3(mc.baseColor) * 0.1f);
+            setUniformFloat("material.shininess", (1.0f - mc.roughness) * 128.0f);
+            setUniformFloat("material.roughness", mc.roughness);
+            setUniformFloat("material.metallic",  mc.metallic);
         } else {
-            shader->setVec3("material.diffuse",  obj.material.diffuse);
-            shader->setVec3("material.specular", obj.material.specular);
-            shader->setVec3("material.ambient",  obj.material.ambient);
-            shader->setFloat("material.shininess", obj.material.shininess);
-            shader->setFloat("material.roughness", obj.material.roughness);
-            shader->setFloat("material.metallic",  obj.material.metallic);
+            shader->setVec3("material.diffuse",  glm::vec3(mc.baseColor));
+            shader->setVec3("material.specular", glm::vec3(mc.metallic > 0.5f ? mc.baseColor : glm::vec4(1.0f)));
+            shader->setVec3("material.ambient",  glm::vec3(mc.baseColor) * 0.1f);
+            shader->setFloat("material.shininess", (1.0f - mc.roughness) * 128.0f);
+            shader->setFloat("material.roughness", mc.roughness);
+            shader->setFloat("material.metallic",  mc.metallic);
         }
         
         // Texturing
@@ -2009,6 +2026,13 @@ void RenderSystem::cleanupRaytracing()
         glDeleteBuffers(1, &m_screenQuadVBO);
         m_screenQuadVBO = 0;
     }
+    // Cleanup RHI raytracing texture first
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_raytraceTextureRhi);
+        m_raytraceTextureRhi = INVALID_HANDLE;
+    }
+
+    // Cleanup legacy GL raytracing texture
     if (m_raytraceTexture) {
         glDeleteTextures(1, &m_raytraceTexture);
         m_raytraceTexture = 0;
@@ -2073,33 +2097,4 @@ void RenderSystem::createOrResizeTargets(int width, int height)
 
     std::cout << "[RenderSystem] Created RHI MSAA render target (" << width << "x" << height
               << ", " << m_samples << "x samples): " << m_msaaRenderTarget << std::endl;
-
-    // Legacy path (TODO: Remove after full migration)
-    // Keep creating GL objects temporarily for compatibility during transition
-    glGenFramebuffers(1, &m_msaaFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_msaaFBO);
-
-    glGenRenderbuffers(1, &m_msaaColorRBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_msaaColorRBO);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_RGBA8, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, m_msaaColorRBO);
-
-    glGenRenderbuffers(1, &m_msaaDepthRBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_msaaDepthRBO);
-#ifndef __EMSCRIPTEN__
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_DEPTH24_STENCIL8, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_msaaDepthRBO);
-#else
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_DEPTH_COMPONENT16, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_msaaDepthRBO);
-#endif
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        destroyTargets();
-        m_samples = 1;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return;
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

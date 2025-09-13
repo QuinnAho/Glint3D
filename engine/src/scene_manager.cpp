@@ -461,31 +461,36 @@ std::string SceneManager::toJson() const
         
         objVal.AddMember("transform", transform, allocator);
         
-        // Add material information from object's built-in material
+        // 🚨 DEPRECATED SERIALIZATION: Using legacy Material for backward compatibility
+        // TODO CLEANUP: Replace with MaterialCore-based serialization:
+        //   - Export obj.materialCore properties directly
+        //   - Add MaterialCore JSON schema to schemas/json_ops_v1.json
+        //   - Update scene loading to populate MaterialCore (with legacy fallback)
+        // CLEANUP TASK: Implement MaterialCore::saveToJSON() and loadFromJSON()
         Value material(kObjectType);
-        
+
         Value diffuse(kArrayType);
         diffuse.PushBack(obj.material.diffuse.x, allocator);
         diffuse.PushBack(obj.material.diffuse.y, allocator);
         diffuse.PushBack(obj.material.diffuse.z, allocator);
         material.AddMember("diffuse", diffuse, allocator);
-        
+
         Value specular(kArrayType);
         specular.PushBack(obj.material.specular.x, allocator);
         specular.PushBack(obj.material.specular.y, allocator);
         specular.PushBack(obj.material.specular.z, allocator);
         material.AddMember("specular", specular, allocator);
-        
+
         material.AddMember("shininess", obj.material.shininess, allocator);
         material.AddMember("roughness", obj.material.roughness, allocator);
         material.AddMember("metallic", obj.material.metallic, allocator);
-        
+
         Value ambient(kArrayType);
         ambient.PushBack(obj.material.ambient.x, allocator);
         ambient.PushBack(obj.material.ambient.y, allocator);
         ambient.PushBack(obj.material.ambient.z, allocator);
         material.AddMember("ambient", ambient, allocator);
-        
+
         objVal.AddMember("material", material, allocator);
         
         objects.PushBack(objVal, allocator);
