@@ -1100,6 +1100,38 @@ int RhiGL::setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle 
     return successCount;
 }
 
+bool RhiGL::bindUniformBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                             const char* blockName) {
+    // Validate shader reflection
+    auto reflection = getShaderReflection(shader);
+    if (!reflection.isValid) {
+        return false;
+    }
+
+    // Find the uniform block by name
+    const UniformBlockReflection* block = nullptr;
+    for (const auto& ub : reflection.uniformBlocks) {
+        if (ub.blockName == blockName) { block = &ub; break; }
+    }
+    if (!block) {
+        return false;
+    }
+
+    // Validate allocation
+    auto it = m_uniformAllocations.find(allocation.handle);
+    if (it == m_uniformAllocations.end() || !it->second.inUse) {
+        return false;
+    }
+
+    // Bind the ring buffer range to the block binding point
+    glBindBufferRange(GL_UNIFORM_BUFFER,
+                      block->binding,
+                      m_uniformRing.buffer,
+                      it->second.offset,
+                      block->blockSize);
+    return true;
+}
+
 // UBO Helper Methods
 // ==================
 

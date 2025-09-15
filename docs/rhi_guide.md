@@ -79,3 +79,45 @@ Texture::setRHI(m_rhi.get());
 - Window/UI: GLFW + `webgpu.h` for surface; ImGui via `imgui_impl_opengl3` now, `imgui_impl_wgpu` later. Expose `getNativeTextureHandle()` for UI texture binding.
 
 See `docs/rhi_architecture.md` for the WebGPU-shaped API roadmap and acceptance criteria.
+
+## Uniforms (UBO Ring + Reflection)
+
+All uniform updates flow through the RHI using a ring-allocated uniform buffer and reflection to validate offsets and types. There are no direct `glUniform*` calls outside the GL backend.
+
+Key APIs:
+- `allocateUniforms(const UniformAllocationDesc&)` → returns a CPU-writable range.
+- `setUniformInBlock` / `setUniformsInBlock` → copy name-addressed data into the allocation using reflection offsets.
+- `bindUniformBlock(const UniformAllocation&, ShaderHandle, const char* blockName)` → binds the allocation to the uniform block’s binding point.
+
+Usage sketch:
+```cpp
+// Assume: shader has a uniform block "MaterialBlock" (std140) with fields
+//   vec4 baseColorFactor; float metallicFactor; float roughnessFactor; ...
+
+// 1) Allocate space for the block
+UniformAllocationDesc allocDesc{ /*size=*/sizeof_MaterialBlock, /*alignment=*/256, "MaterialBlock" };
+auto ua = rhi->allocateUniforms(allocDesc);
+
+// 2) Populate fields via reflection-validated setters
+glm::vec4 baseColor = ...;
+float metallic = ...;
+float roughness = ...;
+RHI::UniformNameValue pairs[] = {
+  {"baseColorFactor", &baseColor, sizeof(baseColor), UniformType::Vec4},
+  {"metallicFactor",  &metallic,  sizeof(metallic),  UniformType::Float},
+  {"roughnessFactor", &roughness, sizeof(roughness), UniformType::Float},
+};
+int ok = rhi->setUniformsInBlock(ua, shaderHandle, "MaterialBlock", pairs, (int)(sizeof(pairs)/sizeof(pairs[0])));
+
+// 3) Bind allocation to the block’s binding point
+bool bound = rhi->bindUniformBlock(ua, shaderHandle, "MaterialBlock");
+
+// 4) Issue draws that rely on this block
+DrawDesc draw{ /* ... */ };
+rhi->draw(draw);
+```
+
+Notes:
+- Use std140 layout in GLSL/HLSL to ensure predictable offsets across backends.
+- Block sizes can be derived from reflection or kept in codegen outputs.
+- Freeing an allocation via `freeUniforms()` marks space reusable on ring wrap-around.

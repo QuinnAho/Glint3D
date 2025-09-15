@@ -86,19 +86,11 @@ void Gizmo::render(const glm::mat4& view,
     R[1] = glm::vec4(orientation[1], 0.0f);
     R[2] = glm::vec4(orientation[2], 0.0f);
     glm::mat4 M = glm::translate(glm::mat4(1.0f), origin) * R * glm::scale(glm::mat4(1.0f), glm::vec3(scale));
-    // Route uniforms through RHI for WebGPU compatibility
+    // Route uniforms through RHI only (no direct glUniform fallback)
     if (s_rhi) {
         s_rhi->setUniformMat4("uModel", M);
         s_rhi->setUniformMat4("uView", view);
         s_rhi->setUniformMat4("uProj", proj);
-    } else {
-        // Fallback to direct GL calls
-        GLint locM = glGetUniformLocation(m_prog, "uModel");
-        GLint locV = glGetUniformLocation(m_prog, "uView");
-        GLint locP = glGetUniformLocation(m_prog, "uProj");
-        glUniformMatrix4fv(locM,1,GL_FALSE,glm::value_ptr(M));
-        glUniformMatrix4fv(locV,1,GL_FALSE,glm::value_ptr(view));
-        glUniformMatrix4fv(locP,1,GL_FALSE,glm::value_ptr(proj));
     }
 
     // To highlight active axis, we draw all axes, then overdraw the active axis thicker via glLineWidth

@@ -292,6 +292,16 @@ public:
     virtual int setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle shader,
                                  const char* blockName, const UniformNameValue* uniforms, int count) = 0;
 
+    /**
+     * @brief Bind an allocated uniform range to a named uniform block in the given shader
+     * @param allocation Uniform allocation previously obtained from allocateUniforms()
+     * @param shader Shader handle providing reflection to locate the block binding
+     * @param blockName Uniform block name to bind (e.g., "MaterialBlock")
+     * @return true on success, false if validation fails
+     */
+    virtual bool bindUniformBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                                  const char* blockName) = 0;
+
     // Encoders/Queue (WebGPU-shaped)
     virtual std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) = 0;
     virtual Queue& getQueue() = 0;

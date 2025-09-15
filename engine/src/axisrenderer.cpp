@@ -54,20 +54,11 @@ void AxisRenderer::init() {
 void AxisRenderer::render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix) {
     glUseProgram(shaderProgram);
 
-    // Route uniforms through RHI for WebGPU compatibility
+    // Route uniforms through RHI only (no direct glUniform fallback)
     if (s_rhi) {
         s_rhi->setUniformMat4("model", modelMatrix);
         s_rhi->setUniformMat4("view", viewMatrix);
         s_rhi->setUniformMat4("projection", projectionMatrix);
-    } else {
-        // Fallback to direct GL calls
-        GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
-        GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
-        GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
-
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
     }
 
     glBindVertexArray(VAO);

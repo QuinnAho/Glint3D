@@ -86,3 +86,18 @@ The Render Hardware Interface (RHI) is transitioning to a WebGPU-shaped API to e
 - Public headers expose WebGPU-shaped types: `BindGroupLayout`, `BindGroup`, `CommandEncoder`, `RenderPassEncoder`, `Queue`, and `ResourceState`.
 - OpenGL backend provides thin adapter classes (`SimpleCommandEncoderGL`, `SimpleRenderPassEncoderGL`, `SimpleQueueGL`) that map encoder calls to existing immediate-mode GL operations.
 - Null backend stubs implemented to satisfy API and enable headless tests.
+
+## Uniform System (FEAT-0249) — Update
+
+The engine is migrating from per-draw `glUniform*` calls to a reflection-validated UBO ring allocator in the RHI. Highlights:
+
+- Ring allocator: persistently mapped uniform buffer provides aligned sub-allocations per frame.
+- Reflection: `ShaderReflection` describes uniform blocks with offsets and types for validation.
+- APIs:
+  - `allocateUniforms(const UniformAllocationDesc&)`
+  - `setUniformInBlock(...)` / `setUniformsInBlock(...)`
+  - `bindUniformBlock(const UniformAllocation&, ShaderHandle, const char* blockName)`
+- Policy: no direct `glUniform*` calls outside the GL backend. Non-RHI layers route uniform updates through the RHI only.
+
+Typical flow:
+- Allocate a range sized to a block, write fields by name using reflection, then bind the range to the block’s binding point before drawing.

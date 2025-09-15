@@ -69,6 +69,8 @@ public:
                          const void* data, size_t dataSize) override;
     int setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle shader,
                          const char* blockName, const UniformNameValue* uniforms, int count) override;
+    bool bindUniformBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                          const char* blockName) override;
 
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) override;
     Queue& getQueue() override;

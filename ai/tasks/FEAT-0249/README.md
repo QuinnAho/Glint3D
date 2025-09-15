@@ -114,3 +114,11 @@ bindUniformBlocks();           // Binds all UBOs when shader changes
 2. Start with `render_system.cpp` (105 calls - largest consumer)
 3. Enhance reflection with SPIRV-Reflect for cross-platform consistency
 4. Remove legacy uniform methods once migration complete
+
+### PR2 Updates (follow-up)
+
+- Added `bindUniformBlock()` to RHI, implemented in OpenGL and Null backends.
+- Removed direct `glUniform*` fallbacks from non-RHI code:
+  - Updated `engine/src/shader.cpp` to route only via RHI.
+  - Updated `engine/src/gizmo.cpp` and `engine/src/axisrenderer.cpp` to remove direct GL uniform calls.
+- Updated docs (`docs/rhi_architecture.md`, `docs/rhi_guide.md`) with UBO ring + reflection flow and examples.

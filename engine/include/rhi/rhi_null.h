@@ -70,6 +70,9 @@ public:
                           const char*, const UniformNameValue*, int) override {
         return 0;
     }
+    bool bindUniformBlock(const UniformAllocation&, ShaderHandle, const char*) override {
+        return true; // no-op success for testing
+    }
 
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* = nullptr) override;
     Queue& getQueue() override { return m_queue; }
