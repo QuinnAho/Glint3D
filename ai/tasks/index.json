@@ -1,8 +1,8 @@
 {
   "meta": {
     "version": "1.0",
-    "last_updated": "2025-09-13T00:00:00Z",
-    "active_task": "FEAT-0248"
+    "last_updated": "2025-09-15T10:00:00Z",
+    "active_task": "FEAT-0249"
   },
   "features": [
     {
@@ -89,12 +89,17 @@
     {
       "id": "FEAT-0249",
       "title": "Uniform System Migration (UBO ring + reflection)",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "ai",
       "priority": "critical",
       "depends_on": ["FEAT-0248"],
       "created": "2025-09-13T00:00:00Z",
-      "estimated_prs": 4
+      "estimated_prs": 4,
+      "progress": {
+        "completed_prs": ["PR1"],
+        "current_pr": "PR2",
+        "description": "PR1 completed: UBO ring allocator and OpenGL reflection system implemented and tested"
+      }
     },
     {
       "id": "FEAT-0250",
@@ -129,12 +134,24 @@
     {
       "id": "FEAT-0253",
       "title": "RHI Framebuffer Migration (MSAA/Offscreen/Readback)",
-      "status": "planned",
+      "status": "completed",
       "owner": "ai",
       "priority": "critical",
       "depends_on": ["FEAT-0248", "FEAT-0250"],
       "created": "2025-09-13T15:50:00Z",
+      "completed": "2025-09-15T10:00:00Z",
       "estimated_prs": 3
+    },
+    {
+      "id": "FEAT-0254",
+      "title": "SPIRV-Reflect Shader Reflection System",
+      "status": "planned",
+      "owner": "ai",
+      "priority": "medium",
+      "depends_on": ["FEAT-0249"],
+      "blocks": ["FEAT-0252"],
+      "created": "2025-09-15T10:30:00Z",
+      "estimated_prs": 4
     }
   ],
   "requirements_catalog": {
@@ -166,7 +183,12 @@
     "backend_lockin": {
       "description": "Direct OpenGL calls scattered throughout engine, hard to port",
       "impact": "Cannot add Vulkan/WebGPU backends without major refactoring",
-      "addressed_by": ["FEAT-0242"]
+      "addressed_by": ["FEAT-0242", "FEAT-0249", "FEAT-0254"]
+    },
+    "reflection_backend_dependency": {
+      "description": "Shader reflection uses OpenGL introspection APIs, limiting cross-platform compatibility",
+      "impact": "Cannot reflect shaders for Vulkan/WebGPU, limits uniform validation accuracy",
+      "addressed_by": ["FEAT-0254"]
     },
     "no_pass_system": {
       "description": "Interleaved rendering logic, hard to extend with new techniques",

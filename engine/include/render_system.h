@@ -8,6 +8,7 @@
 #include "gizmo.h"
 // RHI types for pipeline handles
 #include <glint3d/rhi.h>
+#include <glint3d/uniform_blocks.h>
 
 using namespace glint3d;
 
@@ -252,7 +253,23 @@ private:
     void setUniformFloat(const char* name, float v);
     void setUniformInt(const char* name, int v);
     void setUniformBool(const char* name, bool v);
-    
+
+    // Uniform Block Allocations (FEAT-0249)
+    UniformAllocation m_transformBlock = {};
+    UniformAllocation m_lightingBlock = {};
+    UniformAllocation m_materialBlock = {};
+
+    // Cached uniform block data
+    TransformBlock m_transformData = {};
+    LightingBlock m_lightingData = {};
+    MaterialBlock m_materialData = {};
+
+    // UBO helper methods
+    void updateTransformUniforms();
+    void updateLightingUniforms(const Light& lights);
+    void updateMaterialUniforms();
+    void bindUniformBlocks(); // Bind all UBOs to their binding points
+
     // Shaders
     std::unique_ptr<Shader> m_basicShader;
     std::unique_ptr<Shader> m_pbrShader;

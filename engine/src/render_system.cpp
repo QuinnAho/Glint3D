@@ -1,4 +1,5 @@
 #include "render_system.h"
+#include <glint3d/uniform_blocks.h>
 #include "scene_manager.h"
 #include "light.h"
 #include "axisrenderer.h"
@@ -66,13 +67,179 @@ void RenderSystem::setUniformBool(const char* name, bool v)
     m_rhi->setUniformBool(name, v);
 }
 
+// UBO Helper Methods (FEAT-0249)
+// ===============================
+
+void RenderSystem::updateTransformUniforms()
+{
+    if (!m_rhi) return;
+
+    // Update transform data
+    m_transformData.model = glm::mat4(1.0f); // Default identity, will be updated per-object
+    m_transformData.view = m_viewMatrix;
+    m_transformData.projection = m_projectionMatrix;
+    // lightSpaceMatrix will be set when needed for shadows
+
+    // Allocate UBO if not already allocated
+    if (m_transformBlock.handle == INVALID_HANDLE) {
+        UniformAllocationDesc desc{};
+        desc.size = sizeof(TransformBlock);
+        desc.alignment = 256; // UBO alignment
+        desc.debugName = "TransformBlock";
+
+        m_transformBlock = m_rhi->allocateUniforms(desc);
+    }
+
+    // Update UBO data
+    if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
+        memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
+        // Note: Binding will be done when shader is bound
+    }
+}
+
+void RenderSystem::updateLightingUniforms(const Light& lights)
+{
+    if (!m_rhi) return;
+
+    // Update lighting data - for now use defaults until Light class is extended
+    m_lightingData.numLights = static_cast<int>(lights.getLightCount());
+    m_lightingData.viewPos = m_camera.position;
+    m_lightingData.globalAmbient = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f); // Default ambient
+
+    // TODO: Populate actual light data when Light class getters are available
+    // For now, set reasonable defaults
+    for (int i = 0; i < 10; ++i) {
+        auto& lightData = m_lightingData.lights[i];
+        lightData.type = 0; // Point light
+        lightData.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        lightData.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+        lightData.color = glm::vec3(1.0f);
+        lightData.intensity = (i == 0) ? 1.0f : 0.0f; // Only first light enabled
+        lightData.innerCutoff = 0.9f;
+        lightData.outerCutoff = 0.8f;
+        lightData._padding = 0.0f;
+    }
+
+    // Allocate UBO if not already allocated
+    if (m_lightingBlock.handle == INVALID_HANDLE) {
+        UniformAllocationDesc desc{};
+        desc.size = sizeof(LightingBlock);
+        desc.alignment = 256; // UBO alignment
+        desc.debugName = "LightingBlock";
+
+        m_lightingBlock = m_rhi->allocateUniforms(desc);
+    }
+
+    // Update UBO data
+    if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
+        memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
+        // Note: Binding will be done when shader is bound
+    }
+}
+
+void RenderSystem::updateMaterialUniforms()
+{
+    if (!m_rhi) return;
+
+    // Material data will be updated per-object during rendering
+    // For now, set defaults
+    m_materialData.baseColorFactor = glm::vec4(1.0f);
+    m_materialData.metallicFactor = 0.0f;
+    m_materialData.roughnessFactor = 0.5f;
+    m_materialData.ior = 1.5f;
+    m_materialData.transmission = 0.0f;
+    m_materialData.thickness = 1.0f;
+    m_materialData.attenuationDistance = 1000.0f;
+    m_materialData.attenuationColor = glm::vec3(1.0f);
+    m_materialData.clearcoat = 0.0f;
+    m_materialData.clearcoatRoughness = 0.0f;
+
+    // Allocate UBO if not already allocated
+    if (m_materialBlock.handle == INVALID_HANDLE) {
+        UniformAllocationDesc desc{};
+        desc.size = sizeof(MaterialBlock);
+        desc.alignment = 256; // UBO alignment
+        desc.debugName = "MaterialBlock";
+
+        m_materialBlock = m_rhi->allocateUniforms(desc);
+    }
+
+    // Update UBO data
+    if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
+        memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
+        // Note: Binding will be done when shader is bound
+    }
+}
+
+void RenderSystem::bindUniformBlocks()
+{
+    if (!m_rhi) return;
+
+    // Bind transform block to binding point 0
+    if (m_transformBlock.handle != INVALID_HANDLE) {
+        // Create a buffer handle if needed - for now we'll create temporary buffers
+        // TODO: Improve this to use proper buffer handles from the ring allocator
+        BufferDesc bufferDesc{};
+        bufferDesc.type = BufferType::Uniform;
+        bufferDesc.usage = BufferUsage::Dynamic;
+        bufferDesc.size = sizeof(TransformBlock);
+        bufferDesc.debugName = "TransformUBO";
+
+        static BufferHandle transformBuffer = INVALID_HANDLE;
+        if (transformBuffer == INVALID_HANDLE) {
+            transformBuffer = m_rhi->createBuffer(bufferDesc);
+        }
+
+        m_rhi->updateBuffer(transformBuffer, &m_transformData, sizeof(TransformBlock));
+        m_rhi->bindUniformBuffer(transformBuffer, TransformBlock::BINDING_POINT);
+    }
+
+    // Bind lighting block to binding point 1
+    if (m_lightingBlock.handle != INVALID_HANDLE) {
+        BufferDesc bufferDesc{};
+        bufferDesc.type = BufferType::Uniform;
+        bufferDesc.usage = BufferUsage::Dynamic;
+        bufferDesc.size = sizeof(LightingBlock);
+        bufferDesc.debugName = "LightingUBO";
+
+        static BufferHandle lightingBuffer = INVALID_HANDLE;
+        if (lightingBuffer == INVALID_HANDLE) {
+            lightingBuffer = m_rhi->createBuffer(bufferDesc);
+        }
+
+        m_rhi->updateBuffer(lightingBuffer, &m_lightingData, sizeof(LightingBlock));
+        m_rhi->bindUniformBuffer(lightingBuffer, LightingBlock::BINDING_POINT);
+    }
+
+    // Bind material block to binding point 2
+    if (m_materialBlock.handle != INVALID_HANDLE) {
+        BufferDesc bufferDesc{};
+        bufferDesc.type = BufferType::Uniform;
+        bufferDesc.usage = BufferUsage::Dynamic;
+        bufferDesc.size = sizeof(MaterialBlock);
+        bufferDesc.debugName = "MaterialUBO";
+
+        static BufferHandle materialBuffer = INVALID_HANDLE;
+        if (materialBuffer == INVALID_HANDLE) {
+            materialBuffer = m_rhi->createBuffer(bufferDesc);
+        }
+
+        m_rhi->updateBuffer(materialBuffer, &m_materialData, sizeof(MaterialBlock));
+        m_rhi->bindUniformBuffer(materialBuffer, MaterialBlock::BINDING_POINT);
+    }
+}
+
 void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
 {
     if (!m_rhi) return;
     bool hasNormals = (obj.rhiVboNormals != INVALID_HANDLE);
     bool hasUVs = (obj.rhiVboUVs != INVALID_HANDLE);
     PipelineHandle& target = usePbr ? obj.rhiPipelinePbr : obj.rhiPipelineBasic;
-    if (target != INVALID_HANDLE) { m_rhi->bindPipeline(target); return; }
+    if (target != INVALID_HANDLE) {
+        m_rhi->bindPipeline(target);
+        bindUniformBlocks(); // Bind UBOs when using existing pipeline
+        return;
+    }
 
     PipelineDesc pd{};
     pd.topology = PrimitiveTopology::Triangles;
@@ -91,6 +258,8 @@ void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
     target = m_rhi->createPipeline(pd);
     // Bind immediately so subsequent uniform calls apply to correct program
     m_rhi->bindPipeline(target);
+    // Bind uniform blocks to their binding points
+    bindUniformBlocks();
 }
 
 // PNG writer
@@ -309,6 +478,22 @@ void RenderSystem::shutdown()
     m_pbrShader.reset();
     m_gridShader.reset();
     if (m_dummyShadowTex) { glDeleteTextures(1, &m_dummyShadowTex); m_dummyShadowTex = 0; }
+
+    // Cleanup UBO allocations (FEAT-0249)
+    if (m_rhi) {
+        if (m_transformBlock.handle != INVALID_HANDLE) {
+            m_rhi->freeUniforms(m_transformBlock);
+            m_transformBlock = {};
+        }
+        if (m_lightingBlock.handle != INVALID_HANDLE) {
+            m_rhi->freeUniforms(m_lightingBlock);
+            m_lightingBlock = {};
+        }
+        if (m_materialBlock.handle != INVALID_HANDLE) {
+            m_rhi->freeUniforms(m_materialBlock);
+            m_materialBlock = {};
+        }
+    }
     if (m_rhi && s_dummyShadowTexRhi != 0) { m_rhi->destroyTexture(s_dummyShadowTexRhi); s_dummyShadowTexRhi = 0; }
     destroyTargets();
 }
@@ -317,6 +502,11 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
 {
     // Reset per-frame stats counters
     m_stats = {};
+
+    // Update uniform blocks (FEAT-0249)
+    updateTransformUniforms();
+    updateLightingUniforms(lights);
+    updateMaterialUniforms();
     
     // Optimize clear operations - only clear if background changed
     static glm::vec3 lastBgColor{-1.0f};

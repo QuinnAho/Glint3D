@@ -11,33 +11,42 @@ in mat3 vTBN;
 #define LIGHT_DIRECTIONAL 1
 #define LIGHT_SPOT 2
 
-// Lights
-struct Light { 
+// Lights uniform block
+struct Light {
     int type;
-    vec3 position; 
-    vec3 direction; 
-    vec3 color; 
-    float intensity; 
+    vec3 position;
+    vec3 direction;
+    vec3 color;
+    float intensity;
     float innerCutoff; // cos(inner)
     float outerCutoff; // cos(outer)
+    float _padding;   // std140 alignment
 };
-#define MAX_LIGHTS 10
-uniform int numLights;
-uniform Light lights[MAX_LIGHTS];
-uniform vec3 viewPos;
 
-// PBR inputs
-uniform vec4 baseColorFactor; // rgba
-uniform float metallicFactor;
-uniform float roughnessFactor;
-uniform float ior;            // Index of refraction for F0 computation
-// MaterialCore extensions
-uniform float transmission;           // [0,1]
-uniform float thickness;              // meters
-uniform float attenuationDistance;    // meters (Beer-Lambert)
-uniform vec3  attenuationColor;       // tint for attenuation (approx)
-uniform float clearcoat;              // [0,1]
-uniform float clearcoatRoughness;     // [0,1]
+#define MAX_LIGHTS 10
+layout(std140) uniform LightingBlock {
+    int numLights;
+    vec3 viewPos;
+    vec4 globalAmbient;
+    Light lights[MAX_LIGHTS];
+};
+
+// Material properties uniform block
+layout(std140) uniform MaterialBlock {
+    vec4 baseColorFactor; // rgba
+    float metallicFactor;
+    float roughnessFactor;
+    float ior;            // Index of refraction for F0 computation
+    float transmission;   // [0,1]
+    float thickness;      // meters
+    float attenuationDistance; // meters (Beer-Lambert)
+    vec3 attenuationColor;     // tint for attenuation (approx)
+    float clearcoat;           // [0,1]
+    float clearcoatRoughness;  // [0,1]
+    float _padding1;
+    float _padding2;
+    float _padding3;          // std140 alignment padding
+};
 uniform bool  hasBaseColorMap;
 uniform bool  hasNormalMap;
 uniform bool  hasMRMap;
@@ -46,7 +55,6 @@ uniform sampler2D normalTex;
 uniform sampler2D mrTex; // glTF convention: G=roughness, B=metallic
 
 uniform sampler2D shadowMap;
-uniform mat4 lightSpaceMatrix;
 
 // IBL textures
 uniform samplerCube irradianceMap;

@@ -5,9 +5,13 @@ layout (location = 1) in vec3 aColor;
 
 out vec3 ourColor;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+// Transform matrices uniform block
+layout(std140) uniform TransformBlock {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 lightSpaceMatrix;  // For shadow mapping
+};
 
 void main()
 {

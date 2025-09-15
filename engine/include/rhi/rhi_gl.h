@@ -60,6 +60,16 @@ public:
     void setUniformInt(const char* name, int value) override;
     void setUniformBool(const char* name, bool value) override;
 
+    // Uniform Buffer Ring Allocator (FEAT-0249)
+    UniformAllocation allocateUniforms(const UniformAllocationDesc& desc) override;
+    void freeUniforms(const UniformAllocation& allocation) override;
+    ShaderReflection getShaderReflection(ShaderHandle shader) override;
+    bool setUniformInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                         const char* blockName, const char* varName,
+                         const void* data, size_t dataSize) override;
+    int setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                         const char* blockName, const UniformNameValue* uniforms, int count) override;
+
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) override;
     Queue& getQueue() override;
     
@@ -173,7 +183,39 @@ private:
 
     // Queue instance
     SimpleQueueGL m_queue{*this};
-    
+
+    // Uniform Buffer Ring Allocator (FEAT-0249)
+    struct UniformRingBuffer {
+        GLuint buffer = 0;
+        size_t size = 0;
+        size_t offset = 0;
+        void* mappedPtr = nullptr;
+        bool persistent = false;
+    };
+
+    struct GLUniformAllocation {
+        UniformAllocationHandle handle;
+        BufferHandle bufferHandle;
+        uint32_t offset;
+        uint32_t size;
+        void* mappedPtr;
+        bool inUse;
+    };
+
+    static constexpr size_t UBO_RING_SIZE = 1024 * 1024; // 1MB ring buffer
+    static constexpr size_t UBO_ALIGNMENT = 256; // UBO alignment on most GPUs
+
+    UniformRingBuffer m_uniformRing;
+    std::unordered_map<UniformAllocationHandle, GLUniformAllocation> m_uniformAllocations;
+    uint32_t m_nextUniformHandle = 1;
+    std::unordered_map<ShaderHandle, ShaderReflection> m_shaderReflections;
+
+    // UBO helper methods
+    bool initializeUniformRing();
+    void shutdownUniformRing();
+    uint32_t alignOffset(uint32_t offset, uint32_t alignment) const;
+    bool createShaderReflection(ShaderHandle shader, const ShaderDesc& desc);
+
     // Helper methods
     GLenum textureFormatToGL(TextureFormat format) const;
     GLenum textureTypeToGL(TextureType type) const;

@@ -35,7 +35,12 @@ bool RhiGL::init(const RhiInit& desc) {
         }
 #endif
     }
-    
+
+    // Initialize uniform buffer ring allocator
+    if (!initializeUniformRing()) {
+        return false;
+    }
+
     return true;
 }
 
@@ -68,6 +73,9 @@ void RhiGL::shutdown() {
         }
     }
     m_textures.clear();
+
+    // Shutdown uniform buffer ring allocator
+    shutdownUniformRing();
 }
 
 void RhiGL::beginFrame() {
@@ -226,9 +234,13 @@ ShaderHandle RhiGL::createShader(const ShaderDesc& desc) {
     if (!compileShader(glShader.program, desc)) {
         return INVALID_HANDLE;
     }
-    
+
     ShaderHandle handle = m_nextShaderHandle++;
     m_shaders[handle] = glShader;
+
+    // Create shader reflection data for UBO validation
+    createShaderReflection(handle, desc);
+
     return handle;
 }
 
@@ -834,7 +846,7 @@ bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
     return true;
 }
 
-// ===== Simple WebGPU-shaped adapters =====
+// Simple WebGPU-shaped adapters
 
 RhiGL::SimpleRenderPassEncoderGL::SimpleRenderPassEncoderGL(RhiGL& rhi, const RenderPassDesc& desc)
     : m_rhi(rhi), m_desc(desc), m_active(true) {
@@ -952,4 +964,287 @@ void RhiGL::setUniformInt(const char* name, int value) {
 
 void RhiGL::setUniformBool(const char* name, bool value) {
     setUniformInt(name, value ? 1 : 0);
+}
+
+// Uniform Buffer Ring Allocator Implementation (FEAT-0249)
+// =========================================================
+
+UniformAllocation RhiGL::allocateUniforms(const UniformAllocationDesc& desc) {
+    UniformAllocation result{};
+
+    // Align the size to required alignment
+    uint32_t alignedSize = alignOffset(desc.size, desc.alignment);
+
+    // Check if we have space in the current ring buffer
+    if (m_uniformRing.offset + alignedSize > m_uniformRing.size) {
+        // Ring buffer is full, wrap around to beginning
+        m_uniformRing.offset = 0;
+    }
+
+    // Create allocation record
+    GLUniformAllocation allocation{};
+    allocation.handle = m_nextUniformHandle++;
+    allocation.bufferHandle = INVALID_HANDLE; // We use the ring buffer directly
+    allocation.offset = static_cast<uint32_t>(m_uniformRing.offset);
+    allocation.size = alignedSize;
+    allocation.inUse = true;
+
+    // Calculate mapped pointer
+    if (m_uniformRing.mappedPtr) {
+        allocation.mappedPtr = static_cast<char*>(m_uniformRing.mappedPtr) + allocation.offset;
+    }
+
+    // Update ring buffer offset
+    m_uniformRing.offset += alignedSize;
+
+    // Store allocation
+    m_uniformAllocations[allocation.handle] = allocation;
+
+    // Fill result
+    result.handle = allocation.handle;
+    result.buffer = allocation.bufferHandle;
+    result.offset = allocation.offset;
+    result.mappedPtr = allocation.mappedPtr;
+
+    return result;
+}
+
+void RhiGL::freeUniforms(const UniformAllocation& allocation) {
+    auto it = m_uniformAllocations.find(allocation.handle);
+    if (it != m_uniformAllocations.end()) {
+        it->second.inUse = false;
+        // Note: Ring buffer allocation space is reused on wrap-around
+        // We don't explicitly free individual allocations
+    }
+}
+
+ShaderReflection RhiGL::getShaderReflection(ShaderHandle shader) {
+    auto it = m_shaderReflections.find(shader);
+    if (it != m_shaderReflections.end()) {
+        return it->second;
+    }
+
+    // Return empty reflection if not found
+    ShaderReflection reflection{};
+    reflection.isValid = false;
+    return reflection;
+}
+
+bool RhiGL::setUniformInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                            const char* blockName, const char* varName,
+                            const void* data, size_t dataSize) {
+    // Get shader reflection
+    auto reflection = getShaderReflection(shader);
+    if (!reflection.isValid) {
+        return false;
+    }
+
+    // Find the uniform block
+    UniformBlockReflection* block = nullptr;
+    for (auto& ub : reflection.uniformBlocks) {
+        if (ub.blockName == blockName) {
+            block = &ub;
+            break;
+        }
+    }
+
+    if (!block) {
+        return false;
+    }
+
+    // Find the variable within the block
+    UniformVariableInfo* variable = nullptr;
+    for (auto& var : block->variables) {
+        if (var.name == varName) {
+            variable = &var;
+            break;
+        }
+    }
+
+    if (!variable) {
+        return false;
+    }
+
+    // Validate data size
+    if (dataSize != variable->size) {
+        return false;
+    }
+
+    // Get allocation
+    auto allocIt = m_uniformAllocations.find(allocation.handle);
+    if (allocIt == m_uniformAllocations.end() || !allocIt->second.inUse) {
+        return false;
+    }
+
+    // Copy data to mapped buffer
+    if (allocIt->second.mappedPtr) {
+        char* dest = static_cast<char*>(allocIt->second.mappedPtr) + variable->offset;
+        memcpy(dest, data, dataSize);
+        return true;
+    }
+
+    return false;
+}
+
+int RhiGL::setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                            const char* blockName, const UniformNameValue* uniforms, int count) {
+    int successCount = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (setUniformInBlock(allocation, shader, blockName, uniforms[i].name,
+                            uniforms[i].data, uniforms[i].dataSize)) {
+            successCount++;
+        }
+    }
+
+    return successCount;
+}
+
+// UBO Helper Methods
+// ==================
+
+bool RhiGL::initializeUniformRing() {
+    // Generate uniform buffer
+    glGenBuffers(1, &m_uniformRing.buffer);
+    if (m_uniformRing.buffer == 0) {
+        return false;
+    }
+
+    // Allocate buffer storage
+    glBindBuffer(GL_UNIFORM_BUFFER, m_uniformRing.buffer);
+    glBufferData(GL_UNIFORM_BUFFER, UBO_RING_SIZE, nullptr, GL_DYNAMIC_DRAW);
+
+    m_uniformRing.size = UBO_RING_SIZE;
+    m_uniformRing.offset = 0;
+
+    // Try to get persistent mapping if available (OpenGL 4.4+)
+#ifdef GL_MAP_PERSISTENT_BIT
+    if (GLAD_GL_ARB_buffer_storage) {
+        glBufferStorage(GL_UNIFORM_BUFFER, UBO_RING_SIZE, nullptr,
+                       GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        m_uniformRing.mappedPtr = glMapBufferRange(GL_UNIFORM_BUFFER, 0, UBO_RING_SIZE,
+                                                  GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        m_uniformRing.persistent = (m_uniformRing.mappedPtr != nullptr);
+    }
+#endif
+
+    // Fallback to non-persistent mapping
+    if (!m_uniformRing.persistent) {
+        m_uniformRing.mappedPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+    }
+
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    return true;
+}
+
+void RhiGL::shutdownUniformRing() {
+    if (m_uniformRing.buffer) {
+        if (m_uniformRing.mappedPtr) {
+            glBindBuffer(GL_UNIFORM_BUFFER, m_uniformRing.buffer);
+            glUnmapBuffer(GL_UNIFORM_BUFFER);
+            glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        }
+        glDeleteBuffers(1, &m_uniformRing.buffer);
+        m_uniformRing = {};
+    }
+
+    m_uniformAllocations.clear();
+    m_shaderReflections.clear();
+}
+
+uint32_t RhiGL::alignOffset(uint32_t offset, uint32_t alignment) const {
+    return (offset + alignment - 1) & ~(alignment - 1);
+}
+
+bool RhiGL::createShaderReflection(ShaderHandle shader, const ShaderDesc& desc) {
+    auto shaderIt = m_shaders.find(shader);
+    if (shaderIt == m_shaders.end() || shaderIt->second.program == 0) {
+        return false;
+    }
+
+    GLuint program = shaderIt->second.program;
+    ShaderReflection reflection{};
+
+    // Query uniform blocks using OpenGL introspection
+    GLint numBlocks = 0;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &numBlocks);
+
+    for (GLint blockIndex = 0; blockIndex < numBlocks; ++blockIndex) {
+        UniformBlockReflection blockReflection{};
+
+        // Get block name
+        GLint nameLength = 0;
+        glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_NAME_LENGTH, &nameLength);
+        if (nameLength > 0) {
+            blockReflection.blockName.resize(nameLength);
+            glGetActiveUniformBlockName(program, blockIndex, nameLength, nullptr, blockReflection.blockName.data());
+            if (!blockReflection.blockName.empty() && blockReflection.blockName.back() == '\0') {
+                blockReflection.blockName.pop_back(); // Remove null terminator
+            }
+        }
+
+        // Get block size
+        GLint blockSize = 0;
+        glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &blockSize);
+        blockReflection.blockSize = static_cast<uint32_t>(blockSize);
+
+        // Get binding point
+        GLint binding = 0;
+        glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_BINDING, &binding);
+        blockReflection.binding = static_cast<uint32_t>(binding);
+
+        // Get uniforms in this block
+        GLint numActiveUniforms = 0;
+        glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &numActiveUniforms);
+
+        if (numActiveUniforms > 0) {
+            std::vector<GLint> uniformIndices(numActiveUniforms);
+            glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, uniformIndices.data());
+
+            for (GLint uniformIndex : uniformIndices) {
+                UniformVariableInfo varInfo{};
+
+                // Get uniform name
+                GLint maxNameLength = 0;
+                glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
+                if (maxNameLength > 0) {
+                    std::vector<char> nameBuffer(maxNameLength);
+                    GLsizei actualLength = 0;
+                    GLenum glType = 0;
+                    GLint size = 0;
+                    glGetActiveUniform(program, uniformIndex, maxNameLength, &actualLength, &size, &glType, nameBuffer.data());
+                    varInfo.name = std::string(nameBuffer.data(), actualLength);
+                    varInfo.arraySize = static_cast<uint32_t>(size);
+
+                    // Convert GL type to UniformType
+                    switch (glType) {
+                        case GL_FLOAT: varInfo.type = UniformType::Float; varInfo.size = 4; break;
+                        case GL_FLOAT_VEC2: varInfo.type = UniformType::Vec2; varInfo.size = 8; break;
+                        case GL_FLOAT_VEC3: varInfo.type = UniformType::Vec3; varInfo.size = 12; break;
+                        case GL_FLOAT_VEC4: varInfo.type = UniformType::Vec4; varInfo.size = 16; break;
+                        case GL_FLOAT_MAT3: varInfo.type = UniformType::Mat3; varInfo.size = 36; break;
+                        case GL_FLOAT_MAT4: varInfo.type = UniformType::Mat4; varInfo.size = 64; break;
+                        case GL_INT: case GL_BOOL: varInfo.type = UniformType::Int; varInfo.size = 4; break;
+                        default: varInfo.type = UniformType::Float; varInfo.size = 4; break;
+                    }
+
+                    // Adjust size for arrays
+                    varInfo.size *= varInfo.arraySize;
+
+                    // Get uniform offset
+                    GLint offset = 0;
+                    glGetActiveUniformsiv(program, 1, reinterpret_cast<const GLuint*>(&uniformIndex), GL_UNIFORM_OFFSET, &offset);
+                    varInfo.offset = static_cast<uint32_t>(offset);
+
+                    blockReflection.variables.push_back(varInfo);
+                }
+            }
+        }
+
+        reflection.uniformBlocks.push_back(blockReflection);
+    }
+
+    reflection.isValid = true;
+    m_shaderReflections[shader] = reflection;
+    return true;
 }

@@ -237,6 +237,61 @@ public:
      */
     virtual void setUniformBool(const char* name, bool value) = 0;
 
+    // Uniform Buffer Ring Allocator (FEAT-0249)
+    // ===========================================
+
+    /**
+     * @brief Allocate uniform buffer space from the ring allocator
+     * @param desc Allocation descriptor with size and alignment requirements
+     * @return Allocation result with buffer handle and mapped pointer
+     */
+    virtual UniformAllocation allocateUniforms(const UniformAllocationDesc& desc) = 0;
+
+    /**
+     * @brief Free a uniform buffer allocation (allows reuse in ring)
+     * @param allocation Previously allocated uniform buffer space
+     */
+    virtual void freeUniforms(const UniformAllocation& allocation) = 0;
+
+    /**
+     * @brief Get shader reflection data for validation and offset calculation
+     * @param shader Shader handle to reflect
+     * @return Reflection data with uniform block layouts and variable offsets
+     */
+    virtual ShaderReflection getShaderReflection(ShaderHandle shader) = 0;
+
+    /**
+     * @brief Set uniform data in allocated buffer with reflection validation
+     * @param allocation Target uniform buffer allocation
+     * @param shader Shader handle for reflection validation
+     * @param blockName Uniform block name (e.g., "MaterialBlock")
+     * @param varName Variable name within block (e.g., "diffuseColor")
+     * @param data Pointer to uniform data
+     * @param dataSize Size of data in bytes
+     * @return true if successfully set, false if validation failed
+     */
+    virtual bool setUniformInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                                 const char* blockName, const char* varName,
+                                 const void* data, size_t dataSize) = 0;
+
+    /**
+     * @brief Set multiple uniform variables in a block efficiently
+     * @param allocation Target uniform buffer allocation
+     * @param shader Shader handle for reflection validation
+     * @param blockName Uniform block name
+     * @param uniforms Array of name-value pairs to set
+     * @param count Number of uniforms to set
+     * @return Number of uniforms successfully set
+     */
+    struct UniformNameValue {
+        const char* name;
+        const void* data;
+        size_t dataSize;
+        UniformType type;
+    };
+    virtual int setUniformsInBlock(const UniformAllocation& allocation, ShaderHandle shader,
+                                 const char* blockName, const UniformNameValue* uniforms, int count) = 0;
+
     // Encoders/Queue (WebGPU-shaped)
     virtual std::unique_ptr<CommandEncoder> createCommandEncoder(const char* debugName = nullptr) = 0;
     virtual Queue& getQueue() = 0;

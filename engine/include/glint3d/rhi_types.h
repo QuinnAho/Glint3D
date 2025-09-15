@@ -308,4 +308,74 @@ struct RenderPassDesc {
     std::string debugName;
 };
 
+// Uniform Buffer Ring Allocator Types (FEAT-0249)
+// ================================================
+
+/**
+ * @brief Handle to a uniform buffer allocation from the ring allocator
+ */
+using UniformAllocationHandle = uint32_t;
+
+/**
+ * @brief Uniform data type enumeration for validation
+ */
+enum class UniformType {
+    Float,
+    Vec2,
+    Vec3,
+    Vec4,
+    Mat3,
+    Mat4,
+    Int,
+    Bool
+};
+
+/**
+ * @brief Uniform variable reflection information
+ */
+struct UniformVariableInfo {
+    std::string name;
+    UniformType type;
+    uint32_t offset;        // Byte offset in uniform buffer
+    uint32_t size;          // Size in bytes
+    uint32_t arraySize;     // 1 for non-arrays
+};
+
+/**
+ * @brief Uniform buffer reflection information
+ */
+struct UniformBlockReflection {
+    std::string blockName;
+    uint32_t blockSize;     // Total size in bytes
+    uint32_t binding;       // Binding point
+    std::vector<UniformVariableInfo> variables;
+};
+
+/**
+ * @brief Shader reflection data containing all uniform blocks
+ */
+struct ShaderReflection {
+    std::vector<UniformBlockReflection> uniformBlocks;
+    bool isValid = false;
+};
+
+/**
+ * @brief Parameters for uniform buffer allocation
+ */
+struct UniformAllocationDesc {
+    uint32_t size;          // Size in bytes
+    uint32_t alignment = 16; // Required alignment (UBO std140 is 16 bytes)
+    const char* debugName = nullptr;
+};
+
+/**
+ * @brief Result of uniform buffer allocation
+ */
+struct UniformAllocation {
+    UniformAllocationHandle handle = INVALID_HANDLE;
+    BufferHandle buffer = INVALID_HANDLE;
+    uint32_t offset = 0;    // Offset within the buffer
+    void* mappedPtr = nullptr; // CPU-accessible pointer for updates
+};
+
 } // namespace glint3d

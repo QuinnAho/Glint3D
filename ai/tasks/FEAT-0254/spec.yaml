@@ -1,0 +1,62 @@
+id: FEAT-0254
+title: SPIRV-Reflect Shader Reflection System
+owner: ai
+status: planned
+created: "2025-09-15T10:30:00Z"
+priority: medium
+
+description: >
+  Replace OpenGL-based shader reflection with SPIRV-Reflect for cross-platform
+  consistency and enhanced reflection capabilities. Enables true backend-agnostic
+  uniform buffer layout validation and SPIR-V pipeline compatibility.
+
+acceptance_criteria:
+  - "SPIRV-Reflect integration compiled and functional"
+  - "Shader reflection works from SPIR-V bytecode, not GL introspection"
+  - "Cross-platform parity: OpenGL, WebGL2, and future Vulkan/WebGPU"
+  - "Enhanced reflection: storage buffers, push constants, texture bindings"
+  - "Backward compatibility: existing UBO ring allocator continues working"
+  - "Performance: reflection cached, not computed per-frame"
+
+must_requirements:
+  - ARCH.NO_GL_OUTSIDE_RHI
+  - TEST.CROSS_PLATFORM
+  - PERF.FRAME_BUDGET
+  - API.BACKWARD_COMPATIBILITY
+
+plan:
+  - id: PR1
+    title: "Add SPIRV-Reflect dependency and basic integration"
+    status: planned
+    files: ["CMakeLists.txt", "engine/external/**", "engine/src/rhi/spirv_reflect.*"]
+  - id: PR2
+    title: "Implement SPIR-V shader compilation pipeline (DXC/shaderc)"
+    status: planned
+    files: ["engine/include/glint3d/rhi*.h", "engine/src/rhi/**", "engine/shaders/**"]
+  - id: PR3
+    title: "Replace OpenGL reflection with SPIRV-Reflect in RhiGL"
+    status: planned
+    files: ["engine/src/rhi/rhi_gl.cpp", "tests/unit/rhi_test.cpp"]
+  - id: PR4
+    title: "Add enhanced reflection features (storage buffers, push constants)"
+    status: planned
+    files: ["engine/include/glint3d/rhi_types.h", "engine/src/rhi/**"]
+
+file_whitelist:
+  - "ai/tasks/FEAT-0254/**"
+  - "CMakeLists.txt"
+  - "engine/external/**"
+  - "engine/include/glint3d/rhi*.h"
+  - "engine/src/rhi/**"
+  - "engine/shaders/**"
+  - "tests/unit/rhi_test.cpp"
+  - "docs/rhi_architecture.md"
+
+outputs:
+  - engine/src/rhi/spirv_reflect.cpp
+  - engine/include/rhi/spirv_reflect.h
+  - docs/spirv_reflection_guide.md
+
+dependencies:
+  blocked_by: [FEAT-0249]
+  blocks: [FEAT-0252]

@@ -4,10 +4,13 @@ layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
 
-// Matrices
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+// Transform matrices uniform block
+layout(std140) uniform TransformBlock {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 lightSpaceMatrix;  // For shadow mapping
+};
 
 // Shading mode: 0=Flat, 1=Gouraud
 uniform int shadingMode;
@@ -23,7 +26,7 @@ out vec2 UV;
 #define LIGHT_DIRECTIONAL 1
 #define LIGHT_SPOT 2
 
-// Lights
+// Lights uniform block (matching standard.frag)
 struct Light {
     int type;
     vec3 position;
@@ -32,11 +35,16 @@ struct Light {
     float intensity;
     float innerCutoff; // cos(inner)
     float outerCutoff; // cos(outer)
+    float _padding;   // std140 alignment
 };
 
 #define MAX_LIGHTS 10
-uniform int numLights;
-uniform Light lights[MAX_LIGHTS];
+layout(std140) uniform LightingBlock {
+    int numLights;
+    vec3 viewPos;
+    vec4 globalAmbient;
+    Light lights[MAX_LIGHTS];
+};
 
 // Material for Gouraud specular
 struct Material {
@@ -49,7 +57,6 @@ struct Material {
 };
 
 uniform Material material;
-uniform vec3 viewPos; // Camera position in world space
 
 void main()
 {

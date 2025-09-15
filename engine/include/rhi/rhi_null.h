@@ -52,6 +52,25 @@ public:
     void setUniformInt(const char*, int) override {}
     void setUniformBool(const char*, bool) override {}
 
+    // Uniform Buffer Ring Allocator (FEAT-0249) - No-op implementations
+    UniformAllocation allocateUniforms(const UniformAllocationDesc&) override {
+        return {};
+    }
+    void freeUniforms(const UniformAllocation&) override {}
+    ShaderReflection getShaderReflection(ShaderHandle) override {
+        ShaderReflection reflection{};
+        reflection.isValid = false;
+        return reflection;
+    }
+    bool setUniformInBlock(const UniformAllocation&, ShaderHandle,
+                          const char*, const char*, const void*, size_t) override {
+        return false;
+    }
+    int setUniformsInBlock(const UniformAllocation&, ShaderHandle,
+                          const char*, const UniformNameValue*, int) override {
+        return 0;
+    }
+
     std::unique_ptr<CommandEncoder> createCommandEncoder(const char* = nullptr) override;
     Queue& getQueue() override { return m_queue; }
 

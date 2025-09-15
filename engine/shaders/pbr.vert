@@ -6,9 +6,13 @@ layout(location = 2) in vec2 aUV;
 layout(location = 3) in vec3 aTangent;
 uniform bool hasTangents = false;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+// Transform matrices uniform block
+layout(std140) uniform TransformBlock {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 lightSpaceMatrix;  // For shadow mapping
+};
 
 out vec3 vWorldPos;
 out vec2 vUV;

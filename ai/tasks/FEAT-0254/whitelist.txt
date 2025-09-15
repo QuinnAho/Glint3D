@@ -1,0 +1,35 @@
+# File whitelist for FEAT-0254: SPIRV-Reflect Shader Reflection System
+# Only these files may be modified during this task
+
+# Task management
+ai/tasks/FEAT-0254/**
+
+# Build system
+CMakeLists.txt
+engine/external/**
+
+# RHI interface and types
+engine/include/glint3d/rhi.h
+engine/include/glint3d/rhi_types.h
+
+# RHI implementation
+engine/src/rhi/**
+engine/include/rhi/**
+
+# Shader system
+engine/shaders/**
+engine/src/shader.cpp
+engine/include/shader.h
+
+# Documentation
+docs/rhi_architecture.md
+docs/spirv_reflection_guide.md
+
+# Tests
+tests/unit/rhi_test.cpp
+tests/unit/spirv_reflect_test.cpp
+tests/integration/shader_reflection/
+
+# Optional: shader tooling
+tools/shader_compiler.py
+tools/validate_reflection.py

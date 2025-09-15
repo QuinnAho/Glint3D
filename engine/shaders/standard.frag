@@ -8,7 +8,6 @@ in vec3 GouraudLight;  // We only use this if shadingMode == 1
 in vec2 UV;
 
 uniform sampler2D shadowMap;
-uniform mat4 lightSpaceMatrix;
 
 // For texturing & shading controls
 uniform sampler2D cowTexture;
@@ -16,29 +15,30 @@ uniform bool useTexture;
 uniform int shadingMode;
 uniform vec3 objectColor; // fallback if no texture
 
-// ------------------------------------------------------------------------
-// Global ambient
-uniform vec4 globalAmbient; // .a is often unused, so we just use .rgb
-
 // Light types
 #define LIGHT_POINT 0
 #define LIGHT_DIRECTIONAL 1
 #define LIGHT_SPOT 2
 
-// Light struct
+// Lights uniform block (same as PBR shader)
 struct Light {
     int type;
     vec3 position;
     vec3 direction;
     vec3 color;
-    float intensity; // If 0, treat as disabled
+    float intensity;
     float innerCutoff; // cos(inner)
     float outerCutoff; // cos(outer)
+    float _padding;   // std140 alignment
 };
 
 #define MAX_LIGHTS 10
-uniform int numLights;
-uniform Light lights[MAX_LIGHTS];
+layout(std140) uniform LightingBlock {
+    int numLights;
+    vec3 viewPos;
+    vec4 globalAmbient;
+    Light lights[MAX_LIGHTS];
+};
 
 // ------------------------------------------------------------------------
 // Material struct
@@ -51,9 +51,6 @@ struct Material {
     float metallic;
 };
 uniform Material material;
-
-// Camera position (for specular reflection in Gouraud)
-uniform vec3 viewPos;
 
 // Post-processing uniforms
 uniform float exposure;

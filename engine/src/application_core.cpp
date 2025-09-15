@@ -661,13 +661,18 @@ void ApplicationCore::initCallbacks()
 
 void ApplicationCore::createDefaultScene()
 {
+    // Set default HDRI background
+    if (m_renderer) {
+        m_renderer->setBackgroundHDR("assets/img/qwantani_noon_puresky_4k.exr");
+    }
+
     // Add default lighting
     m_lights->addLight(
         glm::vec3(2.0f, 4.0f, 2.0f),     // position
         glm::vec3(0.8f, 0.8f, 0.7f),     // color
         1.0f                              // intensity
     );
-    
+
     // Set default camera position
     CameraState defaultCam;
     defaultCam.position = glm::vec3(0.0f, 2.0f, 5.0f);
