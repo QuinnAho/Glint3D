@@ -43,13 +43,28 @@ layout(std140) uniform MaterialBlock {
     vec3 attenuationColor;     // tint for attenuation (approx)
     float clearcoat;           // [0,1]
     float clearcoatRoughness;  // [0,1]
-    float _padding1;
-    float _padding2;
-    float _padding3;          // std140 alignment padding
+
+    // Texture flags (bools as ints for std140)
+    bool hasBaseColorMap;  // int converted to bool
+    bool hasNormalMap;     // int converted to bool
+    bool hasMRMap;         // int converted to bool
+    bool hasTangents;      // int converted to bool
+    bool useTexture;       // int converted to bool
 };
-uniform bool  hasBaseColorMap;
-uniform bool  hasNormalMap;
-uniform bool  hasMRMap;
+
+// Rendering state uniform block
+layout(std140) uniform RenderingBlock {
+    float exposure;
+    float gamma;
+    int toneMappingMode;
+    int shadingMode;
+
+    float iblIntensity;
+
+    vec3 objectColor;  // for wireframe/debug modes
+};
+
+// Texture samplers (not in UBOs)
 uniform sampler2D baseColorTex;
 uniform sampler2D normalTex;
 uniform sampler2D mrTex; // glTF convention: G=roughness, B=metallic
@@ -60,12 +75,6 @@ uniform sampler2D shadowMap;
 uniform samplerCube irradianceMap;
 uniform samplerCube prefilterMap;
 uniform sampler2D brdfLUT;
-uniform float iblIntensity;
-
-// Post-processing uniforms
-uniform float exposure;
-uniform float gamma;
-uniform int toneMappingMode; // 0=Linear, 1=Reinhard, 2=Filmic, 3=ACES
 
 // Shadow
 float calculateShadow(vec4 fragPosLightSpace) {

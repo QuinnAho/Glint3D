@@ -2,6 +2,10 @@
 #include "shader.h"
 #include "stb_image.h"
 #include <iostream>
+#include <glint3d/rhi.h>
+
+// Static RHI instance for uniform bridging
+glint3d::RHI* Skybox::s_rhi = nullptr;
 
 namespace {
     // Skybox cube vertices (positions only)
@@ -228,18 +232,22 @@ void Skybox::render(const glm::mat4& view, const glm::mat4& projection)
     glDepthFunc(GL_LEQUAL);
     
     m_shader->use();
-    m_shader->setMat4("view", skyboxView);
-    m_shader->setMat4("projection", projection);
-    m_shader->setBool("useGradient", m_useGradient);
-    m_shader->setVec3("topColor", m_topColor);
-    m_shader->setVec3("bottomColor", m_bottomColor);
-    m_shader->setVec3("horizonColor", m_horizonColor);
-    m_shader->setFloat("intensity", m_intensity);
-    
+
+    // Route uniforms through RHI only (no direct shader calls)
+    if (s_rhi) {
+        s_rhi->setUniformMat4("view", skyboxView);
+        s_rhi->setUniformMat4("projection", projection);
+        s_rhi->setUniformBool("useGradient", m_useGradient);
+        s_rhi->setUniformVec3("topColor", m_topColor);
+        s_rhi->setUniformVec3("bottomColor", m_bottomColor);
+        s_rhi->setUniformVec3("horizonColor", m_horizonColor);
+        s_rhi->setUniformFloat("intensity", m_intensity);
+        s_rhi->setUniformInt("skybox", 0);
+    }
+
     // Bind cubemap
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemapTexture);
-    m_shader->setInt("skybox", 0);
     
     glBindVertexArray(m_VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -279,4 +287,9 @@ void Skybox::setEnvironmentMap(GLuint envMap)
         m_useGradient = false; // Disable gradient mode when using external environment
         m_enabled = true; // Enable skybox when environment map is set
     }
+}
+
+void Skybox::setRHI(glint3d::RHI* rhi)
+{
+    s_rhi = rhi;
 }

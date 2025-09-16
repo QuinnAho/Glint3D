@@ -7,6 +7,7 @@
 #include <vector>
 
 class Shader;
+namespace glint3d { class RHI; }
 
 class Skybox {
 public:
@@ -39,7 +40,12 @@ public:
     // Cleanup
     void cleanup();
 
+    // Set RHI instance for uniform management
+    static void setRHI(glint3d::RHI* rhi);
+
 private:
+    // Static RHI instance for uniform bridging
+    static glint3d::RHI* s_rhi;
     GLuint m_VAO;
     GLuint m_VBO;
     GLuint m_cubemapTexture;

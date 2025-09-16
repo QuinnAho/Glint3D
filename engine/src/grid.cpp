@@ -3,6 +3,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <glint3d/rhi.h>
+
+// Static RHI instance for uniform bridging
+glint3d::RHI* Grid::s_rhi = nullptr;
 
 Grid::Grid() : m_VAO(0), m_VBO(0), m_shader(nullptr), m_lineCount(200) {}
 
@@ -54,11 +58,14 @@ void Grid::render(const glm::mat4& view, const glm::mat4& projection)
     m_shader->use();
 
     glm::mat4 model = glm::mat4(1.0f);
-    m_shader->setMat4("model", model);
-    m_shader->setMat4("view", view);
-    m_shader->setMat4("projection", projection);
 
-    m_shader->setVec3("gridColor", Colors::LightGray);
+    // Route uniforms through RHI only (no direct shader calls)
+    if (s_rhi) {
+        s_rhi->setUniformMat4("model", model);
+        s_rhi->setUniformMat4("view", view);
+        s_rhi->setUniformMat4("projection", projection);
+        s_rhi->setUniformVec3("gridColor", Colors::LightGray);
+    }
 
     glBindVertexArray(m_VAO);
     glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_lineVertices.size()));
@@ -71,4 +78,9 @@ void Grid::cleanup()
     glDeleteBuffers(1, &m_VBO);
     m_VAO = 0;
     m_VBO = 0;
+}
+
+void Grid::setRHI(glint3d::RHI* rhi)
+{
+    s_rhi = rhi;
 }

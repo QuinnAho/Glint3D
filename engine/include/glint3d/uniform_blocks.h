@@ -61,10 +61,34 @@ struct MaterialBlock {
     glm::vec3 attenuationColor; // tint for attenuation
     float clearcoat;        // [0,1]
     float clearcoatRoughness; // [0,1]
+
+    // Texture flags (bools packed as ints for std140)
+    int hasBaseColorMap;    // bool
+    int hasNormalMap;       // bool
+    int hasMRMap;           // bool
+    int hasTangents;        // bool
+    int useTexture;         // bool for legacy paths
     float _padding2[3];     // std140 alignment padding
 
     static constexpr const char* BLOCK_NAME = "MaterialBlock";
     static constexpr uint32_t BINDING_POINT = 2;
+};
+
+// Rendering state and post-processing parameters
+struct RenderingBlock {
+    float exposure;
+    float gamma;
+    int toneMappingMode;
+    int shadingMode;
+
+    float iblIntensity;
+    float _padding1[3];     // vec4 alignment
+
+    glm::vec3 objectColor;  // for wireframe/debug modes
+    float _padding2;        // vec4 alignment
+
+    static constexpr const char* BLOCK_NAME = "RenderingBlock";
+    static constexpr uint32_t BINDING_POINT = 3;
 };
 
 /**

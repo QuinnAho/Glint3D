@@ -6,6 +6,8 @@
 #include "shader.h"
 #include "colors.h"
 
+namespace glint3d { class RHI; }
+
 class Grid {
 public:
     Grid();
@@ -20,7 +22,12 @@ public:
     // Cleanup OpenGL resources
     void cleanup();
 
+    // Set RHI instance for uniform management
+    static void setRHI(glint3d::RHI* rhi);
+
 private:
+    // Static RHI instance for uniform bridging
+    static glint3d::RHI* s_rhi;
     GLuint m_VAO, m_VBO;
     Shader* m_shader;
     int m_lineCount;

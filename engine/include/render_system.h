@@ -258,16 +258,20 @@ private:
     UniformAllocation m_transformBlock = {};
     UniformAllocation m_lightingBlock = {};
     UniformAllocation m_materialBlock = {};
+    UniformAllocation m_renderingBlock = {};
 
     // Cached uniform block data
     TransformBlock m_transformData = {};
     LightingBlock m_lightingData = {};
     MaterialBlock m_materialData = {};
+    RenderingBlock m_renderingData = {};
 
     // UBO helper methods
     void updateTransformUniforms();
     void updateLightingUniforms(const Light& lights);
     void updateMaterialUniforms();
+    void updateMaterialUniformsForObject(const SceneObject& obj); // Update material UBO for specific object
+    void updateRenderingUniforms(); // Update rendering state (exposure, gamma, etc.)
     void bindUniformBlocks(); // Bind all UBOs to their binding points
 
     // Shaders
