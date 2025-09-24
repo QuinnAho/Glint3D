@@ -1,0 +1,9 @@
+# Acceleration Structures
+# Files to move here:
+# - bvh_node.cpp (99 lines) - Bounding Volume Hierarchy construction
+# - triangle.cpp (0 lines) - Triangle primitive intersection
+#
+# Future acceleration structures:
+# - octree.cpp - Spatial octree for large scenes
+# - kdtree.cpp - K-dimensional tree for ray traversal
+# - gpu_bvh.cpp - GPU-accelerated BVH for compute shaders

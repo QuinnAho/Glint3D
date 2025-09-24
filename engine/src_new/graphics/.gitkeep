@@ -1,0 +1,4 @@
+# Graphics Utilities and Components
+# Files to move here:
+# - camera_controller.cpp (338 lines) - Camera system management
+# - shader.cpp (223 lines) - Shader compilation and management

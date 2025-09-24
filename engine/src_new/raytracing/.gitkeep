@@ -1,0 +1,4 @@
+# Ray Tracing Implementation
+# Files to move here:
+# - raytracer.cpp (329 lines) - Main raytracer implementation
+# - raytracer_lighting.cpp (194 lines) - Ray tracing lighting calculations

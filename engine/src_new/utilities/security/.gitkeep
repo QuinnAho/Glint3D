@@ -1,0 +1,9 @@
+# Security Utilities
+# Files to move here:
+# - path_security.cpp (155 lines) - Path traversal validation
+# - path_utils.cpp (53 lines) - Safe path operations
+#
+# Future security features:
+# - input_validation.cpp - Input sanitization
+# - resource_limits.cpp - Resource usage limits
+# - sandbox.cpp - Process sandboxing utilities

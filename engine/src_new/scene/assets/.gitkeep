@@ -1,0 +1,5 @@
+# Asset Loading and Management
+# Files to move here:
+# - importer_registry.cpp (23 lines) - Importer coordination
+# - objloader.cpp (246 lines) - Legacy OBJ loader
+# - mesh_loader.cpp (19 lines) - Mesh utilities

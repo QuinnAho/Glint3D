@@ -1,0 +1,9 @@
+# Ray Tracing Material Models
+# Files to move here:
+# - brdf.cpp (86 lines) - BRDF evaluation functions
+# - refraction.cpp (64 lines) - Refraction and transmission calculations
+#
+# Future material models:
+# - subsurface_scattering.cpp - SSS for skin, wax, etc.
+# - volume_scattering.cpp - Participating media rendering
+# - clearcoat.cpp - Automotive clear coat shading

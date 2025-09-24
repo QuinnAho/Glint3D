@@ -1,0 +1,10 @@
+# UI and External Interfaces
+# Files to move here:
+# - ui_bridge.cpp (1,190 lines) - UI coordination layer [LARGE FILE - NEEDS REFACTORING]
+# - json_ops.cpp (790 lines) - JSON operations API [LARGE FILE]
+# - schema_validator.cpp (416 lines) - JSON schema validation
+#
+# Future interface components:
+# - command_dispatcher.cpp - Command pattern implementation
+# - event_system.cpp - Event-driven architecture
+# - plugin_interface.cpp - Plugin system for extensibility

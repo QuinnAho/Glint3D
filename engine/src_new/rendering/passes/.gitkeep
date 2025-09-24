@@ -1,0 +1,9 @@
+# Render Pass Implementations
+# Files to move here:
+# - render/ssr_pass.cpp (40 lines) - Screen-space reflection pass
+#
+# Future render passes:
+# - gbuffer_pass.cpp - G-buffer generation
+# - lighting_pass.cpp - Deferred lighting
+# - postprocess_pass.cpp - Post-processing effects
+# - shadow_pass.cpp - Shadow mapping

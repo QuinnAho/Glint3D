@@ -1,0 +1,5 @@
+# Core Rendering Engine
+# Files to move here:
+# - render_system.cpp (2,298 lines) - Main render coordinator [NEEDS REFACTORING]
+# - render_pass.cpp (570 lines) - Pass-based rendering framework
+# - render_mode_selector.cpp (408 lines) - Pipeline selection logic

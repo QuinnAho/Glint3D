@@ -1,0 +1,9 @@
+# Render Hardware Interface (RHI)
+# Files to move here:
+# - rhi/rhi.cpp (25 lines) - Interface implementation
+# - rhi/rhi_gl.cpp (1,356 lines) - OpenGL backend [NEEDS REFACTORING]
+# - rhi/rhi_null.cpp (5 lines) - Null backend for testing
+#
+# Future RHI backends:
+# - rhi_webgpu.cpp - WebGPU backend
+# - rhi_vulkan.cpp - Vulkan backend

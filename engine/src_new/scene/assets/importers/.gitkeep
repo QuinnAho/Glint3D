@@ -1,0 +1,9 @@
+# Asset Format Importers
+# Files to move here:
+# - importers/assimp_importer.cpp (57 lines) - Assimp plugin loader
+# - importers/obj_importer.cpp (52 lines) - Modern OBJ loader
+#
+# Future importers:
+# - gltf_importer.cpp - glTF 2.0 support
+# - fbx_importer.cpp - FBX format support
+# - blend_importer.cpp - Blender file support

@@ -1,0 +1,10 @@
+# UI Rendering Components
+# Files to move here:
+# - gizmo.cpp (165 lines) - 3D manipulation gizmos
+# - grid.cpp (86 lines) - Grid rendering for viewport
+# - axisrenderer.cpp (78 lines) - Axis visualization
+#
+# Future UI elements:
+# - bounds_renderer.cpp - Bounding box visualization
+# - debug_text.cpp - Debug text overlay
+# - wireframe_renderer.cpp - Wireframe mode rendering

@@ -1,0 +1,4 @@
+# Cross-cutting Utilities
+# Files to move here:
+# - assimp_loader.cpp (174 lines) - Legacy Assimp wrapper
+# - glad.c - OpenGL function loader (generated)

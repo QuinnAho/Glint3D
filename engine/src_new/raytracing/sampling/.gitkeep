@@ -1,0 +1,9 @@
+# Monte Carlo Sampling
+# Files to move here:
+# - microfacet_sampling.cpp (105 lines) - BRDF importance sampling
+# - ray_utils.cpp (44 lines) - Ray generation and utilities
+#
+# Future sampling techniques:
+# - cosine_sampling.cpp - Cosine-weighted hemisphere sampling
+# - light_sampling.cpp - Direct light sampling techniques
+# - environment_sampling.cpp - HDR environment importance sampling

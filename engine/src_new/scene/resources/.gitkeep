@@ -1,0 +1,9 @@
+# Resource Management
+# Files to move here:
+# - texture.cpp (142 lines) - Texture loading and management
+# - texture_cache.cpp (73 lines) - Texture caching system
+#
+# Future resource managers:
+# - mesh_cache.cpp - Geometry caching
+# - material_cache.cpp - Material instance management
+# - animation_cache.cpp - Animation data caching

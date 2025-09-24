@@ -1,0 +1,4 @@
+# Scene Graph and Asset Management
+# Files to move here:
+# - scene_manager.cpp (680 lines) - Scene graph management
+# - material_core.cpp (162 lines) - Unified material system

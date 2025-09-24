@@ -1,0 +1,8 @@
+# Lighting System
+# Files to move here:
+# - light.cpp (509 lines) - Light management and rendering
+#
+# Future lighting components:
+# - shadow_mapping.cpp - Shadow map generation
+# - light_culling.cpp - Light culling for tiled rendering
+# - volumetric_lighting.cpp - Volumetric fog effects

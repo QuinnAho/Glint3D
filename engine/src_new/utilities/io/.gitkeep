@@ -1,0 +1,9 @@
+# I/O Operations
+# Files to move here:
+# - image_io.cpp (120 lines) - Image loading and saving
+# - file_dialog.cpp (227 lines) - File system dialogs
+#
+# Future I/O utilities:
+# - async_loader.cpp - Asynchronous file loading
+# - compression.cpp - File compression utilities
+# - streaming.cpp - Streaming I/O for large assets

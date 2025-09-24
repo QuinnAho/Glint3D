@@ -1,0 +1,9 @@
+# Environment Rendering
+# Files to move here:
+# - skybox.cpp (294 lines) - Skybox rendering system
+# - ibl_system.cpp (738 lines) - Image-based lighting [LARGE FILE]
+#
+# Future environment features:
+# - atmosphere_scattering.cpp - Atmospheric effects
+# - cloud_rendering.cpp - Volumetric cloud system
+# - weather_effects.cpp - Rain, snow, fog effects

@@ -1,0 +1,11 @@
+# System Managers
+# Files currently here:
+# - camera_manager.cpp (54 lines) - Camera state management
+#
+# Planned manager extractions:
+# - lighting_manager.cpp - Light management and uniforms
+# - material_manager.cpp - Material state and uniforms
+# - shader_manager.cpp - Shader compilation and caching
+# - pipeline_manager.cpp - RHI pipeline management
+# - render_graph_manager.cpp - Render graph coordination
+# - debug_manager.cpp - Debug rendering coordination

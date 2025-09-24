@@ -1,0 +1,6 @@
+# Core Application Framework
+# Files to move here:
+# - application_core.cpp (770 lines) - App lifecycle management
+# - cli_parser.cpp (485 lines) - Command line interface parsing
+# - clock.cpp (16 lines) - Timing utilities
+# - render_settings.cpp (30 lines) - Render configuration
