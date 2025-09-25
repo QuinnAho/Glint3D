@@ -8,37 +8,37 @@
 
 using namespace glint3d;
 
-RenderModeSelector::RenderModeSelector() = default;
+RenderPipelineModeSelector::RenderPipelineModeSelector() = default;
 
-RenderMode RenderModeSelector::selectMode(const SceneManager& scene, const RenderConfig& config) {
+RenderPipelineMode RenderPipelineModeSelector::selectMode(const SceneManager& scene, const RenderConfig& config) {
     // Analyze the scene first
     m_lastAnalysis = analyzeScene(scene);
     
     // If mode is explicitly set, respect it
-    if (config.mode != RenderMode::Auto) {
+    if (config.mode != RenderPipelineMode::Auto) {
         updateSelectionReason(config.mode, m_lastAnalysis, config);
         return config.mode;
     }
     
     // Auto mode logic
-    RenderMode selected = RenderMode::Raster; // Default to faster option
+    RenderPipelineMode selected = RenderPipelineMode::Raster; // Default to faster option
     
     // Check if ray tracing is beneficial
     if (needsRayTracing(m_lastAnalysis, config)) {
         // Check if we can afford ray tracing
         if (canAffordRayTracing(m_lastAnalysis, config)) {
-            selected = RenderMode::Ray;
+            selected = RenderPipelineMode::Ray;
         } else {
             // Fall back to raster with SSR
-            selected = RenderMode::Raster;
+            selected = RenderPipelineMode::Raster;
         }
     }
     
     // Override for preview mode - prefer speed
-    if (config.isPreview && selected == RenderMode::Ray) {
+    if (config.isPreview && selected == RenderPipelineMode::Ray) {
         float rayTime = estimateRayTracingTime(m_lastAnalysis);
         if (rayTime > 5.0f) { // More than 5 seconds for preview
-            selected = RenderMode::Raster;
+            selected = RenderPipelineMode::Raster;
         }
     }
     
@@ -46,19 +46,19 @@ RenderMode RenderModeSelector::selectMode(const SceneManager& scene, const Rende
     return selected;
 }
 
-RenderMode RenderModeSelector::selectMode(const std::vector<MaterialCore>& materials, const RenderConfig& config) {
+RenderPipelineMode RenderPipelineModeSelector::selectMode(const std::vector<MaterialCore>& materials, const RenderConfig& config) {
     m_lastAnalysis = analyzeMaterials(materials);
     
-    if (config.mode != RenderMode::Auto) {
+    if (config.mode != RenderPipelineMode::Auto) {
         updateSelectionReason(config.mode, m_lastAnalysis, config);
         return config.mode;
     }
     
-    RenderMode selected = RenderMode::Raster;
+    RenderPipelineMode selected = RenderPipelineMode::Raster;
     
     if (needsRayTracing(m_lastAnalysis, config)) {
         if (canAffordRayTracing(m_lastAnalysis, config)) {
-            selected = RenderMode::Ray;
+            selected = RenderPipelineMode::Ray;
         }
     }
     
@@ -66,7 +66,7 @@ RenderMode RenderModeSelector::selectMode(const std::vector<MaterialCore>& mater
     return selected;
 }
 
-SceneAnalysis RenderModeSelector::analyzeScene(const SceneManager& scene) const {
+SceneAnalysis RenderPipelineModeSelector::analyzeScene(const SceneManager& scene) const {
     SceneAnalysis analysis;
     
     // TODO: Integrate with actual SceneManager API
@@ -91,7 +91,7 @@ SceneAnalysis RenderModeSelector::analyzeScene(const SceneManager& scene) const 
     return analysis;
 }
 
-SceneAnalysis RenderModeSelector::analyzeMaterials(const std::vector<MaterialCore>& materials) const {
+SceneAnalysis RenderPipelineModeSelector::analyzeMaterials(const std::vector<MaterialCore>& materials) const {
     SceneAnalysis analysis;
     analysis.materialCount = static_cast<int>(materials.size());
     
@@ -146,7 +146,7 @@ SceneAnalysis RenderModeSelector::analyzeMaterials(const std::vector<MaterialCor
     return analysis;
 }
 
-bool RenderModeSelector::needsRayTracing(const SceneAnalysis& analysis, const RenderConfig& config) const {
+bool RenderPipelineModeSelector::needsRayTracing(const SceneAnalysis& analysis, const RenderConfig& config) const {
     // Strong indicators for ray tracing
     if (hasSignificantRefraction(analysis)) {
         return true;
@@ -164,7 +164,7 @@ bool RenderModeSelector::needsRayTracing(const SceneAnalysis& analysis, const Re
     return false;
 }
 
-bool RenderModeSelector::canAffordRayTracing(const SceneAnalysis& analysis, const RenderConfig& config) const {
+bool RenderPipelineModeSelector::canAffordRayTracing(const SceneAnalysis& analysis, const RenderConfig& config) const {
     if (isRealTimeConstrained(config)) {
         return false;
     }
@@ -184,7 +184,7 @@ bool RenderModeSelector::canAffordRayTracing(const SceneAnalysis& analysis, cons
     return true;
 }
 
-float RenderModeSelector::estimateRayTracingTime(const SceneAnalysis& analysis) const {
+float RenderPipelineModeSelector::estimateRayTracingTime(const SceneAnalysis& analysis) const {
     float baseTime = 1.0f; // Base time in seconds
     
     // Scale by geometry complexity
@@ -208,7 +208,7 @@ float RenderModeSelector::estimateRayTracingTime(const SceneAnalysis& analysis) 
     return baseTime * geometryFactor * materialFactor * hardwareFactor;
 }
 
-float RenderModeSelector::estimateRasterTime(const SceneAnalysis& analysis) const {
+float RenderPipelineModeSelector::estimateRasterTime(const SceneAnalysis& analysis) const {
     // Rasterization is generally much faster and more predictable
     float baseTime = 0.016f; // 60 FPS baseline
     
@@ -218,28 +218,28 @@ float RenderModeSelector::estimateRasterTime(const SceneAnalysis& analysis) cons
     return baseTime * geometryFactor * materialFactor;
 }
 
-bool RenderModeSelector::hasSignificantRefraction(const SceneAnalysis& analysis) const {
+bool RenderPipelineModeSelector::hasSignificantRefraction(const SceneAnalysis& analysis) const {
     return analysis.hasRefractiveGlass && 
            analysis.materials.refractiveCount > 0 && 
            analysis.materials.avgTransmission > 0.5f;
 }
 
-bool RenderModeSelector::hasComplexVolumetrics(const SceneAnalysis& analysis) const {
+bool RenderPipelineModeSelector::hasComplexVolumetrics(const SceneAnalysis& analysis) const {
     return analysis.hasVolumetricEffects && 
            analysis.materials.refractiveCount > 2;
 }
 
-bool RenderModeSelector::isRealTimeConstrained(const RenderConfig& config) const {
+bool RenderPipelineModeSelector::isRealTimeConstrained(const RenderConfig& config) const {
     return config.forceRealtime || config.isPreview;
 }
 
-void RenderModeSelector::updateSelectionReason(RenderMode selected, const SceneAnalysis& analysis, const RenderConfig& config) {
+void RenderPipelineModeSelector::updateSelectionReason(RenderPipelineMode selected, const SceneAnalysis& analysis, const RenderConfig& config) {
     std::ostringstream reason;
     
     switch (selected) {
-        case RenderMode::Raster:
+        case RenderPipelineMode::Raster:
             reason << "Rasterization selected: ";
-            if (config.mode == RenderMode::Raster) {
+            if (config.mode == RenderPipelineMode::Raster) {
                 reason << "explicitly requested";
             } else if (config.forceRealtime) {
                 reason << "real-time constraint";
@@ -250,9 +250,9 @@ void RenderModeSelector::updateSelectionReason(RenderMode selected, const SceneA
             }
             break;
             
-        case RenderMode::Ray:
+        case RenderPipelineMode::Ray:
             reason << "Ray tracing selected: ";
-            if (config.mode == RenderMode::Ray) {
+            if (config.mode == RenderPipelineMode::Ray) {
                 reason << "explicitly requested";
             } else if (hasSignificantRefraction(analysis)) {
                 reason << "significant refraction effects (" << analysis.materials.refractiveCount << " refractive materials)";
@@ -263,7 +263,7 @@ void RenderModeSelector::updateSelectionReason(RenderMode selected, const SceneA
             }
             break;
             
-        case RenderMode::Auto:
+        case RenderPipelineMode::Auto:
             reason << "Auto mode (this shouldn't happen)";
             break;
     }
@@ -274,26 +274,29 @@ void RenderModeSelector::updateSelectionReason(RenderMode selected, const SceneA
 // PipelineBuilder implementation
 std::unique_ptr<RenderGraph> PipelineBuilder::createRasterPipeline(RHI* rhi) {
     auto graph = std::make_unique<RenderGraph>(rhi);
-    
-    // Raster pipeline: GBuffer → Lighting → SSR → Post → Readback
-    graph->addPass(std::make_unique<GBufferPass>());
-    graph->addPass(std::make_unique<LightingPass>());
-    graph->addPass(std::make_unique<SSRRefractionPass>());
-    graph->addPass(std::make_unique<PostPass>());
+
+    // Raster pipeline: frame setup -> raster -> overlays -> resolve -> readback/present
+    graph->addPass(std::make_unique<FrameSetupPass>());
+    graph->addPass(std::make_unique<RasterPass>());
+    graph->addPass(std::make_unique<OverlayPass>());
+    graph->addPass(std::make_unique<ResolvePass>());
     graph->addPass(std::make_unique<ReadbackPass>());
-    
+    graph->addPass(std::make_unique<PresentPass>());
+
     return graph;
 }
 
 std::unique_ptr<RenderGraph> PipelineBuilder::createRayPipeline(RHI* rhi) {
     auto graph = std::make_unique<RenderGraph>(rhi);
-    
-    // Ray pipeline: Integrator → Denoise → Tonemap → Readback
-    graph->addPass(std::make_unique<IntegratorPass>());
-    graph->addPass(std::make_unique<DenoisePass>());
-    graph->addPass(std::make_unique<TonemapPass>());
+
+    // Ray pipeline: frame setup -> ray integrate -> denoise -> resolve -> readback/present
+    graph->addPass(std::make_unique<FrameSetupPass>());
+    graph->addPass(std::make_unique<RaytracePass>());
+    graph->addPass(std::make_unique<RayDenoisePass>());
+    graph->addPass(std::make_unique<ResolvePass>());
     graph->addPass(std::make_unique<ReadbackPass>());
-    
+    graph->addPass(std::make_unique<PresentPass>());
+
     return graph;
 }
 
@@ -305,26 +308,26 @@ std::unique_ptr<RenderGraph> PipelineBuilder::createHybridPipeline(RHI* rhi) {
 
 void PipelineBuilder::configureForPreview(RenderGraph* graph) {
     // Reduce quality for faster preview
-    if (auto* integrator = dynamic_cast<IntegratorPass*>(graph->getPass("IntegratorPass"))) {
+    if (auto* integrator = dynamic_cast<RaytracePass*>(graph->getPass("RaytracePass"))) {
         integrator->setSampleCount(4); // Very low sample count
         integrator->setMaxDepth(3);    // Shallow rays
     }
     
     // Disable expensive passes
-    if (auto* denoise = graph->getPass("DenoisePass")) {
+    if (auto* denoise = graph->getPass("RayDenoisePass")) {
         denoise->setEnabled(false);
     }
 }
 
 void PipelineBuilder::configureForFinalQuality(RenderGraph* graph) {
     // Maximum quality settings
-    if (auto* integrator = dynamic_cast<IntegratorPass*>(graph->getPass("IntegratorPass"))) {
+    if (auto* integrator = dynamic_cast<RaytracePass*>(graph->getPass("RaytracePass"))) {
         integrator->setSampleCount(64); // High sample count
         integrator->setMaxDepth(8);     // Deep rays
     }
     
     // Enable all quality passes
-    if (auto* denoise = graph->getPass("DenoisePass")) {
+    if (auto* denoise = graph->getPass("RayDenoisePass")) {
         denoise->setEnabled(true);
     }
 }
@@ -333,36 +336,36 @@ void PipelineBuilder::configureForRealTime(RenderGraph* graph) {
     // Real-time optimizations
     configureForPreview(graph); // Similar to preview but more aggressive
     
-    if (auto* integrator = dynamic_cast<IntegratorPass*>(graph->getPass("IntegratorPass"))) {
+    if (auto* integrator = dynamic_cast<RaytracePass*>(graph->getPass("RaytracePass"))) {
         integrator->setSampleCount(1); // Single sample for real-time
         integrator->setMaxDepth(2);    // Minimal bounces
     }
 }
 
 // Utility functions
-namespace RenderModeUtils {
+namespace RenderPipelineModeUtils {
     
-RenderMode parseRenderMode(const std::string& modeStr) {
+RenderPipelineMode parseRenderPipelineMode(const std::string& modeStr) {
     std::string lower = modeStr;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
     if (lower == "raster" || lower == "rasterize" || lower == "opengl") {
-        return RenderMode::Raster;
+        return RenderPipelineMode::Raster;
     } else if (lower == "ray" || lower == "raytrace" || lower == "raytracing") {
-        return RenderMode::Ray;
+        return RenderPipelineMode::Ray;
     } else if (lower == "auto" || lower == "automatic") {
-        return RenderMode::Auto;
+        return RenderPipelineMode::Auto;
     } else {
-        std::cerr << "[RenderModeUtils] Unknown render mode: " << modeStr << ", defaulting to Auto\n";
-        return RenderMode::Auto;
+        std::cerr << "[RenderPipelineModeUtils] Unknown render mode: " << modeStr << ", defaulting to Auto\n";
+        return RenderPipelineMode::Auto;
     }
 }
 
-std::string renderModeToString(RenderMode mode) {
+std::string renderModeToString(RenderPipelineMode mode) {
     switch (mode) {
-        case RenderMode::Raster: return "raster";
-        case RenderMode::Ray: return "ray";
-        case RenderMode::Auto: return "auto";
+        case RenderPipelineMode::Raster: return "raster";
+        case RenderPipelineMode::Ray: return "ray";
+        case RenderPipelineMode::Auto: return "auto";
         default: return "unknown";
     }
 }
@@ -400,4 +403,6 @@ std::string getModeDescriptions() {
            "  - Good for: General use, when unsure which mode to use";
 }
 
-} // namespace RenderModeUtils
+} // namespace RenderPipelineModeUtils
+
+

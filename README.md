@@ -113,9 +113,9 @@ Docs: `docs/json_ops_v1.md` (schema in `schemas/json_ops_v1.json`).
 - **Headless rendering + CLI** for CI/CD, bulk jobs, and dataset generation  
 - **AI-supported**: external AI agents can issue Ops, request batches, or validate outputs  
 - **Cross-platform parity**: same engine on **desktop + web**, no GPU installs required  
-- **Two rendering paths**:  
+- **Unified render graph**:  
   - **Raster (real-time)** with modern PBR (Cook–Torrance), gizmos, and SSR transparency  
-  - **CPU raytracer** with BVH acceleration and optional denoising  
+  - Configurable for **CPU raytracing** passes (BVH, optional denoise)  
 - **Shareable states**: export Ops, scene JSON, and deep links  
 - **Diagnostics tools**: *“Why is it black?”* checks, performance HUD, actionable tips  
 
@@ -177,9 +177,11 @@ Options:
 
 ## Build Notes
 
-- Toolchain: Visual Studio 2022, C++17, x64  
-- Third-party: GLFW, ImGui, stb, GLM  
-- Optional: Assimp (multi-format import), libktx (KTX2 textures)  
+- **Toolchain**: Visual Studio 2022, C++17, x64
+- **Dependencies**: GLFW, ImGui, stb, GLM (automatically managed via vcpkg)
+- **Optional**: Assimp (multi-format import), libktx (KTX2 textures)
+- **DLL Management**: Automatic DLL copying for Windows builds - see [docs/dll-management.md](docs/dll-management.md)
+- **Build System**: CMake with vcpkg integration for dependency management
 
 ---
 

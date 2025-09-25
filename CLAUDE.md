@@ -18,12 +18,29 @@ cmake --build builds/desktop/cmake -j
 # 3. Or open builds/desktop/cmake/glint.vcxproj directly
 # 4. Build Configuration: Release|x64 or Debug|x64
 # 5. Run from repo root so engine/shaders/ and assets/ paths resolve
-# 
+#
 # Note: Legacy engine/Project1.vcxproj has been removed.
 # Always use CMake-generated project files to ensure consistency.
+
+# Convenient build scripts
+./build-and-run.bat                    # Windows: Debug build + launch UI
+./build-and-run.bat release            # Windows: Release build + launch UI
+chmod +x build-and-run.sh && ./build-and-run.sh  # Cross-platform equivalent
 ```
 
-### Building (Web/Emscripten)  
+### Dependencies
+**Core Requirements:**
+- CMake 3.15+, C++17 compiler, OpenGL 3.3+
+
+**Windows (vcpkg recommended):**
+```bash
+git clone https://github.com/Microsoft/vcpkg.git
+cd vcpkg && .\bootstrap-vcpkg.bat && .\vcpkg integrate install
+.\vcpkg install glfw3:x64-windows assimp:x64-windows openimagedenoise:x64-windows
+cmake -S . -B builds/desktop/cmake -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake
+```
+
+### Building (Web/Emscripten)
 ```bash
 # Complete web build (engine + frontend)
 npm run web:build              # Builds WASM engine + React frontend
@@ -54,6 +71,8 @@ npm run dev          # Start development server
 npm run build:web    # Build production frontend only
 ```
 
+---
+
 ## Current Web UI Status (v0.3.0)
 
 ### Architecture
@@ -77,43 +96,6 @@ platforms/web/src/
 └── main.tsx               # React app entry point
 ```
 
-### Current Functionality ✅
-- **Scene Management**: Load/import models (.obj, .ply, .glb, .gltf, .fbx, .dae)
-- **Lighting System**: Add/select/delete lights, view light properties
-- **Object Operations**: Select, duplicate, remove, nudge transform
-- **Import/Export**: Model files, JSON scene files, scene export
-- **Rendering**: Headless PNG output with configurable dimensions
-- **Desktop Integration**: Tauri native file dialogs and file system access
-- **Real-time Updates**: Scene state synchronization every 1 second
-- **Theme Support**: Dark/light theme toggle with localStorage persistence
-- **Share Links**: URL-based scene state encoding for sharing
-
-### Engine Integration Status ✅
-- **WASM Build**: Successfully building to `builds/web/emscripten/glint.*`
-- **Asset Pipeline**: Automatic asset preloading via Emscripten
-- **API Bridge**: Complete JSON Ops v1 implementation
-- **File System**: Emscripten FS mounting for drag-and-drop and file import
-- **Memory Management**: Proper WASM module initialization and cleanup
-
-### Build Configuration ✅
-- **Vite**: Modern dev server on port 5173 with React plugin
-- **Tauri**: Desktop app configuration with 1280x800 default window
-- **Emscripten**: CMake build system generating web-compatible artifacts
-- **Asset Copying**: Engine build artifacts copied to `platforms/web/public/engine/`
-
-### Deployment Status
-- **Web**: Ready for static hosting (build outputs to `platforms/web/dist/`)
-- **Desktop**: Tauri bundle ready for cross-platform distribution
-- **CI/CD**: Engine builds automatically generate web artifacts
-- **Asset Management**: Engine assets (models, textures, shaders) properly bundled
-
-### Known Limitations & Future Work
-- **Performance**: Large model handling could benefit from streaming/LOD
-- **Networking**: No multi-user collaboration features yet
-- **Advanced Rendering**: Post-processing pipeline not exposed in web UI
-- **Mobile**: Touch controls and responsive design not optimized
-- **Accessibility**: Screen reader and keyboard navigation need improvement
-
 ### Environment Setup (Optional)
 For easier command-line usage, you can set up `glint` as a global command:
 
@@ -134,15 +116,9 @@ After setup, you can use `glint` from any directory instead of the full path:
 # Before setup
 ./builds/desktop/cmake/Release/glint.exe --ops examples/json-ops/sphere_basic.json --render output.png
 
-# After setup  
+# After setup
 glint --ops examples/json-ops/sphere_basic.json --render output.png
 ```
-
-The setup scripts:
-- Create a `glint` wrapper that automatically finds Release/Debug executables
-- Add the project root to your PATH environment variable
-- Ensure proper working directory for asset path resolution
-- Work from any directory while maintaining correct asset paths
 
 ### Running Examples
 ```bash
@@ -152,7 +128,7 @@ The setup scripts:
 # Release build
 ./builds/desktop/cmake/Release/glint.exe --ops examples/json-ops/directional-light-test.json --render output.png --w 256 --h 256
 
-# CLI with denoise (if OIDN available)  
+# CLI with denoise (if OIDN available)
 ./builds/desktop/cmake/Debug/glint.exe --ops examples/json-ops/studio-turntable.json --render output.png --denoise
 
 # Using global command (after environment setup)
@@ -166,6 +142,10 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 
 ### Highlights (v0.3.0 + RHI Updates)
 - **✅ RHI Modernization**: FEAT-0248 completed - WebGPU-shaped API with CommandEncoder, RenderPassEncoder, Queue, BindGroups. All uniform operations now route through RHI abstraction.
+- **✅ Unified Render System**: RenderSystem::renderUnified() uses RenderGraph with pass-based architecture. Raytracer integrated as RHI texture output.
+- **✅ MaterialCore Unification**: Single material system eliminates dual storage confusion. Legacy Material struct deprecated.
+- **✅ Intelligent Mode Selection**: --mode raster|ray|auto with automatic scene analysis via RenderPipelineModeSelector.
+- **✅ Pass-Based Architecture**: RasterGraph (GBuffer→Lighting→SSR→Post) vs RayGraph (Integrator→Denoise→Tonemap).
 - **Lights**: Point, Directional, and Spot supported end-to-end (engine, shaders, UI, JSON ops). Spot has inverse-square attenuation and smooth cone falloff.
 - **UI**: Add/select/delete lights; per-light enable, intensity; type-specific edits (position, direction, cones for spot). Directional and spot indicators are rendered in the viewport.
 - **JSON Ops**: `add_light` supports `type: point|directional|spot` with fields `position`, `direction`, and `inner_deg`/`outer_deg` for spot. Schema is in `schemas/json_ops_v1.json`.
@@ -176,7 +156,7 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 ### Core Application Structure
 - **Application class** (`application.h/cpp`): Main application lifecycle, OpenGL context, scene management
 - **SceneObject struct**: Represents loaded models with VAO/VBO data, materials, textures, and transform matrices
-- **Dual rendering paths**: OpenGL rasterization (desktop/web) + CPU raytracer with BVH acceleration
+- **Unified rendering system**: Pass-based architecture with intelligent mode selection between raster and ray pipelines
 - **Modular UI**: Desktop uses ImGui, Web uses React/Tailwind communicating via JSON Ops bridge
 
 ### Key Systems
@@ -187,10 +167,11 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 - **Assimp plugin** (`importers/assimp_importer.cpp`): glTF, FBX, DAE, PLY support (optional)
 - **Texture cache** (`texture_cache.h/cpp`): Shared texture management with KTX2/Basis optional support
 
-#### 2. Material System  
-- **PBR materials** (`pbr_material.h`): Modern PBR workflow (baseColor, metallic, roughness)
-- **Legacy materials** (`material.h/cpp`): Blinn-Phong for raytracer compatibility
-- **Automatic conversion**: PBR factors → Phong approximation for CPU raytracer
+#### 2. Unified Material System
+- **MaterialCore** (`engine/include/glint3d/material_core.h`): Single unified material representation
+- **PBR workflow**: baseColor, metallic, roughness, normal, emissive, transmission, IOR
+- **Legacy compatibility**: Automatic conversion helpers for raytracer Material API
+- **No dual storage**: Eliminates conversion overhead and material drift issues
 
 #### 3. JSON Ops v1 Bridge (`json_ops.cpp`)
 - **Cross-platform scripting**: Identical scene manipulation on desktop and web
@@ -198,454 +179,78 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 - **Web integration**: Emscripten exports for `app_apply_ops_json()`, `app_scene_to_json()`
 - **State sharing**: URL-based state encoding for shareable scenes
 
-#### 4. Dual Rendering Pipeline
-- **OpenGL rasterization**: PBR shaders, multiple render modes (point/wire/solid)
-- **CPU raytracer** (`raytracer.cpp`): BVH acceleration, material conversion, optional denoising (OIDN)
-- **Offscreen rendering** (`render_offscreen.cpp`): Headless PNG output for automation
-
-**⚠️ CRITICAL: Dual rendering architecture requires explicit mode selection for advanced materials**
+#### 4. Unified Rendering Pipeline
+- **RenderSystem::renderUnified()**: Pass-based rendering using RenderGraph architecture
+- **RasterGraph**: OpenGL rasterization with PBR shaders, SSR approximation
+- **RayGraph**: CPU ray tracing with BVH acceleration, physically accurate transmission
+- **RenderPipelineModeSelector**: Intelligent mode selection based on scene material analysis
+- **RHI Integration**: Both pipelines output to RHI textures for seamless composition
 
 #### 5. UI Architecture
 - **Desktop UI**: ImGui panels integrated directly into Application
-- **Web UI**: React/Tailwind app (`platforms/web/`) communicating via JSON Ops bridge  
+- **Web UI**: React/Tailwind app (`platforms/web/`) communicating via JSON Ops bridge
 - **UI abstraction**: `app_state.h` provides read-only state snapshot for UI layers
 - **Command pattern**: `app_commands.h` for UI → Application actions
 
-## Dual Rendering Architecture (IMPORTANT)
+## Unified Rendering Architecture (Current Implementation)
 
-Glint3D implements **two completely separate rendering pipelines** with different material capabilities. Understanding this is crucial for proper material setup and debugging.
+### Render Entry Point
+- **`RenderSystem::renderUnified(scene, lights)`** - Single entry for interactive and headless flows
+- Each frame builds a `PassContext` and executes a render graph with these passes:
+  1. `FrameSetupPass` - Viewport, camera, uniforms
+  2. `RasterPass` or `RaytracePass` - Main rendering (mode-dependent)
+  3. `RayDenoisePass` - AI denoising (ray mode only)
+  4. `OverlayPass` - Debug elements, gizmos
+  5. `ResolvePass` - MSAA resolve, tonemapping
+  6. `ReadbackPass` - Offscreen texture readback
+  7. `PresentPass` - Display presentation
 
-### Rendering Pipeline Comparison
+### Render Mode Selection
 
-| Feature | **Rasterized** (Default) | **Raytraced** (--raytrace) |
-|---------|-------------------------|----------------------------|
-| **Performance** | Real-time | Offline (30+ seconds) |
-| **Transparency** | Alpha blending only | ✅ Full refraction + TIR |
-| **Materials** | PBR + legacy Phong | Legacy Material struct only |
-| **IOR Usage** | F0 calculation only | ✅ Full Snell's law physics |
-| **Transmission** | ❌ **NOT SUPPORTED** | ✅ **FULL SUPPORT** |
-| **Fresnel Effects** | Basic at normal incidence | ✅ Angle-dependent mixing |
-| **Total Internal Reflection** | ❌ Not available | ✅ Automatic at critical angle |
-| **Shader System** | `pbr.frag`, `standard.frag` | CPU-based raytracing |
+#### Automatic Mode (`--mode auto`)
+The `RenderPipelineModeSelector` analyzes the scene and chooses the optimal pipeline:
 
-### Material Property Flow
+- **Raster Pipeline**: Fast OpenGL rendering for opaque materials and simple transparency
+- **Ray Pipeline**: CPU ray tracing for refractive glass, complex transmission, volumetric effects
 
+#### Selection Criteria
 ```cpp
-JSON Ops: { "ior": 1.5, "transmission": 0.9 }
-           ↓
-SceneObject dual storage:
-├── material.ior = 1.5          ← Used by RAYTRACER (Snell's law)
-├── material.transmission = 0.9  ← Used by RAYTRACER (opacity)  
-├── ior = 1.5                   ← Used by RASTERIZER (F0 only)
-└── baseColorFactor = color     ← Used by RASTERIZER (albedo)
-```
-
-### Shader Selection Logic (Rasterized Pipeline)
-
-```cpp
-// In RenderSystem::renderObjectsBatched()
-bool usePBR = (obj.baseColorTex || obj.mrTex || obj.normalTex);
-Shader* shader = usePBR && m_pbrShader ? m_pbrShader.get() : m_basicShader.get();
-```
-
-- **PBR Shader** (`pbr.vert/frag`): Has `uniform float ior` but **NO** `uniform float transmission`
-- **Basic Shader** (`standard.vert/frag`): Legacy Blinn-Phong only
-
-### Critical Usage Notes
-
-#### ❌ Common Mistake - Missing --raytrace Flag
-```bash
-# WRONG: Uses rasterizer (no refraction, looks like regular sphere)
-./glint.exe --ops glass-scene.json --render output.png
-
-# Output: Opaque sphere with basic lighting, no glass effects
-```
-
-#### ✅ Correct Usage for Glass Materials
-```bash
-# CORRECT: Uses raytracer (full refraction with Fresnel and TIR)
-./glint.exe --ops glass-scene.json --render output.png --raytrace
-
-# Output: Realistic glass with:
-# - Refraction based on IOR (Snell's law)
-# - Fresnel reflection/transmission mixing
-# - Total internal reflection at grazing angles
-# - Proper caustics and light bending
-```
-
-### Material System Architecture
-
-#### SceneObject Material Storage
-```cpp
-struct SceneObject {
-    // Legacy material (used by RAYTRACER)
-    Material material;
-    ├── float ior;              // 1.0-3.0 (air=1.0, glass=1.5, diamond=2.42)
-    ├── float transmission;     // 0.0-1.0 (0=opaque, 1=fully transparent) 
-    ├── glm::vec3 diffuse;      // Base color for lighting
-    ├── float roughness;        // Surface roughness for reflections
-    └── float metallic;         // Metallic vs dielectric
-    
-    // PBR fields (used by RASTERIZER)  
-    glm::vec4 baseColorFactor;  // sRGB color + alpha
-    float metallicFactor;       // 0.0-1.0
-    float roughnessFactor;      // 0.0-1.0
-    float ior;                  // For F0=(n1-n2)²/(n1+n2)² calculation only
-};
-```
-
-### Refraction Implementation Details
-
-#### Raytracer Features (refraction.cpp)
-- **Snell's Law**: `n₁sin(θ₁) = n₂sin(θ₂)` for accurate ray bending
-- **Total Internal Reflection**: Automatic detection when `sin(θ₂) > 1.0`
-- **Fresnel Equations**: Schlick's approximation for reflection/refraction mixing
-- **Media Transition**: Automatic entering/exiting material detection
-- **Ray Depth**: Supports multiple bounces for complex glass objects
-
-#### JSON Ops Material Assignment
-```json
-{
-  "op": "set_material",
-  "target": "GlassSphere", 
-  "material": {
-    "color": [0.95, 0.98, 1.0],
-    "roughness": 0.0,
-    "metallic": 0.0,
-    "ior": 1.5,           // Crown glass
-    "transmission": 0.9    // 90% transparent
-  }
+// In RenderPipelineModeSelector::selectMode()
+for (const auto& material : materials) {
+    if (material.transmission > 0.01f && material.ior > 1.05f) {
+        return RenderPipelineMode::Ray;  // Needs physically accurate refraction
+    }
 }
+return RenderPipelineMode::Raster;  // Use fast rasterization
 ```
 
-### Debugging Glass Materials
-
-#### 1. Verify Raytracer Activation
-Look for this debug output when using `--raytrace`:
-```
-[RenderSystem] Screen quad initialized for raytracing
-[RenderSystem] Raytracing texture initialized (512x512)
-[RenderSystem] Loading N objects into raytracer
-[DEBUG] Tracing row 0 of 512...
+#### Manual Override
+```bash
+# Force specific pipeline
+./glint --ops scene.json --render out.png --mode raster   # Fast, SSR approximation
+./glint --ops scene.json --render out.png --mode ray     # Slow, physically accurate
+./glint --ops scene.json --render out.png --mode auto    # Smart selection (default)
 ```
 
-#### 2. Check Material Loading
-Add debug output in `raytracer.cpp` if materials aren't loading correctly:
-```cpp
-std::cout << "[DEBUG] Material: ior=" << mat.ior 
-          << ", transmission=" << mat.transmission << std::endl;
-```
+### Render Modes & Config
+- **`raster`**: FrameSetup → Raster → Overlay → Resolve → Present
+- **`ray`**: FrameSetup → Raytrace → RayDenoise → Resolve → Present
+- **`auto`**: Heuristic choice between raster/ray based on scene analysis
+- **Offscreen** (`renderToTextureRHI`, `renderToPNG`): Same graph with `interactive=false`, enables `ReadbackPass`, disables overlays/MSAA
 
-#### 3. Common Material Values
-- **Water**: `ior: 1.33, transmission: 0.85`
-- **Crown Glass**: `ior: 1.5, transmission: 0.9`  
-- **Flint Glass**: `ior: 1.6, transmission: 0.9`
-- **Diamond**: `ior: 2.42, transmission: 0.95`
-- **Ice**: `ior: 1.31, transmission: 0.8`
-
-### Architecture Limitations
-
-#### Rasterized Pipeline Constraints
-- **No Screen-Space Refraction**: Would require depth buffer reconstruction
-- **No Multi-Layer Transparency**: Limited to single alpha blend pass
-- **No Caustics**: Requires light transport simulation
-- **Basic Fresnel**: Only F0 term, no angle-dependent effects
-
-#### Future Enhancements
-- **Hybrid Pipeline**: Auto-enable raytracing for transmission > 0
-- **Screen-Space Refraction**: Add to PBR shader for real-time glass
-- **Material Validation**: Warn when using transmission without raytracing
+### Key Implementation Files
+- **RenderSystem**: `engine/src/render_system.cpp:renderUnified()` - Main unified entry point
+- **RenderGraph**: `engine/include/render_pass.h` - Pass-based rendering framework
+- **RenderPass**: `engine/src/render_pass.cpp` - Pass implementations
+- **Mode Selection**: `engine/include/render_mode_selector.h` - Intelligent pipeline selection
+- **Material System**: `engine/include/glint3d/material_core.h` - Unified material representation
+- **RHI Layer**: `engine/include/glint3d/rhi.h` - Hardware abstraction interface
 
 ---
 
-## Rendering System Refactoring Plan
+## Directory Structure & File Organization
 
-**Status**: Architecture redesign planned for v0.4.0  
-**Goal**: Modern, flexible, AI-friendly renderer with unified materials and backend abstraction
-
-### Remaining System Areas for Enhancement
-- ✅ ~~**Dual Material Storage**: PBR + legacy causing conversion drift~~ **RESOLVED**
-- ✅ ~~**Backend Lock-in**: Direct OpenGL calls, hard to port to Vulkan/WebGPU~~ **RESOLVED**
-- **Pipeline Fragmentation**: Raster (no refraction) vs Ray (full physics)
-- **Manual Mode Selection**: Users must remember `--raytrace` for glass
-- **No Pass System**: Interleaved rendering logic, hard to extend
-
-### Current RHI Implementation Status ✅
-
-**Completed (FEAT-0248 + FEAT-0253 + Material System Unification)**:
-- **WebGPU-Shaped RHI API**: Full abstraction layer implemented (`engine/include/glint3d/rhi.h`)
-- **OpenGL Backend**: Complete implementation (`engine/src/rhi/rhi_gl.cpp`)
-- **Uniform System Migration**: All `glUniform*` calls now route through RHI
-- **MSAA Framebuffer Migration**: Main rendering pipeline uses RHI render targets
-- **Texture Integration**: Raytracer and core rendering use RHI texture handles
-- **Unified Material System**: MaterialCore eliminates dual material storage issues
-
-**Architecture Status**:
-```cpp
-// Current: Engine Core → RHI Interface → GL Backend
-RenderSystem::render() {
-    m_rhi->bindRenderTarget(m_msaaRenderTarget);  // ✅ RHI abstracted
-    m_rhi->clear(backgroundColor, depth, stencil); // ✅ RHI abstracted
-    m_rhi->resolveToDefaultFramebuffer(target);   // ✅ RHI abstracted
-}
-
-// Unified material system:
-void renderObject(const SceneObject& obj) {
-    const auto& mc = obj.materialCore;  // ✅ Single source of truth
-    m_rhi->setUniformVec3("material.diffuse", glm::vec3(mc.baseColor));
-    m_rhi->setUniformFloat("material.roughness", mc.roughness);
-    // Legacy dual storage eliminated - no more obj.material usage
-}
-
-// Migration achievements:
-// glUniform4f() → m_rhi->setUniformVec4()      // ✅ Migrated
-// glBindFramebuffer() → m_rhi->bindRenderTarget() // ✅ Migrated
-// glBlitFramebuffer() → m_rhi->resolveRenderTarget() // ✅ Migrated
-// obj.material + obj.materialCore → obj.materialCore only // ✅ Unified
-```
-
-**Backend Implementations**:
-- `RhiGL`: Desktop OpenGL 3.3+ (✅ Complete)
-- `RhiNull`: Testing/validation backend (✅ Complete)
-- `RhiVulkan`: Planned for v0.4.0
-- `RhiWebGPU`: Planned for web platform evolution
-
-**Remaining Legacy GL Usage** (non-critical):
-- PNG export functions still use hybrid RHI/GL approach (future work)
-- Some fallback paths for compatibility during transition
-- Engine core is now effectively backend-agnostic
-
-### Target Architecture
-
-#### **RHI (Render Hardware Interface)**
-```cpp
-// Thin abstraction for GPU operations
-class RHI {
-    virtual bool init(const RhiInit& desc) = 0;
-    virtual void beginFrame() = 0; 
-    virtual void draw(const DrawDesc& desc) = 0;
-    virtual void readback(const ReadbackDesc& desc) = 0;
-    virtual void endFrame() = 0;
-};
-
-// Implementations:
-// - RhiGL (desktop OpenGL)
-// - RhiWebGL2 (web)  
-// - RhiVulkan (future)
-// - RhiWebGPU (future)
-```
-
-#### **MaterialCore (Unified BSDF)** ✅ **IMPLEMENTED**
-```cpp
-struct MaterialCore {
-    glm::vec4 baseColor;           // sRGB + alpha
-    float metallic;                // 0=dielectric, 1=metal
-    float roughness;               // 0=mirror, 1=rough
-    float normalStrength;          // Normal map intensity
-    glm::vec3 emissive;           // Self-emission
-    float ior;                     // Index of refraction
-    float transmission;            // Transparency factor
-    float thickness;               // Volume thickness
-    float attenuationDistance;     // Beer-Lambert falloff
-    float clearcoat;               // Clear coat strength
-    float clearcoatRoughness;      // Clear coat roughness
-};
-// ✅ ACTIVE: Used by all rendering pipelines, eliminates dual storage
-// JSON ops → MaterialCore → Auto-convert to legacy APIs when needed
-```
-
-#### **RenderGraph (Minimal Pass System)**
-```cpp
-class RenderPass {
-    virtual void setup(const PassContext& ctx) = 0;
-    virtual void execute(const PassContext& ctx) = 0; 
-    virtual void teardown(const PassContext& ctx) = 0;
-};
-
-// Raster Pipeline:
-// GBufferPass → LightingPass → SSRRefractionPass → PostPass → ReadbackPass
-
-// Ray Pipeline:  
-// IntegratorPass → DenoisePass → TonemapPass → ReadbackPass
-```
-
-#### **Hybrid Auto Mode**
-```cpp
-enum class RenderMode { Raster, Ray, Auto };
-
-// Auto mode heuristics:
-bool needsRaytracing = false;
-for (const auto& material : scene.materials) {
-    if (material.transmission > 0.01f && 
-        (material.thickness > 0.0f || material.ior > 1.05f)) {
-        needsRaytracing = true;
-        break;
-    }
-}
-
-// CLI: --mode raster|ray|auto
-// Auto: raster for preview, ray for final quality
-```
-
-### Migration Tasks (20 Sequential Steps)
-
-#### **Phase 1: Foundation (Tasks 1-3)** ✅ **COMPLETED**
-1. ✅ **Define RHI Interface** - WebGPU-shaped API (`engine/include/glint3d/rhi.h`)
-2. ✅ **Implement RhiGL** - Desktop OpenGL backend (`engine/src/rhi/rhi_gl.cpp`)
-3. ✅ **Thread Raster Through RHI** - Uniforms + framebuffers migrated (FEAT-0248/0253)
-
-#### **Phase 2: Unified Materials (Tasks 4-5)**
-4. **Introduce MaterialCore** - Single material struct
-5. **Adapt Raytracer to MaterialCore** - Remove PBR→legacy conversion
-
-#### **Phase 3: Pass System (Tasks 6-7)**
-6. **Add Minimal RenderGraph** - Pass-based rendering
-7. **Wire Material Uniforms** - Prep shaders for transmission
-
-#### **Phase 4: Screen-Space Refraction (Tasks 8-9)**
-8. **Implement SSR-T** - Real-time refraction in raster pipeline
-9. **Roughness-Aware Blur** - Micro-roughness approximation
-
-#### **Phase 5: Hybrid Pipeline (Tasks 10-12)**
-10. **Auto Mode + CLI** - Intelligent pipeline selection
-11. **Align BSDF Models** - Consistent shading across pipelines
-12. **Clearcoat & Attenuation** - Advanced material features
-
-#### **Phase 6: Production Features (Tasks 13-15)**
-13. **Auxiliary Readback** - Depth, normals, instance IDs
-14. **Deterministic Rendering** - Seeded outputs + metadata
-15. **Golden Test Suite** - Regression validation
-
-#### **Phase 7: Platform Support (Tasks 16-18)**
-16. **WebGL2 Compliance** - ES 3.0 compatibility
-17. **Performance Profiling** - Per-pass timing hooks
-18. **Error Handling** - Graceful fallbacks
-
-#### **Phase 8: Cleanup (Tasks 19-20)**
-19. **Architecture Documentation** - Developer guide
-20. **Legacy Code Removal** - Dead code cleanup
-
-### Implementation Guidelines
-
-#### **For Graphics Engineers**
-```bash
-# Quick Start
-cmake -S . -B builds/desktop/cmake/Debug -DCMAKE_BUILD_TYPE=Debug
-cmake --build builds/desktop/cmake/Debug --config Debug
-
-# Test current system
-./builds/desktop/cmake/Debug/glint.exe --ops examples/json-ops/basic.json --render out.png
-./builds/desktop/cmake/Debug/glint.exe --ops examples/json-ops/glass-sphere-refraction.json --render out.png --raytrace
-```
-
-#### **Key Files to Understand**
-- `engine/include/glint3d/rhi.h` - **RHI interface (backend abstraction)**
-- `engine/src/rhi/rhi_gl.cpp` - **OpenGL backend implementation**
-- `engine/src/render_system.cpp` - RHI-based rendering pipeline + dual materials
-- `engine/include/scene_manager.h` - SceneObject with dual materials
-- `engine/shaders/pbr.frag` - Rasterized PBR shader
-- `engine/src/raytracer.cpp` - CPU raytracing pipeline
-- `engine/src/json_ops.cpp` - Material property parsing
-
-#### **Acceptance Criteria Per Task**
-Each task has specific success criteria:
-- **Task 1**: Headers compile, no integration
-- **Task 3**: Raster renders match golden images (±FP noise)
-- **Task 8**: Glass materials refract in raster mode
-- **Task 15**: Validator passes on 5 canonical scenes
-
-#### **Screen-Space Refraction (SSR-T) Overview**
-```glsl
-// In pbr.frag - simplified concept
-vec3 refractionDirection = refract(-viewDir, normal, 1.0/material.ior);
-vec2 refractionUV = screenUV + refractionDirection.xy * refractionStrength;
-vec3 refractedColor = texture(sceneColor, refractionUV).rgb;
-
-// Fresnel mixing
-float fresnel = fresnelSchlick(dot(normal, viewDir), 1.0, material.ior);
-finalColor = mix(refractedColor, reflectedColor, fresnel);
-```
-
-### Expected Outcomes
-
-#### **User Experience**
-- Glass materials work in both raster and ray modes
-- No need to remember `--raytrace` flag (auto mode)
-- Consistent material behavior across pipelines
-- Real-time preview with offline-quality final renders
-
-#### **Developer Experience**  
-- Single MaterialCore struct (no dual storage)
-- Clean RHI abstraction (easy Vulkan/WebGPU porting)
-- Modular pass system (easy to add new effects)
-- Comprehensive test suite (regression protection)
-
-#### **Performance**
-- Real-time refraction via SSR-T (<16ms frame budget)
-- GPU backend abstraction with minimal overhead
-- Hybrid mode balances quality vs performance automatically
-
-### Migration Timeline
-- **Phase 1**: ✅ **COMPLETED** - RHI foundation implemented (FEAT-0248 + FEAT-0253)
-- **Phase 2-4**: 2 weeks (materials + passes + SSR-T)
-- **Phase 5-6**: 1 week (hybrid + production)
-- **Phase 7-8**: 3 days (platform + cleanup)
-- **Total**: ~3 weeks remaining for complete refactor
-
-**Current Status (September 2025)**: Core RHI abstraction complete, engine backend-agnostic for main rendering operations. MaterialCore unification implemented with legacy Material system deprecated and marked for removal.
-
-### Legacy Material System Cleanup (Future Work)
-
-**Status**: Deprecated and ready for removal in v0.4.1
-
-The legacy Material system has been fully replaced by MaterialCore but remains for backward compatibility. All rendering pipelines now use MaterialCore as the single source of truth, with legacy Material only used for:
-- Scene serialization backward compatibility
-- Raytracer API bridge (temporary)
-- UI serialization compatibility
-
-**Cleanup Preparation**:
-- ✅ All code marked with 🚨 DEPRECATED comments and cleanup TODOs
-- ✅ Comprehensive cleanup task specification created (`ai/tasks/CLEANUP-LEGACY-MATERIALS/`)
-- ✅ Cleanup helper script for identifying remaining legacy usage
-- ✅ Clear implementation order and acceptance criteria defined
-
-**Cleanup Benefits**:
-- Eliminates dual storage confusion entirely
-- Reduces memory usage (~32 bytes per SceneObject)
-- Removes conversion overhead
-- Simplifies material system maintenance
-
-### External Dependencies
-
-The refactored system uses proven, lightweight packages organized in `engine/external/`:
-
-#### **Core Dependencies** (Always Required)
-- **fmt + spdlog**: Fast, structured logging with minimal overhead
-- **cgltf**: Lightweight, robust glTF 2.0 loader (replacing heavy Assimp)
-- **tinyexr**: HDR/floating-point image support for environment maps
-- **stb libraries**: Already integrated - PNG/JPG loading and writing
-
-#### **Shader Pipeline** (Future-Proofing)
-- **shaderc**: GLSL → SPIR-V compilation for cross-platform shaders
-- **SPIRV-Cross**: SPIR-V → GLSL ES/MSL/HLSL cross-compilation
-- **SPIRV-Reflect**: Automatic UBO layout detection and binding inference
-
-#### **Backend Abstraction** (Future)
-- **volk**: Vulkan function loader (when adding Vulkan backend)
-- **VMA**: Vulkan Memory Allocator (painless Vulkan memory management)
-- **Dawn** or **wgpu-native**: WebGPU desktop implementation
-
-#### **Optional Acceleration** (Desktop Only)
-- **Intel Embree**: 2-10x faster CPU ray tracing vs custom BVH
-- **Intel OIDN**: Already integrated - AI-based denoising
-
-#### **Build Strategy**
-- **Web Preview**: <2MB WASM, raster+SSR-T only, basic materials
-- **Desktop Final**: ~50MB executable, hybrid ray/raster, full features
-
-See `engine/external/README.md` for detailed dependency documentation and integration instructions.
-
-### Directory Structure
+### Project Layout
 ```
 Glint3D/
 ├── engine/                     # Core C++ engine
@@ -666,7 +271,7 @@ Glint3D/
 │   ├── ops-sdk/               # TypeScript SDK for JSON operations
 │   └── wasm-bindings/         # WASM/JavaScript bindings
 ├── sdk/                        # Software Development Kits
-│   └── web/                   # Web SDK and TypeScript definitions  
+│   └── web/                   # Web SDK and TypeScript definitions
 ├── assets/                     # Runtime content
 │   ├── models/                # 3D models (OBJ, GLB, GLTF)
 │   ├── textures/              # Texture maps
@@ -690,18 +295,54 @@ Glint3D/
     └── web/emscripten/        # Emscripten web builds
 ```
 
-### Platform Differences
-- **Desktop**: Full feature set, Assimp support, OIDN denoising, compute shaders
-- **Web**: WebGL2 only, no compute shaders, HTML UI instead of ImGui overlay
-- **Shader compatibility**: Auto-conversion from `#version 330 core` to `#version 300 es`
+### File Placement Guidelines
 
-### Build Configuration Notes
-- **Optional dependencies**: Assimp (`USE_ASSIMP=1`), OIDN (`OIDN_ENABLED=1`), KTX2 (`ENABLE_KTX2=ON`)
-- **vcpkg integration**: Preferred dependency management for Windows builds
-- **Emscripten flags**: Asset preloading, WASM exports, WebGL2 targeting
-- **C++17 standard**: Required for filesystem operations and modern STL features
+#### Engine Core (`engine/`)
+- **Headers**: Place in `engine/include/` for public APIs, `engine/include/glint3d/` for core systems
+- **Implementation**: Place in `engine/src/` with matching directory structure
+- **Shaders**: All GLSL files go in `engine/shaders/`
+- **Resources**: Icons, RC files, etc. in `engine/resources/`
 
-### Security Features
+#### Platform Integration (`platforms/`)
+- **Desktop**: Platform-specific code in `platforms/desktop/`
+- **Web**: React components and web-specific code in `platforms/web/`
+- **Never mix**: Platform code should not be in `engine/` core
+
+#### Asset Organization (`assets/`)
+- **Models**: 3D files (.obj, .glb, .gltf) in `assets/models/`
+- **Textures**: Image files for materials in `assets/textures/`
+- **Environments**: HDR/EXR skyboxes in `assets/img/`
+
+#### Testing (`tests/`)
+- **Unit Tests**: C++ unit tests in `tests/unit/`
+- **Integration**: JSON Ops tests in `tests/integration/`
+- **Golden Images**: Reference renders in `tests/golden/references/`
+- **Security**: Vulnerability tests in `tests/security/`
+
+#### Documentation & Configuration
+- **Schemas**: JSON schema files in `schemas/`
+- **Documentation**: User docs in `docs/`
+- **AI Configuration**: Task management in `ai/`
+- **Build Tools**: Scripts and utilities in `tools/`
+
+---
+
+## Recommended Practices
+
+- **Use RHI**: All GPU work uses RHI interfaces (`engine/include/glint3d/rhi.h`) - no raw GL calls.
+- **MaterialCore Only**: Single material struct for all pipelines - conversion helpers eliminated.
+- **Pass-Based Design**: Add passes to existing `RenderGraph` rather than creating new pipelines.
+- **Unified Interface**: Use `renderUnified()` for new features; legacy `render()` maintained for compatibility.
+- **Mode Selection**: Let `RenderPipelineModeSelector` choose pipeline based on scene content - avoid hardcoded modes.
+- **File Organization**: Follow directory structure guidelines; keep platform code separate from engine core.
+- **RHI Abstraction**: Use RHI layer for all graphics operations to maintain cross-platform compatibility.
+
+---
+
+---
+
+## Security Features
+
 #### Asset Root Directory Restriction (`--asset-root`)
 - **Purpose**: Prevents path traversal attacks in JSON operations by restricting file access to a specified directory
 - **Usage**: `glint --asset-root /path/to/assets --ops operations.json`
@@ -716,75 +357,29 @@ Glint3D/
 
 ---
 
-## Contribution & PR Guidelines
-- Branch naming: `feature/<short-desc>`, `fix/<short-desc>`
-- Small, atomic commits; use imperative tense (`add`, `fix`, `refactor`)
-- PR checklist:
-  - [ ] Compiles on Desktop + Web
-  - [ ] Docs updated (JSON Ops schema, README, release.md if needed)
-  - [ ] Tests added/updated
-  - [ ] No platform-specific code leaked into Engine Core
+## Safe Edits & Workflow
 
----
+1. Outline change and affected files.
+2. Apply minimal diffs (no broad renames unless requested).
+3. Build desktop + web.
+4. Run unit, integration, and golden tests.
+5. If goldens change intentionally, regenerate candidates and update references.
 
-## Testing & Validation
+### Useful Requests
+- "Abstract GL calls into RHI"
+- "Add JSON op and update schema/docs/tests"
+- "Write golden test for headless renderer"
+- "Decouple ImGui/GLFW dependencies from Engine Core"
+- "Add new pass to RenderGraph (e.g., `SSAOPass`, `BloomPass`)"
+- "Implement screen-space refraction in `SSRRefractionPass`"
+- "Add material property to MaterialCore and update JSON schema"
+- "Optimize mode selection in `RenderPipelineModeSelector`"
 
-**Organized Test Structure:**
-All tests are now organized in a hierarchical structure under `tests/` following industry best practices:
-
-```
-tests/
-├── unit/                          # C++ unit tests
-│   ├── camera_preset_test.cpp     # Camera preset calculations
-│   ├── path_security_test.cpp     # Path validation logic
-│   └── test_path_security_build.cpp # Security build validation
-├── integration/                   # Integration tests (JSON ops)
-│   ├── json_ops/
-│   │   ├── basic/                 # Load, duplicate, transform tests
-│   │   ├── lighting/              # Light system tests
-│   │   ├── camera/                # Camera operation tests
-│   │   └── materials/             # Material and tone mapping tests
-│   ├── cli/                       # Command-line interface tests
-│   └── rendering/                 # End-to-end rendering tests
-├── security/                      # Security vulnerability tests
-│   └── path_traversal/            # Path traversal attack tests
-├── golden/                        # Visual regression testing
-│   ├── scenes/                    # Test scenes for golden generation
-│   ├── references/                # Reference golden images
-│   └── tools/                     # SSIM comparison tools
-├── data/                          # Test assets and fixtures
-├── scripts/                       # Test automation scripts
-└── results/                       # Test output and artifacts (gitignored)
-```
-
-**Test Execution:**
-```bash
-# Run all test categories
-tests/scripts/run_all_tests.sh
-
-# Run specific test categories  
-tests/scripts/run_unit_tests.sh        # C++ unit tests
-tests/scripts/run_integration_tests.sh # JSON ops integration tests
-tests/scripts/run_security_tests.sh    # Security vulnerability tests
-tests/scripts/run_golden_tests.sh      # Visual regression tests
-```
-
-**Golden Image Testing:**
-- Headless renders compared against references via SSIM
-- Primary metric: SSIM >= 0.995 (fallback per-channel Δ <= 2 LSB)  
-- Jobs render test scenes to `tests/results/golden/renders/` and compare to `tests/golden/references/`
-- On failure: CI uploads diff images, heatmaps, and comparison reports as artifacts
-- Regenerate goldens: Use workflow_dispatch `regenerate_goldens=true` for candidate generation
-- Tools located in `tests/golden/tools/` (golden_image_compare.py, generate_goldens.py)
-
-**Security Testing:**
-- Path traversal protection validation via `tests/security/path_traversal/`  
-- Verify --asset-root blocks attack vectors: ../../../etc/passwd, ..\\..\\System32, etc.
-- Automated via `tests/scripts/run_security_tests.sh`
-
-**Cross-platform & Performance:**
-- Verify JSON Ops produces equivalent results on Desktop and Web
-- Performance: Log BVH build and frame times in Perf HUD; regressions block PRs
+### Workflow Guidelines
+- Keep edits surgical; avoid repo-wide renames without explicit request
+- Don't change public APIs unless asked; if changed, update docs/tests
+- Never modify binary assets or third-party code
+- Prefer adapter-level fixes before touching Engine Core
 
 ---
 
@@ -793,95 +388,6 @@ tests/scripts/run_golden_tests.sh      # Visual regression tests
 - **RHI (Render Hardware Interface)**: abstract OpenGL/WebGL away for future Vulkan/Metal backends
 - **JSON Ops** is the single source of truth between engine and UIs
 - New features tested in headless CLI first, then integrated into UI
-
----
-
-## Application Branding
-- **Logo**: Glint3D diamond icon in `assets/img/Glint3DIcon.png`
-- **Windows Icon**: Auto-converted to ICO format and embedded in executable via Windows resources
-- **Resource File**: `engine/resources/glint3d.rc` includes icon and version information
-- **Icon Regeneration**: Use `tools/create_basic_ico.py` when updating logo
-
-## Release & Versioning
-- **Engine**: tag semver releases (e.g., `v0.3.0`)
-- **JSON Ops**: schema versioned; bump minor for additive ops, major for breaking
-- **Web UI**: pinned to engine version in `release.md`
-
----
-
-## Footguns & Gotchas
-- **WebGL2 limitations**: no geometry/tessellation shaders; limited texture formats
-- **sRGB handling**: avoid double-gamma (FB vs texture decode)
-- **Normals**: recompute if missing; winding order must match
-- **Headless paths**: must run from repo root or use absolute paths
-- **ImGui**: keep out of Engine Core; treat as view/controller only
-- **Shadows**: disabled by default in shaders for deterministic CI until a real shadow-map implementation is added (see TODO). Re-enable via `useShadows` when implemented.
-
----
-
-## Claude Code Usage Notes
-
-### Safe Edits
-- Keep edits surgical; avoid repo-wide renames without explicit request
-- Don’t change public APIs unless asked; if changed, update docs/tests
-- Never modify binary assets or third-party code
-- Prefer adapter-level fixes before touching Engine Core
-
-### Useful Requests
-- “Abstract GL calls into RHI”
-- “Add JSON op and update schema/docs/tests”
-- “Write golden test for headless renderer”
-- “Decouple ImGui/GLFW dependencies from Engine Core”
-- “Implement deterministic shadow maps (depth FBO + PCF) and re-enable shadows gate”
-
-### Workflow
-1. Outline change and affected files  
-2. Apply minimal diffs  
-3. Build Desktop + Web  
-4. Run tests (unit + golden). If goldens change intentionally, use the regen workflow to produce candidates and update `tests/golden/references/*.png`.  
-5. Update docs/schema/recipes
-
----
-
-## Graphics API Evolution Strategy
-
-### Current Implementation: OpenGL/WebGL2
-- **Desktop**: OpenGL 3.3+ core profile with mature feature set
-- **Web**: WebGL 2.0 with automatic shader translation (#version 330 core → #version 300 es)
-- **Architecture**: RHI (Render Hardware Interface) abstraction layer already in place
-
-### Planned Migration: Vulkan/WebGPU
-- **Desktop Target**: Vulkan API for explicit GPU control and better multi-threading
-- **Web Target**: WebGPU for next-generation web graphics with compute shader support
-- **Timeline**: Architecture preparation ongoing, migration planned for future releases
-
-### Future Vision: Neural Rendering
-- **Gaussian Splatting**: Point-based rendering for photorealistic real-time scenes
-- **Neural Radiance Fields (NeRF)**: AI-powered view synthesis and scene representation
-- **Hybrid Pipeline**: Integration of traditional rasterization with neural techniques
-
-### Development Guidelines for Graphics Evolution
-When implementing new features, consider the upcoming graphics API transition:
-
-1. **API Abstraction**: Use the existing RHI layer; avoid direct OpenGL calls in Engine Core
-2. **Resource Management**: Design with explicit lifetime patterns suitable for Vulkan
-3. **Compute Integration**: Plan shader features to work with compute pipelines
-4. **Cross-Platform Design**: Ensure compatibility patterns that translate across APIs
-5. **Performance Patterns**: Avoid OpenGL-specific optimizations that won't carry forward
-
-### Current RHI Status (Updated 2025-09-13)
-- **✅ WebGPU-Shaped API**: FEAT-0248 completed - CommandEncoder, RenderPassEncoder, Queue, BindGroups implemented
-- **✅ Uniform System**: All `glUniform*` calls now route through RHI uniform helpers (Shader, Material, Light, Gizmo classes)
-- **✅ Cross-Platform Ready**: OpenGL backend functional, WebGPU backend foundation prepared
-- **🔄 Framebuffer Migration**: FEAT-0253 in progress - migrating MSAA/offscreen rendering to RHI render targets
-- **Engine Core**: Successfully decoupled from direct OpenGL calls (except RHI backend)
-
-### Implementation Priority (Updated)
-- ✅ Phase 1: WebGPU-shaped RHI API surface (FEAT-0248) - **COMPLETED**
-- 🔄 Phase 1.5: Complete framebuffer abstraction (FEAT-0253) - **IN PROGRESS**
-- Phase 2: Full uniform buffer object migration (FEAT-0249) + MSAA resolve (FEAT-0250)
-- Phase 3: WebGPU backend implementation (FEAT-0252)
-- Phase 4: Advanced features (compute, neural rendering, performance optimization)
 
 ---
 
@@ -895,13 +401,13 @@ When implementing new features, consider the upcoming graphics API transition:
 
 ---
 
-## Security
-- Never commit API keys or `.env`; provide `.env.example`
-- Share links must serialize scene state only (no secrets/paths)
-- Validate JSON Ops against schema at boundaries
-- **Path Security**: Use `--asset-root` flag to prevent directory traversal attacks when processing untrusted JSON ops files
-- **File Access Control**: All file operations (load, render_image, set_background) validate paths against the configured asset root
-- **Defense in Depth**: Path validation includes normalization, traversal detection, and bounds checking
+## Footguns & Gotchas
+- **WebGL2 limitations**: no geometry/tessellation shaders; limited texture formats
+- **sRGB handling**: avoid double-gamma (FB vs texture decode)
+- **Normals**: recompute if missing; winding order must match
+- **Headless paths**: must run from repo root or use absolute paths
+- **ImGui**: keep out of Engine Core; treat as view/controller only
+- **Shadows**: disabled by default in shaders for deterministic CI until a real shadow-map implementation is added (see TODO). Re-enable via `useShadows` when implemented.
 
 ---
 

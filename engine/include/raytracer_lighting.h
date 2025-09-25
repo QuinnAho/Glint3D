@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "light.h"
-#include "material.h"
+#include "material_core.h"
 #include "ray.h"
 
 // Forward declaration
@@ -35,7 +35,7 @@ namespace raytracer {
 
         // Evaluate material response to light
         static MaterialEval evaluateMaterial(
-            const Material& material,
+            const MaterialCore& material,
             const glm::vec3& normal,
             const glm::vec3& viewDir,
             const glm::vec3& lightDir,
@@ -44,7 +44,7 @@ namespace raytracer {
 
         // Compute ambient lighting contribution
         static glm::vec3 computeAmbient(
-            const Material& material,
+            const MaterialCore& material,
             const glm::vec4& globalAmbient
         );
 
@@ -61,7 +61,7 @@ namespace raytracer {
             const glm::vec3& hitPoint,
             const glm::vec3& normal,
             const glm::vec3& viewDir,
-            const Material& material,
+            const MaterialCore& material,
             const Light& lights,
             const Raytracer& raytracer
         );
@@ -70,12 +70,12 @@ namespace raytracer {
     // Helper functions for material properties
     namespace material {
         // Get base diffuse color accounting for metallic workflow
-        glm::vec3 getBaseColor(const Material& mat);
-        
+        glm::vec3 getBaseColor(const MaterialCore& mat);
+
         // Get effective ambient color
-        glm::vec3 getAmbientColor(const Material& mat);
-        
+        glm::vec3 getAmbientColor(const MaterialCore& mat);
+
         // Get fresnel F0 for metallic workflow
-        glm::vec3 getF0(const Material& mat);
+        glm::vec3 getF0(const MaterialCore& mat);
     }
 }

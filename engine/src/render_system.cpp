@@ -11,6 +11,8 @@
 #include "shader.h"
 #include "texture.h"
 #include "material_core.h"
+#include "render_mode_selector.h"
+#include "render_pass.h"
 #include <glint3d/rhi.h>
 #include <glint3d/rhi_types.h>
 #include "rhi/rhi_gl.h"
@@ -48,8 +50,8 @@ void RenderSystem::updateTransformUniforms()
 
     // Update transform data
     m_transformData.model = glm::mat4(1.0f); // Default identity, will be updated per-object
-    m_transformData.view = m_viewMatrix;
-    m_transformData.projection = m_projectionMatrix;
+    m_transformData.view = m_cameraManager.viewMatrix();
+    m_transformData.projection = m_cameraManager.projectionMatrix();
     // lightSpaceMatrix will be set when needed for shadows
 
     // Allocate UBO if not already allocated
@@ -75,7 +77,7 @@ void RenderSystem::updateLightingUniforms(const Light& lights)
 
     // Update lighting data - for now use defaults until Light class is extended
     m_lightingData.numLights = static_cast<int>(lights.getLightCount());
-    m_lightingData.viewPos = m_camera.position;
+    m_lightingData.viewPos = m_cameraManager.camera().position;
     m_lightingData.globalAmbient = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f); // Default ambient
 
     // TODO: Populate actual light data when Light class getters are available
@@ -324,6 +326,7 @@ void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
 #endif
 
 RenderSystem::RenderSystem()
+    : m_activePipelineMode(RenderPipelineMode::Raster)
 {
     // Initialize renderer components (GL resources are created in init)
     m_axisRenderer = std::make_unique<AxisRenderer>();
@@ -513,6 +516,8 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     m_fbHeight = windowHeight;
     createOrResizeTargets(windowWidth, windowHeight);
 
+    initRenderGraphs();
+
     return true;
 }
 
@@ -545,9 +550,94 @@ void RenderSystem::shutdown()
     }
     if (m_rhi && s_dummyShadowTexRhi != 0) { m_rhi->destroyTexture(s_dummyShadowTexRhi); s_dummyShadowTexRhi = 0; }
     destroyTargets();
+
+    m_rasterGraph.reset();
+    m_rayGraph.reset();
+    m_pipelineSelector.reset();
 }
 
 void RenderSystem::render(const SceneManager& scene, const Light& lights)
+{
+    renderUnified(scene, lights);
+}
+
+void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
+{
+    if (!m_rhi || !m_pipelineSelector) {
+        // Fallback to legacy if render graphs not initialized
+        renderLegacy(scene, lights);
+        return;
+    }
+
+    // Reset per-frame stats counters
+    m_stats = {};
+
+    // Update uniform blocks
+    updateTransformUniforms();
+    updateLightingUniforms(lights);
+    updateMaterialUniforms();
+    updateRenderingUniforms();
+    bindUniformBlocks();
+
+    // Select appropriate pipeline mode
+    std::vector<MaterialCore> materials;
+    for (const auto& obj : scene.getObjects()) {
+        materials.push_back(obj.material);
+    }
+    RenderPipelineMode mode = m_pipelineSelector->selectMode(materials, m_pipelineOverride);
+    m_activePipelineMode = mode;
+
+    // Get the active render graph
+    RenderGraph* graph = getActiveGraph(mode);
+    if (!graph) {
+        std::cerr << "[RenderSystem] No render graph available for mode " << (int)mode << std::endl;
+        renderLegacy(scene, lights);
+        return;
+    }
+
+    // Setup pass context
+    PassContext ctx{};
+    ctx.rhi = m_rhi.get();
+    ctx.scene = &scene;
+    ctx.lights = &lights;
+    ctx.renderer = this;
+    ctx.interactive = true;
+    ctx.enableRaster = (mode == RenderPipelineMode::Raster);
+    ctx.enableRay = (mode == RenderPipelineMode::Ray);
+    ctx.enableOverlays = m_showGrid || m_showAxes;
+    ctx.resolveMsaa = (m_samples > 1);
+    ctx.finalizeFrame = true;
+
+    // Camera and viewport
+    ctx.viewMatrix = m_cameraManager.viewMatrix();
+    ctx.projMatrix = m_cameraManager.projectionMatrix();
+    GLint vp[4];
+    glGetIntegerv(GL_VIEWPORT, vp);
+    ctx.viewportWidth = vp[2];
+    ctx.viewportHeight = vp[3];
+
+    // Frame state
+    ctx.frameIndex = ++m_frameCounter;
+    ctx.deltaTime = 0.016f; // TODO: get real delta time
+
+    // Timing support
+    ctx.enableTiming = true;
+    ctx.passTimings = &m_stats.passTimings;
+
+    // Setup render graph if needed
+    if (!graph->setup(ctx)) {
+        std::cerr << "[RenderSystem] Failed to setup render graph" << std::endl;
+        renderLegacy(scene, lights);
+        return;
+    }
+
+    // Execute render graph
+    m_rhi->beginFrame();
+    graph->execute(ctx);
+    m_rhi->endFrame();
+}
+
+void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
 {
     // Reset per-frame stats counters
     m_stats = {};
@@ -622,7 +712,7 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
         if (envMap != 0 && m_skybox) {
             // Use the IBL environment map as the skybox texture
             m_skybox->setEnvironmentMap(envMap);
-            m_skybox->render(m_viewMatrix, m_projectionMatrix);
+            m_skybox->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
             // counts as one draw call
             m_stats.drawCalls += 1;
         }
@@ -655,8 +745,8 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
 
                     // Update transform UBO with object-specific data
                     m_transformData.model = obj.modelMatrix;
-                    m_transformData.view = m_viewMatrix;
-                    m_transformData.projection = m_projectionMatrix;
+                    m_transformData.view = m_cameraManager.viewMatrix();
+                    m_transformData.projection = m_cameraManager.projectionMatrix();
                     m_transformData.lightSpaceMatrix = glm::mat4(1.0f);
                     if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
                         memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
@@ -664,7 +754,7 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
 
                     // Update lighting UBO for selection overlay (no lights, bright ambient)
                     m_lightingData.numLights = 0;
-                    m_lightingData.viewPos = m_camera.position;
+                    m_lightingData.viewPos = m_cameraManager.camera().position;
                     m_lightingData.globalAmbient = glm::vec4(1.0f);
                     if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
                         memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
@@ -752,9 +842,9 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
                 center = lights.m_lights[(size_t)m_selectedLightIndex].position;
                 R = glm::mat3(1.0f); // lights are treated as world-aligned
             }
-            float dist = glm::length(m_camera.position - center);
+            float dist = glm::length(m_cameraManager.camera().position - center);
             float gscale = glm::clamp(dist * 0.15f, 0.5f, 10.0f);
-            m_gizmo->render(m_viewMatrix, m_projectionMatrix, center, R, gscale, m_gizmoAxis, m_gizmoMode);
+            m_gizmo->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix(), center, R, gscale, m_gizmoAxis, m_gizmoMode);
             // Approximate draw call for gizmo
             m_stats.drawCalls += 1;
         }
@@ -838,7 +928,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
     glGetIntegerv(GL_VIEWPORT, prevViewport);
 
     // Use offscreen aspect ratio; restore later
-    glm::mat4 prevProj = m_projectionMatrix;
+    glm::mat4 prevProj = m_cameraManager.projectionMatrix();
     updateProjectionMatrix(width, height);
 
     std::cerr << "[RenderSystem] m_samples=" << m_samples << std::endl;
@@ -876,7 +966,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
             if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
             if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
-            m_projectionMatrix = prevProj;
+            m_cameraManager.setProjectionMatrix(prevProj);
             // Restore viewport via RHI
             if (m_rhi) {
                 m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
@@ -916,7 +1006,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
             if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
             if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
-            m_projectionMatrix = prevProj;
+            m_cameraManager.setProjectionMatrix(prevProj);
             // Restore viewport via RHI
             if (m_rhi) {
                 m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
@@ -940,7 +1030,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
         if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
 
-        m_projectionMatrix = prevProj;
+        m_cameraManager.setProjectionMatrix(prevProj);
         // Restore viewport via RHI
             if (m_rhi) {
                 m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
@@ -1002,7 +1092,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
             if (rboDepth != 0) glDeleteRenderbuffers(1, &rboDepth);
             if (fbo != 0) glDeleteFramebuffers(1, &fbo);
-            m_projectionMatrix = prevProj;
+            m_cameraManager.setProjectionMatrix(prevProj);
             // Restore viewport via RHI
             if (m_rhi) {
                 m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
@@ -1025,7 +1115,7 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
         }
 
         // Restore projection, framebuffer and viewport
-        m_projectionMatrix = prevProj;
+        m_cameraManager.setProjectionMatrix(prevProj);
         glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
         // Restore viewport via RHI
             if (m_rhi) {
@@ -1184,7 +1274,7 @@ bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& li
     // Preserve current framebuffer (GL) and viewport to restore; RHI has no query API
     GLint prevViewport[4] = {0, 0, 0, 0};
     glGetIntegerv(GL_VIEWPORT, prevViewport);
-    glm::mat4 prevProj = m_projectionMatrix;
+    glm::mat4 prevProj = m_cameraManager.projectionMatrix();
     updateProjectionMatrix(width, height);
 
     bool ok = true;
@@ -1249,7 +1339,7 @@ bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& li
     }
 
     // Restore projection and viewport
-    m_projectionMatrix = prevProj;
+    m_cameraManager.setProjectionMatrix(prevProj);
     if (m_rhi) {
         m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     } else {
@@ -1261,17 +1351,18 @@ bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& li
 
 void RenderSystem::updateViewMatrix()
 {
-    glm::vec3 target = m_camera.position + m_camera.front;
-    m_viewMatrix = glm::lookAt(m_camera.position, target, m_camera.up);
+    m_cameraManager.updateViewMatrix();
 }
+
 
 void RenderSystem::updateProjectionMatrix(int windowWidth, int windowHeight)
 {
-    float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    m_projectionMatrix = glm::perspective(glm::radians(m_camera.fov), aspect, 
-                                         m_camera.nearClip, m_camera.farClip);
-    if (m_rhi) m_rhi->setViewport(0, 0, windowWidth, windowHeight);
+    m_cameraManager.updateProjectionMatrix(windowWidth, windowHeight);
+    if (m_rhi) {
+        m_rhi->setViewport(0, 0, windowWidth, windowHeight);
+    }
 }
+
 
 void RenderSystem::setReflectionSpp(int spp)
 {
@@ -1467,7 +1558,7 @@ void RenderSystem::renderRasterized(const SceneManager& scene, const Light& ligh
 {
     // Render skybox first as background
     if (m_showSkybox && m_skybox) {
-        m_skybox->render(m_viewMatrix, m_projectionMatrix);
+        m_skybox->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
         m_stats.drawCalls += 1;
     }
     
@@ -1517,7 +1608,7 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
             reflectivity = 0.3f + (mc.metallic * 0.7f); // Range 0.3 to 1.0 based on metallic
         }
 
-        // 🚨 DEPRECATED CONVERSION: MaterialCore → legacy Material for raytracer API
+        // ðŸš¨ DEPRECATED CONVERSION: MaterialCore â†’ legacy Material for raytracer API
         // TODO CLEANUP: Update Raytracer::loadModel() to accept MaterialCore directly
         // CLEANUP TASK: Modify raytracer.h signature and eliminate this conversion
         Material legacyMat;
@@ -1536,8 +1627,8 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
         m_raytracer->setSeed(m_seed);
     }
     m_raytracer->renderImage(raytraceBuffer, m_raytraceWidth, m_raytraceHeight,
-                            m_camera.position, m_camera.front, m_camera.up, 
-                            m_camera.fov, lights);
+                            m_cameraManager.camera().position, m_cameraManager.camera().front, m_cameraManager.camera().up, 
+                            m_cameraManager.camera().fov, lights);
     
     // Apply OIDN denoising if enabled
     if (m_denoiseEnabled) {
@@ -1620,8 +1711,8 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     if (m_rhi) {
         // Update transform UBO with object-specific model matrix
         m_transformData.model = obj.modelMatrix;
-        m_transformData.view = m_viewMatrix;
-        m_transformData.projection = m_projectionMatrix;
+        m_transformData.view = m_cameraManager.viewMatrix();
+        m_transformData.projection = m_cameraManager.projectionMatrix();
 
         // Update transform UBO
         if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
@@ -1632,7 +1723,7 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         updateMaterialUniformsForObject(obj);
 
         // Update lighting UBO (camera position)
-        m_lightingData.viewPos = m_camera.position;
+        m_lightingData.viewPos = m_cameraManager.camera().position;
         if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
             memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
         }
@@ -1963,17 +2054,17 @@ void RenderSystem::renderDebugElements(const SceneManager& scene, const Light& l
 {
     // Batch debug element rendering to minimize state changes
     if (m_showGrid && m_grid) {
-        m_grid->render(m_viewMatrix, m_projectionMatrix);
+        m_grid->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
         m_stats.drawCalls += 1;
     }
     if (m_showAxes && m_axisRenderer) {
         glm::mat4 I(1.0f);
-        m_axisRenderer->render(I, m_viewMatrix, m_projectionMatrix);
+        m_axisRenderer->render(I, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
         m_stats.drawCalls += 1;
     }
     
     // Light indicators
-    lights.renderIndicators(m_viewMatrix, m_projectionMatrix, m_selectedLightIndex);
+    lights.renderIndicators(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix(), m_selectedLightIndex);
     m_stats.drawCalls += 1;
 
     // Selection outline for currently selected object (wireframe overlay)
@@ -2076,9 +2167,9 @@ void RenderSystem::renderGizmo(const SceneManager& scene, const Light& lights)
                 center = lights.m_lights[(size_t)m_selectedLightIndex].position;
                 R = glm::mat3(1.0f); // lights are treated as world-aligned
             }
-            float dist = glm::length(m_camera.position - center);
+            float dist = glm::length(m_cameraManager.camera().position - center);
             float gscale = glm::clamp(dist * 0.15f, 0.5f, 10.0f);
-            m_gizmo->render(m_viewMatrix, m_projectionMatrix, center, R, gscale, m_gizmoAxis, m_gizmoMode);
+            m_gizmo->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix(), center, R, gscale, m_gizmoAxis, m_gizmoMode);
             // Approximate draw call for gizmo
             m_stats.drawCalls += 1;
         }
@@ -2118,13 +2209,13 @@ void RenderSystem::setupCommonUniforms(Shader* shader)
     // Prefer RHI-bound current program; fall back to shader wrapper
     if (m_rhi) {
         // FEAT-0249: Use UBO system for structured data
-        m_transformData.view = m_viewMatrix;
-        m_transformData.projection = m_projectionMatrix;
+        m_transformData.view = m_cameraManager.viewMatrix();
+        m_transformData.projection = m_cameraManager.projectionMatrix();
         if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
             memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
         }
 
-        m_lightingData.viewPos = m_camera.position;
+        m_lightingData.viewPos = m_cameraManager.camera().position;
         if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
             memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
         }
@@ -2300,3 +2391,115 @@ void RenderSystem::createOrResizeTargets(int width, int height)
     std::cout << "[RenderSystem] Created RHI MSAA render target (" << width << "x" << height
               << ", " << m_samples << "x samples): " << m_msaaRenderTarget << std::endl;
 }
+
+
+
+void RenderSystem::initRenderGraphs()
+{
+    if (!m_rhi || m_pipelineSelector) {
+        return;
+    }
+
+    std::cout << "[RenderSystem] Initializing render graphs" << std::endl;
+
+    m_pipelineSelector = std::make_unique<RenderPipelineModeSelector>();
+
+    // Create raster pipeline graph
+    m_rasterGraph = std::make_unique<RenderGraph>(m_rhi.get());
+    m_rasterGraph->addPass(std::make_unique<FrameSetupPass>());
+    m_rasterGraph->addPass(std::make_unique<GBufferPass>());
+    m_rasterGraph->addPass(std::make_unique<DeferredLightingPass>());
+    m_rasterGraph->addPass(std::make_unique<OverlayPass>());
+    m_rasterGraph->addPass(std::make_unique<ResolvePass>());
+    m_rasterGraph->addPass(std::make_unique<PresentPass>());
+    m_rasterGraph->addPass(std::make_unique<ReadbackPass>());
+
+    // Create ray pipeline graph
+    m_rayGraph = std::make_unique<RenderGraph>(m_rhi.get());
+    m_rayGraph->addPass(std::make_unique<FrameSetupPass>());
+    m_rayGraph->addPass(std::make_unique<RayIntegratorPass>());
+    m_rayGraph->addPass(std::make_unique<RayDenoisePass>());
+    m_rayGraph->addPass(std::make_unique<OverlayPass>());
+    m_rayGraph->addPass(std::make_unique<PresentPass>());
+    m_rayGraph->addPass(std::make_unique<ReadbackPass>());
+
+    m_activePipelineMode = RenderPipelineMode::Raster;
+
+    std::cout << "[RenderSystem] Render graphs initialized successfully" << std::endl;
+}
+
+RenderGraph* RenderSystem::getActiveGraph(RenderPipelineMode mode)
+{
+    switch (mode) {
+    case RenderPipelineMode::Ray:
+        return m_rayGraph.get();
+    case RenderPipelineMode::Raster:
+    default:
+        return m_rasterGraph.get();
+    }
+}
+
+void RenderSystem::passFrameSetup(const PassContext& /*ctx*/)
+{
+    // TODO: integrate modern frame setup (uniform updates, target binding)
+}
+
+void RenderSystem::passRaster(const PassContext& /*ctx*/)
+{
+    // TODO: route rasterization through render graph
+}
+
+void RenderSystem::passRaytrace(const PassContext& /*ctx*/, int /*sampleCount*/, int /*maxDepth*/)
+{
+    // TODO: integrate ray tracing path through render graph
+}
+
+void RenderSystem::passRayDenoise(const PassContext& /*ctx*/, TextureHandle /*inputTexture*/, TextureHandle /*outputTexture*/)
+{
+    // TODO: hook denoiser pass
+}
+
+void RenderSystem::passOverlays(const PassContext& /*ctx*/)
+{
+    // TODO: render debug overlays via render graph
+}
+
+void RenderSystem::passResolve(const PassContext& /*ctx*/)
+{
+    // TODO: resolve MSAA / blit results as part of render graph
+}
+
+void RenderSystem::passPresent(const PassContext& /*ctx*/)
+{
+    // TODO: finalize RHI frame / swap buffers
+}
+
+void RenderSystem::passReadback(const PassContext& /*ctx*/)
+{
+    // TODO: perform readback via RHI when requested
+}
+
+void RenderSystem::passGBuffer(const PassContext& /*ctx*/, RenderTargetHandle /*gBufferRT*/)
+{
+    // TODO: move G-buffer rendering into render graph
+}
+
+void RenderSystem::passDeferredLighting(const PassContext& /*ctx*/, RenderTargetHandle /*outputRT*/,
+                                       TextureHandle /*gBaseColor*/, TextureHandle /*gNormal*/,
+                                       TextureHandle /*gPosition*/, TextureHandle /*gMaterial*/)
+{
+    // TODO: implement deferred lighting pass routing
+}
+
+void RenderSystem::passRayIntegrator(const PassContext& /*ctx*/, TextureHandle /*outputTexture*/, int /*sampleCount*/, int /*maxDepth*/)
+{
+    // TODO: integrate ray integrator pass
+}
+
+
+
+
+
+
+
+

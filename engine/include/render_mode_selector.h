@@ -13,7 +13,7 @@ namespace glint3d {
 }
 
 // Rendering pipeline modes
-enum class RenderMode { 
+enum class RenderPipelineMode {
     Raster,     // OpenGL rasterization (fast, SSR approximation)
     Ray,        // CPU ray tracing (slow, physically accurate)
     Auto        // Smart selection based on scene content
@@ -21,7 +21,7 @@ enum class RenderMode {
 
 // Render configuration
 struct RenderConfig {
-    RenderMode mode = RenderMode::Auto;
+    RenderPipelineMode mode = RenderPipelineMode::Auto;
     bool isPreview = false;          // Preview vs final quality
     bool forceRealtime = false;      // Force real-time constraints
     int maxRayDepth = 8;             // Max ray bounces for ray tracing
@@ -54,14 +54,14 @@ struct SceneAnalysis {
 };
 
 // Intelligent render mode selection system
-class RenderModeSelector {
+class RenderPipelineModeSelector {
 public:
-    RenderModeSelector();
-    ~RenderModeSelector() = default;
+    RenderPipelineModeSelector();
+    ~RenderPipelineModeSelector() = default;
     
     // Main selection interface
-    RenderMode selectMode(const SceneManager& scene, const RenderConfig& config);
-    RenderMode selectMode(const std::vector<MaterialCore>& materials, const RenderConfig& config);
+    RenderPipelineMode selectMode(const SceneManager& scene, const RenderConfig& config);
+    RenderPipelineMode selectMode(const std::vector<MaterialCore>& materials, const RenderConfig& config);
     
     // Scene analysis
     SceneAnalysis analyzeScene(const SceneManager& scene) const;
@@ -112,7 +112,7 @@ private:
     bool hasComplexVolumetrics(const SceneAnalysis& analysis) const;
     bool isRealTimeConstrained(const RenderConfig& config) const;
     
-    void updateSelectionReason(RenderMode selected, const SceneAnalysis& analysis, const RenderConfig& config);
+    void updateSelectionReason(RenderPipelineMode selected, const SceneAnalysis& analysis, const RenderConfig& config);
 };
 
 // Pipeline builder that creates appropriate render graphs based on mode
@@ -129,9 +129,9 @@ public:
 };
 
 // Utility functions for CLI integration
-namespace RenderModeUtils {
-    RenderMode parseRenderMode(const std::string& modeStr);
-    std::string renderModeToString(RenderMode mode);
+namespace RenderPipelineModeUtils {
+    RenderPipelineMode parseRenderPipelineMode(const std::string& modeStr);
+    std::string renderModeToString(RenderPipelineMode mode);
     std::vector<std::string> getAvailableModes();
     
     // CLI help text

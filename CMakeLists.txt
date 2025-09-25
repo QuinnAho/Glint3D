@@ -21,6 +21,7 @@ set(APP_SOURCES
     ${SRC_DIR}/application_core.cpp
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
+    ${SRC_DIR}/managers/camera_manager.cpp
     ${SRC_DIR}/camera_controller.cpp
     ${SRC_DIR}/ui_bridge.cpp
     ${SRC_DIR}/json_ops.cpp
@@ -42,7 +43,6 @@ set(APP_SOURCES
     ${SRC_DIR}/importer_registry.cpp
     ${SRC_DIR}/importers/obj_importer.cpp
     ${SRC_DIR}/importers/assimp_importer.cpp
-    ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
     ${SRC_DIR}/ray_utils.cpp
     ${SRC_DIR}/bvh_node.cpp
@@ -63,7 +63,6 @@ set(APP_SOURCES
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
     ${SRC_DIR}/rhi/rhi_null.cpp
-    ${SRC_DIR}/rhi/scene_object_gl.cpp
     ${SRC_DIR}/clock.cpp
 )
 
@@ -72,6 +71,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/application_core.cpp
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
+    ${SRC_DIR}/managers/camera_manager.cpp
     ${SRC_DIR}/camera_controller.cpp
     ${SRC_DIR}/ui_bridge.cpp
     ${SRC_DIR}/cli_parser.cpp
@@ -90,7 +90,6 @@ set(CORE_SOURCES
     ${SRC_DIR}/importer_registry.cpp
     ${SRC_DIR}/importers/obj_importer.cpp
     ${SRC_DIR}/importers/assimp_importer.cpp
-    ${SRC_DIR}/material.cpp
     ${SRC_DIR}/light.cpp
     ${SRC_DIR}/ray_utils.cpp
     ${SRC_DIR}/bvh_node.cpp
@@ -112,7 +111,6 @@ set(CORE_SOURCES
     ${SRC_DIR}/rhi/rhi.cpp
     ${SRC_DIR}/rhi/rhi_gl.cpp
     ${SRC_DIR}/rhi/rhi_null.cpp
-    ${SRC_DIR}/rhi/scene_object_gl.cpp
     ${SRC_DIR}/clock.cpp
 )
 
@@ -446,3 +444,6 @@ install(TARGETS glint RUNTIME DESTINATION bin)
 install(TARGETS glint_core ARCHIVE DESTINATION lib LIBRARY DESTINATION lib)
 install(DIRECTORY engine/include/ DESTINATION include/glint)
 install(FILES schemas/json_ops_v1.json DESTINATION share/glint/schemas)
+
+
+

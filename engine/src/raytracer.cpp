@@ -90,7 +90,7 @@ glm::vec3 Raytracer::traceRay(const Ray& ray, const Light& lights, int depth) co
     glm::vec3 viewDir = glm::normalize(-ray.direction);
     glm::vec3 normal = glm::normalize(hitNormal);
 
-    const Material& mat = hitObject->material;
+    const MaterialCore& mat = hitObject->material;
 
     // Use the new modular lighting system
     glm::vec3 color = raytracer::LightingSystem::computeLighting(
@@ -185,7 +185,7 @@ void Raytracer::renderImage(std::vector<glm::vec3>& out,
     std::cout << "[DEBUG] renderImage() finished!\n";
 }
 
-void Raytracer::loadModel(const ObjLoader& obj, const glm::mat4& M, float refl, const Material& mat)
+void Raytracer::loadModel(const ObjLoader& obj, const glm::mat4& M, float refl, const MaterialCore& mat)
 {
     const float* pos = obj.getPositions();
     const unsigned int* idx = obj.getFaces();
@@ -221,7 +221,7 @@ glm::vec3 Raytracer::sampleGlossyReflection(
     const glm::vec3& hitPoint,
     const glm::vec3& viewDir,
     const glm::vec3& normal,
-    const Material& material,
+    const MaterialCore& material,
     const Light& lights,
     int depth,
         SeededRng& rng) const
@@ -282,7 +282,7 @@ glm::vec3 Raytracer::computeRefraction(
     const glm::vec3& hitPoint,
     const glm::vec3& incident,
     const glm::vec3& normal,
-    const Material& material,
+    const MaterialCore& material,
     const Light& lights,
     int depth) const
 {

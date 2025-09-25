@@ -411,10 +411,6 @@ bool JsonOpsExecutor::apply(const std::string& json, std::string& error)
                 mutableObj->materialCore.baseColor = glm::vec4(baseRGB * (1.0f + glm::length(ambient) * 0.1f), mutableObj->materialCore.baseColor.a);
             }
 
-            // 🚨 DEPRECATED SYNC: Auto-update legacy material from MaterialCore
-            // TODO CLEANUP: Remove this line when legacy Material field is removed from SceneObject
-            // CLEANUP TASK: Update serialization systems to use MaterialCore directly
-            mutableObj->materialCore.toLegacyMaterial(mutableObj->material);
 
             return true;
         }

@@ -1,274 +1,279 @@
 #pragma once
 
-#include <string>
 #include <memory>
-#include <vector>
+#include <string>
 #include <unordered_map>
+#include <vector>
+
+#include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 
 using namespace glint3d;
 
-// Forward declarations
+struct PassTiming {
+    std::string passName;
+    float timeMs = 0.0f;
+    bool enabled = false;
+};
+
 class SceneManager;
 class Light;
 class RenderGraph;
-struct MaterialCore;
+class RenderSystem;
+
+struct ReadbackRequest {
+    void* destination = nullptr;
+    size_t size = 0;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    TextureFormat format = TextureFormat::RGBA8;
+};
 
 // Pass execution context containing all resources and state
 struct PassContext {
     RHI* rhi = nullptr;
     const SceneManager* scene = nullptr;
     const Light* lights = nullptr;
-    
+    RenderSystem* renderer = nullptr;
+    bool interactive = false;
+    bool enableRaster = true;
+    bool enableRay = false;
+    bool enableOverlays = true;
+    bool resolveMsaa = true;
+    bool finalizeFrame = true;
+    const ReadbackRequest* readback = nullptr;
+    RenderTargetHandle renderTarget = INVALID_HANDLE;
+    TextureHandle outputTexture = INVALID_HANDLE;
+
     // Render targets and textures
     std::unordered_map<std::string, TextureHandle> textures;
-    
+
     // Camera and viewport
     glm::mat4 viewMatrix{1.0f};
     glm::mat4 projMatrix{1.0f};
     int viewportWidth = 0;
     int viewportHeight = 0;
-    
+
     // Frame state
     uint32_t frameIndex = 0;
     float deltaTime = 0.0f;
-    
+
+    // Timing support
+    bool enableTiming = true;
+    std::vector<PassTiming>* passTimings = nullptr; // Pointer to stats collection
+
     // Pass-specific data (can be extended by derived passes)
     std::unordered_map<std::string, void*> customData;
 };
 
-// Base class for all render passes
 class RenderPass {
 public:
     virtual ~RenderPass() = default;
-    
-    // Pass lifecycle
+
     virtual bool setup(const PassContext& ctx) = 0;
     virtual void execute(const PassContext& ctx) = 0;
     virtual void teardown(const PassContext& ctx) = 0;
-    
-    // Pass metadata
+
     virtual const char* getName() const = 0;
     virtual bool isEnabled() const { return m_enabled; }
     virtual void setEnabled(bool enabled) { m_enabled = enabled; }
-    
-    // Resource dependencies (for automatic ordering)
+
     virtual std::vector<std::string> getInputs() const { return {}; }
     virtual std::vector<std::string> getOutputs() const { return {}; }
-    
+
+    // Execute with timing support
+    void executeWithTiming(const PassContext& ctx);
+
 protected:
     bool m_enabled = true;
 };
 
-// Minimal render graph for pass management
 class RenderGraph {
 public:
-    RenderGraph(RHI* rhi);
+    explicit RenderGraph(RHI* rhi);
     ~RenderGraph();
-    
-    // Pass management
+
     void addPass(std::unique_ptr<RenderPass> pass);
     void removePass(const std::string& name);
     RenderPass* getPass(const std::string& name);
-    
-    // Execution
+
     bool setup(const PassContext& baseContext);
     void execute(const PassContext& baseContext);
     void teardown();
-    
-    // Resource management
+
     TextureHandle createTexture(const std::string& name, const TextureDesc& desc);
     void destroyTexture(const std::string& name);
     TextureHandle getTexture(const std::string& name) const;
-    
-    // Graph state
+
     void setEnabled(bool enabled) { m_enabled = enabled; }
     bool isEnabled() const { return m_enabled; }
-    
+
 private:
     RHI* m_rhi;
     std::vector<std::unique_ptr<RenderPass>> m_passes;
     std::unordered_map<std::string, TextureHandle> m_textures;
     bool m_enabled = true;
     bool m_isSetup = false;
-    
-    // Automatic pass ordering based on dependencies
+
     void sortPasses();
 };
 
-// Specific pass implementations
-
-// G-Buffer pass for deferred rendering
-class GBufferPass : public RenderPass {
+class FrameSetupPass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "GBufferPass"; }
-    std::vector<std::string> getOutputs() const override { 
-        return {"gbuffer_color", "gbuffer_normal", "gbuffer_material", "gbuffer_depth"}; 
-    }
-    
-private:
-    PipelineHandle m_pipeline = INVALID_HANDLE;
-    ShaderHandle m_shader = INVALID_HANDLE;
+    const char* getName() const override { return "FrameSetupPass"; }
 };
 
-// Lighting pass for deferred shading
-class LightingPass : public RenderPass {
+class RasterPass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "LightingPass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"gbuffer_color", "gbuffer_normal", "gbuffer_material", "gbuffer_depth"}; 
-    }
-    std::vector<std::string> getOutputs() const override { 
-        return {"lighting_result"}; 
-    }
-    
-private:
-    PipelineHandle m_pipeline = INVALID_HANDLE;
-    ShaderHandle m_shader = INVALID_HANDLE;
+    const char* getName() const override { return "RasterPass"; }
 };
 
-// Screen-space refraction pass for real-time transparency
-class SSRRefractionPass : public RenderPass {
+class RaytracePass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "SSRRefractionPass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"lighting_result", "gbuffer_normal", "gbuffer_depth"}; 
-    }
-    std::vector<std::string> getOutputs() const override { 
-        return {"refraction_result"}; 
-    }
-    
+    const char* getName() const override { return "RaytracePass"; }
+
+    void setSampleCount(int samples);
+    void setMaxDepth(int depth);
+
 private:
-    PipelineHandle m_pipeline = INVALID_HANDLE;
-    ShaderHandle m_shader = INVALID_HANDLE;
-    bool m_hasTransparentObjects = false;
+    int m_sampleCount = 64;
+    int m_maxDepth = 8;
 };
 
-// Post-processing pass (tone mapping, gamma correction)
-class PostPass : public RenderPass {
+class RayDenoisePass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "PostPass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"refraction_result"}; 
+    const char* getName() const override { return "RayDenoisePass"; }
+
+    std::vector<std::string> getInputs() const override {
+        return {"rayTraceResult"};
     }
-    std::vector<std::string> getOutputs() const override { 
-        return {"final_color"}; 
+
+    std::vector<std::string> getOutputs() const override {
+        return {"denoisedResult"};
     }
-    
-    // Post-processing settings
-    void setExposure(float exposure) { m_exposure = exposure; }
-    void setGamma(float gamma) { m_gamma = gamma; }
-    void setToneMapMode(int mode) { m_toneMapMode = mode; }
-    
+
 private:
-    PipelineHandle m_pipeline = INVALID_HANDLE;
-    ShaderHandle m_shader = INVALID_HANDLE;
-    float m_exposure = 0.0f;
-    float m_gamma = 2.2f;
-    int m_toneMapMode = 0; // 0=Linear, 1=Reinhard, 2=Filmic, 3=ACES
+    TextureHandle m_outputTex = INVALID_HANDLE;
 };
 
-// CPU readback pass for headless rendering
+class OverlayPass : public RenderPass {
+public:
+    bool setup(const PassContext& ctx) override;
+    void execute(const PassContext& ctx) override;
+    void teardown(const PassContext& ctx) override;
+    const char* getName() const override { return "OverlayPass"; }
+};
+
+class ResolvePass : public RenderPass {
+public:
+    bool setup(const PassContext& ctx) override;
+    void execute(const PassContext& ctx) override;
+    void teardown(const PassContext& ctx) override;
+    const char* getName() const override { return "ResolvePass"; }
+};
+
+class PresentPass : public RenderPass {
+public:
+    bool setup(const PassContext& ctx) override;
+    void execute(const PassContext& ctx) override;
+    void teardown(const PassContext& ctx) override;
+    const char* getName() const override { return "PresentPass"; }
+};
+
 class ReadbackPass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
     const char* getName() const override { return "ReadbackPass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"final_color"}; 
+
+    // Allow specifying which texture to read back
+    void setSourceTexture(const std::string& textureName) { m_sourceTexture = textureName; }
+
+    std::vector<std::string> getInputs() const override {
+        if (!m_sourceTexture.empty()) {
+            return {m_sourceTexture};
+        }
+        return {"litColor", "rayTraceResult", "denoisedResult"}; // Accept any of these
     }
-    
-    // Readback configuration
-    void setDestination(void* dest, size_t size) { m_destination = dest; m_destinationSize = size; }
-    void setRegion(int x, int y, int width, int height) { 
-        m_x = x; m_y = y; m_width = width; m_height = height; 
-    }
-    
+
 private:
-    void* m_destination = nullptr;
-    size_t m_destinationSize = 0;
-    int m_x = 0, m_y = 0, m_width = 0, m_height = 0;
+    std::string m_sourceTexture; // Optional specific source texture
 };
 
-// Ray tracing integrator pass
-class IntegratorPass : public RenderPass {
+class GBufferPass : public RenderPass {
 public:
     bool setup(const PassContext& ctx) override;
     void execute(const PassContext& ctx) override;
     void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "IntegratorPass"; }
-    std::vector<std::string> getOutputs() const override { 
-        return {"raytrace_color", "raytrace_normal", "raytrace_albedo"}; 
+    const char* getName() const override { return "GBufferPass"; }
+
+    std::vector<std::string> getOutputs() const override {
+        return {"gBaseColor", "gNormal", "gPosition", "gMaterial", "gDepth"};
     }
-    
-    // Ray tracing settings
+
+private:
+    RenderTargetHandle m_gBufferRT = INVALID_HANDLE;
+    TextureHandle m_baseColorTex = INVALID_HANDLE;
+    TextureHandle m_normalTex = INVALID_HANDLE;
+    TextureHandle m_positionTex = INVALID_HANDLE;
+    TextureHandle m_materialTex = INVALID_HANDLE;
+    TextureHandle m_depthTex = INVALID_HANDLE;
+};
+
+class DeferredLightingPass : public RenderPass {
+public:
+    bool setup(const PassContext& ctx) override;
+    void execute(const PassContext& ctx) override;
+    void teardown(const PassContext& ctx) override;
+    const char* getName() const override { return "DeferredLightingPass"; }
+
+    std::vector<std::string> getInputs() const override {
+        return {"gBaseColor", "gNormal", "gPosition", "gMaterial"};
+    }
+
+    std::vector<std::string> getOutputs() const override {
+        return {"litColor"};
+    }
+
+private:
+    TextureHandle m_outputTex = INVALID_HANDLE;
+    RenderTargetHandle m_outputRT = INVALID_HANDLE;
+};
+
+class RayIntegratorPass : public RenderPass {
+public:
+    bool setup(const PassContext& ctx) override;
+    void execute(const PassContext& ctx) override;
+    void teardown(const PassContext& ctx) override;
+    const char* getName() const override { return "RayIntegratorPass"; }
+
+    std::vector<std::string> getOutputs() const override {
+        return {"rayTraceResult"};
+    }
+
     void setSampleCount(int samples) { m_sampleCount = samples; }
     void setMaxDepth(int depth) { m_maxDepth = depth; }
-    
+
 private:
+    TextureHandle m_outputTex = INVALID_HANDLE;
     int m_sampleCount = 64;
     int m_maxDepth = 8;
-    class Raytracer* m_raytracer = nullptr;
 };
 
-// AI denoising pass
-class DenoisePass : public RenderPass {
-public:
-    bool setup(const PassContext& ctx) override;
-    void execute(const PassContext& ctx) override;
-    void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "DenoisePass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"raytrace_color", "raytrace_normal", "raytrace_albedo"}; 
-    }
-    std::vector<std::string> getOutputs() const override { 
-        return {"denoised_color"}; 
-    }
-    
-private:
-    bool m_oidnAvailable = false;
-};
 
-// HDR tone mapping pass for ray traced content
-class TonemapPass : public RenderPass {
-public:
-    bool setup(const PassContext& ctx) override;
-    void execute(const PassContext& ctx) override;
-    void teardown(const PassContext& ctx) override;
-    
-    const char* getName() const override { return "TonemapPass"; }
-    std::vector<std::string> getInputs() const override { 
-        return {"denoised_color"}; 
-    }
-    std::vector<std::string> getOutputs() const override { 
-        return {"final_color"}; 
-    }
-    
-    // Tone mapping settings
-    void setExposure(float exposure) { m_exposure = exposure; }
-    void setGamma(float gamma) { m_gamma = gamma; }
-    
-private:
-    float m_exposure = 0.0f;
-    float m_gamma = 2.2f;
-};
+

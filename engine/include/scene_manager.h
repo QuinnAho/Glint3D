@@ -4,7 +4,6 @@
 #include <memory>
 #include <unordered_map>
 #include <glm/glm.hpp>
-#include "material.h"
 #include "light.h"
 #include "objloader.h"
 #include "texture.h"
@@ -18,13 +17,12 @@ using namespace glint3d;
 struct SceneObject
 {
     std::string name;
-    unsigned int VAO = 0, VBO_positions = 0, VBO_normals = 0, VBO_uvs = 0, VBO_tangents = 0, EBO = 0;
-    // RHI buffer handles (migration)
+    // RHI buffer handles (pure RHI implementation - legacy VAO/VBO removed)
     BufferHandle rhiVboPositions = INVALID_HANDLE;
     BufferHandle rhiVboNormals = INVALID_HANDLE;
     BufferHandle rhiVboUVs = INVALID_HANDLE;
     BufferHandle rhiEbo = INVALID_HANDLE;
-    PipelineHandle rhiPipelineBasic = INVALID_HANDLE;
+    PipelineHandle rhiPipelineGBuffer = INVALID_HANDLE;
     PipelineHandle rhiPipelinePbr = INVALID_HANDLE;
     glm::mat4 modelMatrix{ 1.0f };        // World transform (computed from hierarchy)
     
@@ -46,14 +44,6 @@ struct SceneObject
     // ✅ Unified material system - single source of truth (ACTIVE)
     MaterialCore materialCore;
 
-    // 🚨 DEPRECATED: Legacy material - scheduled for removal in v0.4.1
-    // Only used for: serialization compatibility, legacy API bridges
-    // TODO CLEANUP: Remove this field and update:
-    //   - SceneManager::toJson() to export MaterialCore directly
-    //   - ui_bridge.cpp material serialization
-    //   - Any remaining raytracer API calls
-    // REMOVAL TARGET: After implementing native MaterialCore serialization
-    Material material;
 };
 
 class SceneManager 
@@ -92,8 +82,8 @@ public:
     std::string getSelectedObjectName() const;
     glm::vec3 getSelectedObjectCenterWorld() const;
 
-    // Material management  
-    bool createMaterial(const std::string& name, const Material& material);
+    // Material management (using MaterialCore)
+    bool createMaterial(const std::string& name, const MaterialCore& material);
     bool assignMaterialToObject(const std::string& objectName, const std::string& materialName);
 
     // Accessors
@@ -114,7 +104,7 @@ public:
 private:
     RHI* m_rhi = nullptr; // not owned; provided by RenderSystem
     std::vector<SceneObject> m_objects;
-    std::unordered_map<std::string, Material> m_materials;
+    std::unordered_map<std::string, MaterialCore> m_materials;
     int m_selectedObjectIndex = -1;
 
     void setupObjectOpenGL(SceneObject& obj);
@@ -124,3 +114,4 @@ public:
     // Inject RHI (called from Application once RenderSystem is initialized)
     void setRHI(RHI* rhi) { m_rhi = rhi; }
 };
+

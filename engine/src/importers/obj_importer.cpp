@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
+// Can we just use the assimp importer for objs instead?
 namespace {
 static std::string toLowerExt(const std::string& s){
     auto pos = s.find_last_of('.');

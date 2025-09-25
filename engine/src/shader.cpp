@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <glint3d/rhi.h>
+#include "path_utils.h"
 
 // Static RHI instance for uniform bridging
 glint3d::RHI* Shader::s_rhi = nullptr;
@@ -90,7 +91,10 @@ std::string Shader::loadShaderFromFile(const std::string& path)
 {
     std::ofstream logFile("shader_log.txt", std::ios::app); // Append mode
 
-    std::ifstream file(path);
+    // Resolve path using the utility
+    std::string resolvedPath = PathUtils::resolveAssetPath(path);
+
+    std::ifstream file(resolvedPath);
     if (!file.is_open()) {
         std::cerr << "Failed to open shader: " << path << std::endl;
         if (logFile.is_open())

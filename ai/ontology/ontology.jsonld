@@ -1,8 +1,0 @@
-{
-  "@context": {"@vocab": "https://glint3d.dev/ontology#"},
-  "@graph": [
-    {"@id": "Scene", "@type": "Concept"},
-    {"@id": "Node", "@type": "Concept", "has": ["Transform","Material","Mesh"]},
-    {"@id": "RenderOp", "@type": "Concept", "variants": ["Load","SetMaterial","Render","Export"] }
-  ]
-}

@@ -1,5 +1,4 @@
 #include "scene_manager.h"
-#include "rhi/scene_object_gl.h"
 #include "mesh_loader.h"
 #include "texture_cache.h"
 #include <iostream>
@@ -11,6 +10,7 @@
 #include <rapidjson/writer.h>
 #include <rapidjson/prettywriter.h>
 #include <cmath>
+#include <glm/gtc/matrix_transform.hpp>
 
 using namespace glint3d;
 
@@ -142,7 +142,7 @@ bool SceneManager::removeObject(const std::string& name)
 
 bool SceneManager::duplicateObject(const std::string& sourceName, const std::string& newName,
                                   const glm::vec3* deltaPos, const glm::vec3* deltaScale, 
-                                  const glm::vec3* deltaRotDeg)
+                                  const glm::vec3* deltaRotDeg) // two duplicate object funtions this seems ambigous
 {
     const SceneObject* source = findObjectByName(sourceName);
     if (!source) {
@@ -218,7 +218,7 @@ glm::vec3 SceneManager::getSelectedObjectCenterWorld() const
     return glm::vec3(0.0f);
 }
 
-bool SceneManager::createMaterial(const std::string& name, const Material& material)
+bool SceneManager::createMaterial(const std::string& name, const MaterialCore& material)
 {
     m_materials[name] = material;
     return true;
@@ -236,7 +236,7 @@ bool SceneManager::assignMaterialToObject(const std::string& objectName, const s
         return false;
     }
     
-    obj->material = it->second;
+    obj->materialCore = it->second;
     return true;
 }
 
@@ -308,13 +308,11 @@ bool SceneManager::duplicateObject(const std::string& sourceName, const std::str
     newObj.localMatrix[3] = glm::vec4(newPosition, 1.0f);
     newObj.modelMatrix[3] = glm::vec4(newPosition, 1.0f);
     
-    // Clear OpenGL handles (they will be regenerated)
-    newObj.VAO = 0;
-    newObj.VBO_positions = 0;
-    newObj.VBO_normals = 0;
-    newObj.VBO_uvs = 0;
-    newObj.VBO_tangents = 0;
-    newObj.EBO = 0;
+    // Clear RHI handles (they will be regenerated in pure RHI implementation)
+    newObj.rhiVboPositions = INVALID_HANDLE;
+    newObj.rhiVboNormals = INVALID_HANDLE;
+    newObj.rhiVboUVs = INVALID_HANDLE;
+    newObj.rhiEbo = INVALID_HANDLE;
     
     // Add to scene
     m_objects.push_back(newObj);
@@ -345,8 +343,9 @@ void SceneManager::setupObjectOpenGL(SceneObject& obj)
     const bool hasNormals = (obj.objLoader.getNormals() != nullptr);
     const bool hasUVs = obj.objLoader.hasTexcoords();
 
+    // Pure RHI implementation - legacy VAO/VBO system removed
     if (!m_rhi) {
-        rhi::setupSceneObjectGL(obj);
+        std::cerr << "ERROR: RHI not initialized - cannot create scene objects" << std::endl;
         return;
     }
 
@@ -382,15 +381,16 @@ void SceneManager::setupObjectOpenGL(SceneObject& obj)
 
 void SceneManager::cleanupObjectOpenGL(SceneObject& obj)
 {
+    // Pure RHI implementation - legacy VAO/VBO cleanup removed
     if (!m_rhi) {
-        rhi::cleanupSceneObjectGL(obj);
+        std::cerr << "ERROR: RHI not initialized - cannot cleanup scene objects" << std::endl;
         return;
     }
     if (m_rhi && obj.rhiVboPositions != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboPositions); obj.rhiVboPositions = INVALID_HANDLE; }
     if (m_rhi && obj.rhiVboNormals != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboNormals); obj.rhiVboNormals = INVALID_HANDLE; }
     if (m_rhi && obj.rhiVboUVs != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboUVs); obj.rhiVboUVs = INVALID_HANDLE; }
     if (m_rhi && obj.rhiEbo != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiEbo); obj.rhiEbo = INVALID_HANDLE; }
-    if (m_rhi && obj.rhiPipelineBasic != INVALID_HANDLE) { m_rhi->destroyPipeline(obj.rhiPipelineBasic); obj.rhiPipelineBasic = INVALID_HANDLE; }
+    if (m_rhi && obj.rhiPipelineGBuffer != INVALID_HANDLE) { m_rhi->destroyPipeline(obj.rhiPipelineGBuffer); obj.rhiPipelineGBuffer = INVALID_HANDLE; }
     if (m_rhi && obj.rhiPipelinePbr != INVALID_HANDLE) { m_rhi->destroyPipeline(obj.rhiPipelinePbr); obj.rhiPipelinePbr = INVALID_HANDLE; }
 }
 
@@ -461,35 +461,33 @@ std::string SceneManager::toJson() const
         
         objVal.AddMember("transform", transform, allocator);
         
-        // 🚨 DEPRECATED SERIALIZATION: Using legacy Material for backward compatibility
-        // TODO CLEANUP: Replace with MaterialCore-based serialization:
-        //   - Export obj.materialCore properties directly
-        //   - Add MaterialCore JSON schema to schemas/json_ops_v1.json
-        //   - Update scene loading to populate MaterialCore (with legacy fallback)
-        // CLEANUP TASK: Implement MaterialCore::saveToJSON() and loadFromJSON()
+        // MaterialCore-based serialization
         Value material(kObjectType);
 
-        Value diffuse(kArrayType);
-        diffuse.PushBack(obj.material.diffuse.x, allocator);
-        diffuse.PushBack(obj.material.diffuse.y, allocator);
-        diffuse.PushBack(obj.material.diffuse.z, allocator);
-        material.AddMember("diffuse", diffuse, allocator);
+        // Base color (PBR)
+        Value baseColor(kArrayType);
+        baseColor.PushBack(obj.materialCore.baseColor.x, allocator);
+        baseColor.PushBack(obj.materialCore.baseColor.y, allocator);
+        baseColor.PushBack(obj.materialCore.baseColor.z, allocator);
+        baseColor.PushBack(obj.materialCore.baseColor.w, allocator);
+        material.AddMember("baseColor", baseColor, allocator);
 
-        Value specular(kArrayType);
-        specular.PushBack(obj.material.specular.x, allocator);
-        specular.PushBack(obj.material.specular.y, allocator);
-        specular.PushBack(obj.material.specular.z, allocator);
-        material.AddMember("specular", specular, allocator);
+        // PBR properties
+        material.AddMember("metallic", obj.materialCore.metallic, allocator);
+        material.AddMember("roughness", obj.materialCore.roughness, allocator);
+        material.AddMember("ior", obj.materialCore.ior, allocator);
+        material.AddMember("transmission", obj.materialCore.transmission, allocator);
 
-        material.AddMember("shininess", obj.material.shininess, allocator);
-        material.AddMember("roughness", obj.material.roughness, allocator);
-        material.AddMember("metallic", obj.material.metallic, allocator);
+        // Emissive
+        Value emissive(kArrayType);
+        emissive.PushBack(obj.materialCore.emissive.x, allocator);
+        emissive.PushBack(obj.materialCore.emissive.y, allocator);
+        emissive.PushBack(obj.materialCore.emissive.z, allocator);
+        material.AddMember("emissive", emissive, allocator);
 
-        Value ambient(kArrayType);
-        ambient.PushBack(obj.material.ambient.x, allocator);
-        ambient.PushBack(obj.material.ambient.y, allocator);
-        ambient.PushBack(obj.material.ambient.z, allocator);
-        material.AddMember("ambient", ambient, allocator);
+        // Advanced properties
+        material.AddMember("normalStrength", obj.materialCore.normalStrength, allocator);
+        material.AddMember("thickness", obj.materialCore.thickness, allocator);
 
         objVal.AddMember("material", material, allocator);
         
@@ -512,7 +510,7 @@ std::string SceneManager::toJson() const
     return buffer.GetString();
 }
 
-bool SceneManager::reparentObject(int childIndex, int newParentIndex)
+bool SceneManager::reparentObject(int childIndex, int newParentIndex) // there are two reparent object functions, this seems ambigous, is this fine?
 {
     // Validate indices
     if (childIndex < 0 || childIndex >= static_cast<int>(m_objects.size())) {
@@ -679,3 +677,4 @@ glm::mat4 SceneManager::getLocalMatrix(int objectIndex) const
     }
     return m_objects[objectIndex].localMatrix;
 }
+

@@ -4,23 +4,30 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include <cstdint>
+#include "camera_state.h"
+#include "managers/camera_manager.h"
 #include "gl_platform.h"
 #include "gizmo.h"
 // RHI types for pipeline handles
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
+#include "render_mode_selector.h"
 
 using namespace glint3d;
 
 // Forward declarations
 class SceneManager;
-class Light; 
+class Light;
 class Raytracer;
 class AxisRenderer;
 class Grid;
 class Gizmo;
 class Skybox;
 class IBLSystem;
+class RenderGraph;
+class RenderPipelineModeSelector;
+enum class RenderPipelineMode;
+struct PassContext;
 struct SceneObject;
 
 class Shader;
@@ -44,16 +51,7 @@ enum class ShadingMode {
     Gouraud = 1
 };
 
-struct CameraState {
-    glm::vec3 position{0.0f, 0.0f, 10.0f};
-    glm::vec3 front{0.0f, 0.0f, -1.0f};
-    glm::vec3 up{0.0f, 1.0f, 0.0f};
-    float fov = 45.0f;
-    float nearClip = 0.1f;
-    float farClip = 100.0f;
-    float yaw = -90.0f;
-    float pitch = 0.0f;
-};
+struct PassTiming; // Forward declaration
 
 struct RenderStats {
     int drawCalls = 0;
@@ -65,6 +63,7 @@ struct RenderStats {
     float vramMB = 0.0f;
     int topSharedCount = 0;
     std::string topSharedKey;
+    std::vector<PassTiming> passTimings;
 };
 
 class RenderSystem 
@@ -76,8 +75,9 @@ public:
     bool init(int windowWidth, int windowHeight);
     void shutdown();
 
-    // Main render call
+    // Main render calls
     void render(const SceneManager& scene, const Light& lights);
+    void renderUnified(const SceneManager& scene, const Light& lights);
     
     // Offscreen rendering
     // Legacy GL path: renders into a raw GL texture via FBO (kept for compatibility)
@@ -90,15 +90,16 @@ public:
                     const std::string& path, int width, int height);
 
     // Camera management
-    void setCamera(const CameraState& camera) { m_camera = camera; }
-    const CameraState& getCamera() const { return m_camera; }
-    CameraState& getCamera() { return m_camera; }
+    void setCamera(const CameraState& camera) { m_cameraManager.setCamera(camera); }
+    const CameraState& getCamera() const { return m_cameraManager.camera(); }
+    CameraState& getCamera() { return m_cameraManager.camera(); }
     
     void updateViewMatrix();
     void updateProjectionMatrix(int windowWidth, int windowHeight);
     
-    glm::mat4 getViewMatrix() const { return m_viewMatrix; }
-    glm::mat4 getProjectionMatrix() const { return m_projectionMatrix; }
+    glm::mat4 getViewMatrix() const { return m_cameraManager.viewMatrix(); }
+    glm::mat4 getProjectionMatrix() const { return m_cameraManager.projectionMatrix(); }
+
 
     // Render modes
     void setRenderMode(RenderMode mode) { m_renderMode = mode; }
@@ -194,10 +195,18 @@ public:
 
 private:
     // Core rendering state
-    CameraState m_camera;
-    glm::mat4 m_viewMatrix{1.0f};
-    glm::mat4 m_projectionMatrix{1.0f};
-    
+    CameraManager m_cameraManager;
+
+    std::unique_ptr<RenderGraph> m_rasterGraph;
+    std::unique_ptr<RenderGraph> m_rayGraph;
+    std::unique_ptr<RenderPipelineModeSelector> m_pipelineSelector;
+    RenderPipelineMode m_activePipelineMode = RenderPipelineMode::Raster;
+    RenderPipelineMode m_pipelineOverride = RenderPipelineMode::Auto;
+
+    RenderTargetHandle m_activeRenderTarget = INVALID_HANDLE;
+    TextureHandle m_activeOutputTexture = INVALID_HANDLE;
+    uint64_t m_frameCounter = 0;
+
     RenderMode m_renderMode = RenderMode::Solid;
     ShadingMode m_shadingMode = ShadingMode::Gouraud;
     bool m_framebufferSRGBEnabled = true;
@@ -210,7 +219,7 @@ private:
     float m_gamma = 2.2f;
     RenderToneMapMode m_tonemap = RenderToneMapMode::Linear;
     uint32_t m_seed = 0;
-    
+
     // Debug rendering
     bool m_showGrid = true;
     bool m_showAxes = true;
@@ -288,6 +297,7 @@ private:
     RenderStats m_stats;
     
     // Private methods
+    void renderLegacy(const SceneManager& scene, const Light& lights);
     void renderRasterized(const SceneManager& scene, const Light& lights);
     void renderRaytraced(const SceneManager& scene, const Light& lights);
     void renderObject(const SceneObject& obj, const Light& lights);
@@ -331,6 +341,37 @@ private:
     void createOrResizeTargets(int width, int height);
     void destroyTargets();
 
+    // Render Graph System
+    void initializeRenderGraphs();
+    void destroyRenderGraphs();
+
+public:
+    // Render Pass Methods (called by render graph passes)
+    void passFrameSetup(const PassContext& ctx);
+    void passRaster(const PassContext& ctx);
+    void passRaytrace(const PassContext& ctx, int sampleCount = 1, int maxDepth = 8);
+    void passGBuffer(const PassContext& ctx);
+    void passDeferredLighting(const PassContext& ctx);
+    void passRayIntegrator(const PassContext& ctx);
+    void passRayDenoise(const PassContext& ctx);
+    void passOverlays(const PassContext& ctx);
+    void passResolve(const PassContext& ctx);
+    void passPresent(const PassContext& ctx);
+    void passReadback(const PassContext& ctx);
+
+private:
+
     // Minimal RHI integration (initial cut)
     std::unique_ptr<RHI> m_rhi;
 };
+
+
+
+
+
+
+
+
+
+
+

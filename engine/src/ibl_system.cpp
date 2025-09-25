@@ -1,6 +1,7 @@
 #include "ibl_system.h"
 #include "shader.h"
 #include "image_io.h"
+#include "path_utils.h"
 #include <iostream>
 #include <cmath>
 
@@ -115,7 +116,7 @@ bool IBLSystem::init()
     return true;
 }
 
-void IBLSystem::createShaders()
+void IBLSystem::createShaders() // Should we move the shaders into its own shaders folder?
 {
     // Equirectangular to cubemap shader
     m_equirectToCubemapShader = new Shader();
@@ -373,9 +374,16 @@ void IBLSystem::createShaders()
 
 GLuint IBLSystem::loadHDRTexture(const std::string& path)
 {
+    // Resolve path to handle different working directories
+    std::string resolvedPath = PathUtils::resolveAssetPath(path);
+    if (resolvedPath.empty()) {
+        std::cerr << "Failed to resolve HDR/EXR path: " << path << std::endl;
+        return 0;
+    }
+
     ImageIO::ImageDataFloat img;
-    if (!ImageIO::LoadImageFloat(path, img, /*flipY=*/true)) {
-        std::cerr << "Failed to load HDR/EXR image: " << path << std::endl;
+    if (!ImageIO::LoadImageFloat(resolvedPath, img, /*flipY=*/true)) {
+        std::cerr << "Failed to load HDR/EXR image: " << resolvedPath << " (original: " << path << ")" << std::endl;
         return 0;
     }
 

@@ -3,7 +3,7 @@
 #include "triangle.h"
 #include "ray.h"
 #include "objloader.h"
-#include "material.h"
+#include "material_core.h"
 #include "bvh_node.h"
 #include "light.h"  
 #include "microfacet_sampling.h"
@@ -17,7 +17,7 @@ class Raytracer
 public:
     Raytracer();
 
-    void loadModel(const ObjLoader& loader, const glm::mat4& transform, float reflectivity, const Material& mat);
+    void loadModel(const ObjLoader& loader, const glm::mat4& transform, float reflectivity, const MaterialCore& mat);
 
     glm::vec3 traceRay(const Ray& r, const Light& lights, int depth = 3) const;  
     void renderImage(std::vector<glm::vec3>& out,
@@ -48,7 +48,7 @@ private:
         const glm::vec3& hitPoint,
         const glm::vec3& viewDir,
         const glm::vec3& normal,
-        const Material& material,
+        const MaterialCore& material,
         const Light& lights,
         int depth,
         SeededRng& rng
@@ -59,7 +59,7 @@ private:
         const glm::vec3& hitPoint,
         const glm::vec3& incident,
         const glm::vec3& normal,
-        const Material& material,
+        const MaterialCore& material,
         const Light& lights,
         int depth
     ) const;

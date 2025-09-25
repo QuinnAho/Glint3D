@@ -5,6 +5,10 @@
 #include <cmath>
 #include <limits>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 namespace raytracer {
 
     LightSample LightingSystem::sampleLight(
@@ -73,7 +77,7 @@ namespace raytracer {
     }
 
     MaterialEval LightingSystem::evaluateMaterial(
-        const Material& material,
+        const MaterialCore& material,
         const glm::vec3& normal,
         const glm::vec3& viewDir,
         const glm::vec3& lightDir,
@@ -88,7 +92,7 @@ namespace raytracer {
         
         // Diffuse component (Lambertian)
         glm::vec3 diffuseAlbedo = baseColor * (1.0f - material.metallic); // Metals have no diffuse
-        eval.diffuse = (diffuseAlbedo / glm::pi<float>()) * lightColor * NdotL;
+        eval.diffuse = (diffuseAlbedo / (float)M_PI) * lightColor * NdotL;
         
         // Specular component (Cook-Torrance)
         glm::vec3 brdfSpecular = brdf::cookTorrance(normal, viewDir, lightDir, baseColor, material.roughness, material.metallic);
@@ -101,7 +105,7 @@ namespace raytracer {
     }
 
     glm::vec3 LightingSystem::computeAmbient(
-        const Material& material,
+        const MaterialCore& material,
         const glm::vec4& globalAmbient)
     {
         // Proper PBR ambient calculation
@@ -136,7 +140,7 @@ namespace raytracer {
         const glm::vec3& hitPoint,
         const glm::vec3& normal,
         const glm::vec3& viewDir,
-        const Material& material,
+        const MaterialCore& material,
         const Light& lights,
         const Raytracer& raytracer)
     {
@@ -164,10 +168,10 @@ namespace raytracer {
     }
 
     namespace material {
-        glm::vec3 getBaseColor(const Material& mat) {
-            // For PBR workflow, diffuse is the base albedo color
+        glm::vec3 getBaseColor(const MaterialCore& mat) {
+            // For PBR workflow, use the base color from MaterialCore
             // Ensure minimum brightness for visibility
-            glm::vec3 baseColor = mat.diffuse;
+            glm::vec3 baseColor = glm::vec3(mat.baseColor);
             
             // Ensure we have some color visibility
             if (glm::length(baseColor) < 0.1f) {
@@ -177,12 +181,12 @@ namespace raytracer {
             return baseColor;
         }
         
-        glm::vec3 getAmbientColor(const Material& mat) {
+        glm::vec3 getAmbientColor(const MaterialCore& mat) {
             // Use base color for ambient, but dimmer
             return getBaseColor(mat) * 0.2f;
         }
         
-        glm::vec3 getF0(const Material& mat) {
+        glm::vec3 getF0(const MaterialCore& mat) {
             // Standard PBR F0 calculation
             const glm::vec3 dielectricF0(0.04f);
             return glm::mix(dielectricF0, getBaseColor(mat), mat.metallic);

@@ -1,4 +1,0 @@
-{"ts":"2025-09-11T21:40:00Z","who":"ai","kind":"task_analysis","task":"FEAT-0242","msg":"Discovered existing substantial RHI implementation in engine/include/rhi/ and engine/src/rhi/"}
-{"ts":"2025-09-11T21:40:00Z","who":"ai","kind":"api_created","task":"FEAT-0242","pr":"PR1","msg":"Created public API headers engine/include/glint3d/rhi.h and rhi_types.h with comprehensive documentation"}
-{"ts":"2025-09-11T21:40:00Z","who":"ai","kind":"integration_needed","task":"FEAT-0242","msg":"Need to validate compatibility between existing internal RHI and new public API, then migrate RenderSystem"}
-{"ts":"2025-09-13T00:00:00Z","who":"ai","kind":"strategy_shift","task":"FEAT-0242","msg":"Switched from Vulkan-first to WebGPU-first approach for cross-platform parity; GL remains primary backend short-term."}

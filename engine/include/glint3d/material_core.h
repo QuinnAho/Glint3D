@@ -117,19 +117,13 @@ struct MaterialCore {
     }
     
     /**
-     * @brief Legacy system interoperability (temporary during migration)
+     * @brief PBR system interoperability (for asset loading/export)
      */
-    
-    /// Convert from legacy Material struct (raytracer format)
-    static MaterialCore fromLegacyMaterial(const class Material& legacy);
-    
-    /// Convert from PBR material struct (rasterizer format)  
+
+    /// Convert from PBR material struct (for asset import)
     static MaterialCore fromPBRMaterial(const struct PBRMaterial& pbr);
-    
-    /// Convert to legacy Material (for raytracer compatibility)
-    void toLegacyMaterial(class Material& legacy) const;
-    
-    /// Convert to PBR material (for rasterizer compatibility)
+
+    /// Convert to PBR material (for asset export compatibility)
     void toPBRMaterial(struct PBRMaterial& pbr) const;
     
     /**

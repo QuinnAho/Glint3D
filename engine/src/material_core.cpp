@@ -1,5 +1,4 @@
 #include "material_core.h"
-#include "material.h"
 #include "pbr_material.h"
 #include <algorithm>
 #include <iostream>
@@ -48,63 +47,28 @@ MaterialCore MaterialCore::createEmissive(const glm::vec3& color, float intensit
     return material;
 }
 
-MaterialCore MaterialCore::fromLegacyMaterial(const Material& legacy) {
-    MaterialCore material;
-    
-    // Map legacy diffuse to base color
-    material.baseColor = glm::vec4(legacy.diffuse, 1.0f);
-    
-    // Convert legacy properties
-    material.metallic = legacy.metallic;
-    material.roughness = legacy.roughness;
-    material.ior = legacy.ior;
-    material.transmission = legacy.transmission;
-    
-    // Legacy materials don't have these advanced properties
-    material.normalStrength = 1.0f;
-    material.emissive = glm::vec3(0.0f);
-    material.thickness = 0.001f;
-    material.attenuationDistance = 1.0f;
-    material.clearcoat = 0.0f;
-    material.clearcoatRoughness = 0.03f;
-    
-    material.name = "Legacy";
-    return material;
-}
-
 MaterialCore MaterialCore::fromPBRMaterial(const PBRMaterial& pbr) {
     MaterialCore material;
-    
+
     // Direct mapping of PBR properties
     material.baseColor = pbr.baseColorFactor;
     material.metallic = pbr.metallicFactor;
     material.roughness = pbr.roughnessFactor;
     material.ior = pbr.ior;
-    
+
     // Map texture paths
     material.baseColorTex = pbr.baseColorTex;
     material.normalTex = pbr.normalTex;
     material.metallicRoughnessTex = pbr.mrTex;
     material.occlusionTex = pbr.aoTex;
-    
+
     // PBR materials don't have transmission by default
     material.transmission = 0.0f;
     material.thickness = 0.001f;
     material.attenuationDistance = 1.0f;
-    
+
     material.name = "PBR";
     return material;
-}
-
-void MaterialCore::toLegacyMaterial(Material& legacy) const {
-    legacy.diffuse = glm::vec3(baseColor);
-    legacy.specular = glm::vec3(1.0f); // Simplified
-    legacy.ambient = glm::vec3(0.1f); // Simplified
-    legacy.shininess = (1.0f - roughness) * 128.0f; // Rough approximation
-    legacy.metallic = metallic;
-    legacy.roughness = roughness;
-    legacy.ior = ior;
-    legacy.transmission = transmission;
 }
 
 void MaterialCore::toPBRMaterial(PBRMaterial& pbr) const {

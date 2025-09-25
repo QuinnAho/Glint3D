@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <limits>
+#include "path_utils.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>   // glm::min / glm::max
@@ -16,7 +17,10 @@ ObjLoader::ObjLoader()
 
 void ObjLoader::load(const char* filename)
 {
-    std::ifstream file(filename);
+    // Resolve asset path
+    std::string resolvedPath = PathUtils::resolveAssetPath(filename);
+
+    std::ifstream file(resolvedPath);
     if (!file.is_open())
     {
         std::cerr << "[ObjLoader] cannot open " << filename << '\n';

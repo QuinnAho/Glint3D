@@ -108,7 +108,7 @@ SchemaValidator::ValidationResponse SchemaValidator::validate(const std::string&
     return m_impl->validateDocument(document);
 }
 
-std::string SchemaValidator::getEmbeddedSchemaV1_3() {
+std::string SchemaValidator::getEmbeddedSchemaV1_3() { // make sure everything is updated to 1_3
     return R"({
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Glint JSON Ops v1.3",

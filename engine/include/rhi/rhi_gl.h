@@ -46,6 +46,9 @@ public:
     void bindTexture(TextureHandle texture, uint32_t slot) override;
     void bindUniformBuffer(BufferHandle buffer, uint32_t slot) override;
     void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) override;
+    void updateTexture(TextureHandle texture, const void* data,
+                      int width, int height, TextureFormat format,
+                      int x = 0, int y = 0, int mipLevel = 0) override;
     void bindRenderTarget(RenderTargetHandle renderTarget) override;
     void resolveRenderTarget(RenderTargetHandle srcRenderTarget, TextureHandle dstTexture,
                            const int* srcRect = nullptr, const int* dstRect = nullptr) override;
@@ -220,6 +223,7 @@ private:
 
     // Helper methods
     GLenum textureFormatToGL(TextureFormat format) const;
+    void getTextureFormatAndType(TextureFormat format, GLenum& outFormat, GLenum& outType) const;
     GLenum textureTypeToGL(TextureType type) const;
     GLenum bufferTypeToGL(BufferType type) const;
     GLenum bufferUsageToGL(BufferUsage usage) const;

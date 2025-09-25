@@ -1,0 +1,37 @@
+{
+  "description": "Auto mode test - should select ray pipeline for refractive materials",
+  "ops": [
+    {
+      "op": "load",
+      "path": "assets/models/sphere.obj",
+      "name": "CrystalSphere",
+      "position": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "material": {
+        "baseColor": [1.0, 0.98, 0.9],
+        "metallic": 0.0,
+        "roughness": 0.0,
+        "transmission": 0.95,
+        "ior": 2.4,
+        "thickness": 0.3
+      }
+    },
+    {
+      "op": "add_light",
+      "type": "directional",
+      "direction": [-0.3, -0.8, -0.5],
+      "color": [1, 1, 1],
+      "intensity": 1.5
+    },
+    {
+      "op": "set_camera",
+      "position": [2.5, 1.5, 2.5],
+      "target": [0, 0, 0],
+      "fov": 50
+    },
+    {
+      "op": "set_background",
+      "color": [0.05, 0.1, 0.2]
+    }
+  ]
+}

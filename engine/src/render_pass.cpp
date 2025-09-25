@@ -1,14 +1,40 @@
 #include "render_pass.h"
-#include <glint3d/rhi_types.h>
+#include "render_system.h"
 #include "scene_manager.h"
 #include "light.h"
-#include "raytracer.h"
+
+#include <glint3d/rhi_types.h>
+
 #include <algorithm>
 #include <iostream>
+#include <chrono>
 
 using namespace glint3d;
 
-// RenderGraph implementation
+// RenderPass timing implementation
+void RenderPass::executeWithTiming(const PassContext& ctx) {
+    if (!isEnabled()) return;
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    // Execute the actual pass
+    execute(ctx);
+
+    // Calculate elapsed time
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    float timeMs = duration.count() / 1000.0f;
+
+    // Record timing if enabled and timing collection is available
+    if (ctx.enableTiming && ctx.passTimings) {
+        PassTiming timing{};
+        timing.passName = getName();
+        timing.timeMs = timeMs;
+        timing.enabled = isEnabled();
+        ctx.passTimings->push_back(timing);
+    }
+}
+
 RenderGraph::RenderGraph(RHI* rhi) : m_rhi(rhi) {}
 
 RenderGraph::~RenderGraph() {
@@ -18,7 +44,7 @@ RenderGraph::~RenderGraph() {
 void RenderGraph::addPass(std::unique_ptr<RenderPass> pass) {
     if (pass) {
         m_passes.push_back(std::move(pass));
-        sortPasses(); // Re-sort whenever a new pass is added
+        sortPasses();
     }
 }
 
@@ -28,8 +54,7 @@ void RenderGraph::removePass(const std::string& name) {
             [&name](const std::unique_ptr<RenderPass>& pass) {
                 return std::string(pass->getName()) == name;
             }),
-        m_passes.end()
-    );
+        m_passes.end());
 }
 
 RenderPass* RenderGraph::getPass(const std::string& name) {
@@ -44,7 +69,7 @@ bool RenderGraph::setup(const PassContext& baseContext) {
     if (m_isSetup) {
         teardown();
     }
-    
+
     bool success = true;
     for (auto& pass : m_passes) {
         if (pass->isEnabled()) {
@@ -54,7 +79,7 @@ bool RenderGraph::setup(const PassContext& baseContext) {
             }
         }
     }
-    
+
     m_isSetup = success;
     return success;
 }
@@ -63,14 +88,13 @@ void RenderGraph::execute(const PassContext& baseContext) {
     if (!m_enabled || !m_isSetup) {
         return;
     }
-    
-    // Create context with graph textures
+
     PassContext ctx = baseContext;
     ctx.textures = m_textures;
-    
+
     for (auto& pass : m_passes) {
         if (pass->isEnabled()) {
-            pass->execute(ctx);
+            pass->executeWithTiming(ctx);
         }
     }
 }
@@ -79,25 +103,22 @@ void RenderGraph::teardown() {
     for (auto& pass : m_passes) {
         pass->teardown(PassContext{});
     }
-    
-    // Clean up graph textures
+
     for (auto& [name, handle] : m_textures) {
         if (handle != INVALID_HANDLE) {
             m_rhi->destroyTexture(handle);
         }
     }
     m_textures.clear();
-    
     m_isSetup = false;
 }
 
 TextureHandle RenderGraph::createTexture(const std::string& name, const TextureDesc& desc) {
     auto it = m_textures.find(name);
     if (it != m_textures.end()) {
-        // Texture already exists, destroy old one
         m_rhi->destroyTexture(it->second);
     }
-    
+
     TextureHandle handle = m_rhi->createTexture(desc);
     m_textures[name] = handle;
     return handle;
@@ -117,219 +138,433 @@ TextureHandle RenderGraph::getTexture(const std::string& name) const {
 }
 
 void RenderGraph::sortPasses() {
-    // Simple dependency-based sorting
-    // For now, we'll use a basic topological sort
-    // In a full implementation, this would be more sophisticated
-    
     std::stable_sort(m_passes.begin(), m_passes.end(),
         [](const std::unique_ptr<RenderPass>& a, const std::unique_ptr<RenderPass>& b) {
-            // Simple heuristic: passes with no inputs come first
             return a->getInputs().empty() && !b->getInputs().empty();
         });
 }
 
-// GBufferPass implementation
-bool GBufferPass::setup(const PassContext& ctx) {
-    // TODO: Create G-buffer shader and pipeline
-    // This is a simplified implementation
-    std::cout << "[GBufferPass] Setup completed\n";
-    return true;
-}
-
-void GBufferPass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !ctx.scene) return;
-    
-    // TODO: Render geometry to G-buffer
-    // - Bind G-buffer framebuffer
-    // - Render all opaque objects
-    // - Output: albedo, normal, material properties, depth
-    std::cout << "[GBufferPass] Rendering geometry to G-buffer\n";
-}
-
-void GBufferPass::teardown(const PassContext& ctx) {
-    if (m_pipeline != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyPipeline(m_pipeline);
-        m_pipeline = INVALID_HANDLE;
-    }
-    if (m_shader != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyShader(m_shader);
-        m_shader = INVALID_HANDLE;
+namespace {
+    bool ensureRenderer(const PassContext& ctx, const char* passName) {
+        if (!ctx.renderer) {
+            std::cerr << "[" << passName << "] Missing RenderSystem reference" << std::endl;
+            return false;
+        }
+        if (!ctx.rhi) {
+            std::cerr << "[" << passName << "] Missing RHI reference" << std::endl;
+            return false;
+        }
+        return true;
     }
 }
 
-// LightingPass implementation
-bool LightingPass::setup(const PassContext& ctx) {
-    std::cout << "[LightingPass] Setup completed\n";
-    return true;
+bool FrameSetupPass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
 }
 
-void LightingPass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !ctx.lights) return;
-    
-    // TODO: Perform deferred lighting
-    // - Sample G-buffer textures
-    // - Apply lighting calculations
-    // - Output: lit color
-    std::cout << "[LightingPass] Performing deferred lighting\n";
+void FrameSetupPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    ctx.renderer->passFrameSetup(ctx);
 }
 
-void LightingPass::teardown(const PassContext& ctx) {
-    if (m_pipeline != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyPipeline(m_pipeline);
-        m_pipeline = INVALID_HANDLE;
+void FrameSetupPass::teardown(const PassContext&) {}
+
+bool RasterPass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
+}
+
+void RasterPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRaster) return;
+    ctx.renderer->passRaster(ctx);
+}
+
+void RasterPass::teardown(const PassContext&) {}
+
+bool RaytracePass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
+}
+
+void RaytracePass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRay) return;
+    ctx.renderer->passRaytrace(ctx, m_sampleCount, m_maxDepth);
+}
+
+
+void RaytracePass::teardown(const PassContext&) {}
+
+void RaytracePass::setSampleCount(int samples) {
+    m_sampleCount = std::max(1, samples);
+}
+
+void RaytracePass::setMaxDepth(int depth) {
+    m_maxDepth = std::max(1, depth);
+}
+
+
+bool RayDenoisePass::setup(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return false;
+    if (!ctx.rhi) return false;
+
+    // Create output texture for denoised result
+    int width = ctx.viewportWidth > 0 ? ctx.viewportWidth : 1024;
+    int height = ctx.viewportHeight > 0 ? ctx.viewportHeight : 768;
+
+    TextureDesc desc{};
+    desc.width = width;
+    desc.height = height;
+    desc.format = TextureFormat::RGBA32F; // High precision for HDR denoising
+    desc.debugName = "RayDenoise_Output";
+    m_outputTex = ctx.rhi->createTexture(desc);
+
+    return m_outputTex != INVALID_HANDLE;
+}
+
+void RayDenoisePass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRay || m_outputTex == INVALID_HANDLE) return;
+
+    // Get ray traced input texture
+    auto rayTraceResult = ctx.textures.find("rayTraceResult");
+    if (rayTraceResult == ctx.textures.end()) {
+        std::cerr << "[RayDenoisePass] Missing ray trace result texture" << std::endl;
+        return;
     }
-    if (m_shader != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyShader(m_shader);
-        m_shader = INVALID_HANDLE;
-    }
+
+    // Apply denoising to the ray traced result
+    ctx.renderer->passRayDenoise(ctx, rayTraceResult->second, m_outputTex);
+
+    // Add denoised result to context for other passes
+    PassContext* mutableCtx = const_cast<PassContext*>(&ctx);
+    mutableCtx->textures["denoisedResult"] = m_outputTex;
 }
 
-// SSRRefractionPass implementation
-bool SSRRefractionPass::setup(const PassContext& ctx) {
-    std::cout << "[SSRRefractionPass] Setup completed\n";
-    return true;
-}
-
-void SSRRefractionPass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !m_hasTransparentObjects) return;
-    
-    // TODO: Implement screen-space refraction
-    // - Ray-march through screen space
-    // - Apply refraction based on IOR and normals
-    // - Blend with background
-    std::cout << "[SSRRefractionPass] Applying screen-space refraction\n";
-}
-
-void SSRRefractionPass::teardown(const PassContext& ctx) {
-    if (m_pipeline != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyPipeline(m_pipeline);
-        m_pipeline = INVALID_HANDLE;
-    }
-    if (m_shader != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyShader(m_shader);
-        m_shader = INVALID_HANDLE;
-    }
-}
-
-// PostPass implementation
-bool PostPass::setup(const PassContext& ctx) {
-    std::cout << "[PostPass] Setup completed\n";
-    return true;
-}
-
-void PostPass::execute(const PassContext& ctx) {
+void RayDenoisePass::teardown(const PassContext& ctx) {
     if (!ctx.rhi) return;
-    
-    // TODO: Apply post-processing
-    // - Tone mapping (Linear/Reinhard/Filmic/ACES)
-    // - Gamma correction
-    // - Exposure adjustment
-    std::cout << "[PostPass] Applying tone mapping and gamma correction\n";
-}
 
-void PostPass::teardown(const PassContext& ctx) {
-    if (m_pipeline != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyPipeline(m_pipeline);
-        m_pipeline = INVALID_HANDLE;
-    }
-    if (m_shader != INVALID_HANDLE && ctx.rhi) {
-        ctx.rhi->destroyShader(m_shader);
-        m_shader = INVALID_HANDLE;
+    if (m_outputTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_outputTex);
+        m_outputTex = INVALID_HANDLE;
     }
 }
 
-// ReadbackPass implementation
+bool OverlayPass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
+}
+
+void OverlayPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableOverlays) return;
+    ctx.renderer->passOverlays(ctx);
+}
+
+void OverlayPass::teardown(const PassContext&) {}
+
+bool ResolvePass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
+}
+
+void ResolvePass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    ctx.renderer->passResolve(ctx);
+}
+
+void ResolvePass::teardown(const PassContext&) {}
+
+bool PresentPass::setup(const PassContext& ctx) {
+    return ensureRenderer(ctx, getName());
+}
+
+void PresentPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.finalizeFrame) return;
+    ctx.renderer->passPresent(ctx);
+}
+
+void PresentPass::teardown(const PassContext&) {}
+
 bool ReadbackPass::setup(const PassContext& ctx) {
-    std::cout << "[ReadbackPass] Setup completed\n";
-    return true;
+    return ensureRenderer(ctx, getName());
 }
 
 void ReadbackPass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !m_destination) return;
-    
-    // Get final color texture
-    auto it = ctx.textures.find("final_color");
-    if (it == ctx.textures.end()) {
-        std::cerr << "[ReadbackPass] Final color texture not found\n";
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.readback) return;
+
+    // Determine source texture - either specified or auto-select
+    TextureHandle sourceTexture = ctx.outputTexture;
+
+    if (!m_sourceTexture.empty()) {
+        // Use specified source texture
+        auto it = ctx.textures.find(m_sourceTexture);
+        if (it != ctx.textures.end()) {
+            sourceTexture = it->second;
+        }
+    } else {
+        // Auto-select based on enabled render mode
+        if (ctx.enableRay) {
+            // For ray mode, prefer denoised result, fallback to raw ray trace
+            auto denoised = ctx.textures.find("denoisedResult");
+            if (denoised != ctx.textures.end()) {
+                sourceTexture = denoised->second;
+            } else {
+                auto rayTrace = ctx.textures.find("rayTraceResult");
+                if (rayTrace != ctx.textures.end()) {
+                    sourceTexture = rayTrace->second;
+                }
+            }
+        } else if (ctx.enableRaster) {
+            // For raster mode, use lit color
+            auto litColor = ctx.textures.find("litColor");
+            if (litColor != ctx.textures.end()) {
+                sourceTexture = litColor->second;
+            }
+        }
+    }
+
+    // Create modified context with the correct source texture
+    PassContext modifiedCtx = ctx;
+    modifiedCtx.outputTexture = sourceTexture;
+
+    ctx.renderer->passReadback(modifiedCtx);
+}
+
+void ReadbackPass::teardown(const PassContext&) {}
+
+// G-Buffer Pass Implementation
+bool GBufferPass::setup(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return false;
+    if (!ctx.rhi) return false;
+
+    // Create G-buffer render targets
+    int width = ctx.viewportWidth > 0 ? ctx.viewportWidth : 1024;
+    int height = ctx.viewportHeight > 0 ? ctx.viewportHeight : 768;
+
+    // Create textures for G-buffer
+    TextureDesc desc{};
+    desc.width = width;
+    desc.height = height;
+    desc.format = TextureFormat::RGBA8;
+    desc.debugName = "GBuffer_BaseColor";
+    m_baseColorTex = ctx.rhi->createTexture(desc);
+
+    desc.debugName = "GBuffer_Normal";
+    m_normalTex = ctx.rhi->createTexture(desc);
+
+    desc.format = TextureFormat::RGBA32F; // Need higher precision for world positions
+    desc.debugName = "GBuffer_Position";
+    m_positionTex = ctx.rhi->createTexture(desc);
+
+    desc.format = TextureFormat::RGBA8;
+    desc.debugName = "GBuffer_Material";
+    m_materialTex = ctx.rhi->createTexture(desc);
+
+    // Create depth texture
+    desc.format = TextureFormat::Depth24Stencil8;
+    desc.debugName = "GBuffer_Depth";
+    m_depthTex = ctx.rhi->createTexture(desc);
+
+    // Create render target with attachments
+    RenderTargetDesc rtDesc{};
+    rtDesc.width = width;
+    rtDesc.height = height;
+
+    // Set up color attachments
+    RenderTargetAttachment baseColorAttachment{};
+    baseColorAttachment.type = AttachmentType::Color0;
+    baseColorAttachment.texture = m_baseColorTex;
+    rtDesc.colorAttachments.push_back(baseColorAttachment);
+
+    RenderTargetAttachment normalAttachment{};
+    normalAttachment.type = AttachmentType::Color1;
+    normalAttachment.texture = m_normalTex;
+    rtDesc.colorAttachments.push_back(normalAttachment);
+
+    RenderTargetAttachment positionAttachment{};
+    positionAttachment.type = AttachmentType::Color2;
+    positionAttachment.texture = m_positionTex;
+    rtDesc.colorAttachments.push_back(positionAttachment);
+
+    RenderTargetAttachment materialAttachment{};
+    materialAttachment.type = AttachmentType::Color3;
+    materialAttachment.texture = m_materialTex;
+    rtDesc.colorAttachments.push_back(materialAttachment);
+
+    // Set up depth attachment
+    rtDesc.depthAttachment.type = AttachmentType::Depth;
+    rtDesc.depthAttachment.texture = m_depthTex;
+
+    rtDesc.debugName = "GBufferRT";
+    m_gBufferRT = ctx.rhi->createRenderTarget(rtDesc);
+
+    return m_gBufferRT != INVALID_HANDLE;
+}
+
+void GBufferPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRaster || m_gBufferRT == INVALID_HANDLE) return;
+
+    // Add G-buffer textures to context for use by other passes
+    PassContext* mutableCtx = const_cast<PassContext*>(&ctx);
+    mutableCtx->textures["gBaseColor"] = m_baseColorTex;
+    mutableCtx->textures["gNormal"] = m_normalTex;
+    mutableCtx->textures["gPosition"] = m_positionTex;
+    mutableCtx->textures["gMaterial"] = m_materialTex;
+    mutableCtx->textures["gDepth"] = m_depthTex;
+
+    ctx.renderer->passGBuffer(ctx, m_gBufferRT);
+}
+
+void GBufferPass::teardown(const PassContext& ctx) {
+    if (!ctx.rhi) return;
+
+    if (m_gBufferRT != INVALID_HANDLE) {
+        ctx.rhi->destroyRenderTarget(m_gBufferRT);
+        m_gBufferRT = INVALID_HANDLE;
+    }
+    if (m_baseColorTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_baseColorTex);
+        m_baseColorTex = INVALID_HANDLE;
+    }
+    if (m_normalTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_normalTex);
+        m_normalTex = INVALID_HANDLE;
+    }
+    if (m_positionTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_positionTex);
+        m_positionTex = INVALID_HANDLE;
+    }
+    if (m_materialTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_materialTex);
+        m_materialTex = INVALID_HANDLE;
+    }
+    if (m_depthTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_depthTex);
+        m_depthTex = INVALID_HANDLE;
+    }
+}
+
+// Deferred Lighting Pass Implementation
+bool DeferredLightingPass::setup(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return false;
+    if (!ctx.rhi) return false;
+
+    // Create output texture for lit result
+    int width = ctx.viewportWidth > 0 ? ctx.viewportWidth : 1024;
+    int height = ctx.viewportHeight > 0 ? ctx.viewportHeight : 768;
+
+    TextureDesc desc{};
+    desc.width = width;
+    desc.height = height;
+    desc.format = TextureFormat::RGBA8;
+    desc.debugName = "DeferredLighting_Output";
+    m_outputTex = ctx.rhi->createTexture(desc);
+
+    // Create render target
+    RenderTargetDesc rtDesc{};
+    rtDesc.width = width;
+    rtDesc.height = height;
+
+    RenderTargetAttachment colorAttachment{};
+    colorAttachment.type = AttachmentType::Color0;
+    colorAttachment.texture = m_outputTex;
+    rtDesc.colorAttachments.push_back(colorAttachment);
+
+    rtDesc.debugName = "DeferredLightingRT";
+    m_outputRT = ctx.rhi->createRenderTarget(rtDesc);
+
+    return m_outputRT != INVALID_HANDLE;
+}
+
+void DeferredLightingPass::execute(const PassContext& ctx) {
+    std::cout << "[DeferredLightingPass] execute called, enableRaster=" << ctx.enableRaster << ", outputRT=" << m_outputRT << std::endl;
+
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRaster) {
+        std::cout << "[DeferredLightingPass] Skipping - raster disabled" << std::endl;
         return;
     }
-    
-    ReadbackDesc desc;
-    desc.sourceTexture = it->second;
-    desc.format = TextureFormat::RGBA8;
-    desc.x = m_x;
-    desc.y = m_y;
-    desc.width = m_width;
-    desc.height = m_height;
-    desc.destination = m_destination;
-    desc.destinationSize = m_destinationSize;
-    
-    ctx.rhi->readback(desc);
-    std::cout << "[ReadbackPass] Reading back final color\n";
+    if (m_outputRT == INVALID_HANDLE) {
+        std::cout << "[DeferredLightingPass] ERROR: Invalid output render target" << std::endl;
+        return;
+    }
+
+    // Get G-buffer textures from context
+    auto gBaseColor = ctx.textures.find("gBaseColor");
+    auto gNormal = ctx.textures.find("gNormal");
+    auto gPosition = ctx.textures.find("gPosition");
+    auto gMaterial = ctx.textures.find("gMaterial");
+
+    std::cout << "[DeferredLightingPass] Available textures in context: " << ctx.textures.size() << std::endl;
+
+    if (gBaseColor == ctx.textures.end() || gNormal == ctx.textures.end() ||
+        gPosition == ctx.textures.end() || gMaterial == ctx.textures.end()) {
+        std::cerr << "[DeferredLightingPass] Missing G-buffer textures" << std::endl;
+        return;
+    }
+
+    std::cout << "[DeferredLightingPass] Calling passDeferredLighting" << std::endl;
+    ctx.renderer->passDeferredLighting(ctx, m_outputRT,
+        gBaseColor->second, gNormal->second, gPosition->second, gMaterial->second);
+    std::cout << "[DeferredLightingPass] passDeferredLighting completed" << std::endl;
+
+    // Add lit color texture to context for use by other passes
+    PassContext* mutableCtx = const_cast<PassContext*>(&ctx);
+    mutableCtx->textures["litColor"] = m_outputTex;
 }
 
-void ReadbackPass::teardown(const PassContext& ctx) {
-    // No resources to clean up
-}
-
-// IntegratorPass implementation
-bool IntegratorPass::setup(const PassContext& ctx) {
-    // TODO: Initialize raytracer if not already done
-    std::cout << "[IntegratorPass] Setup completed\n";
-    return true;
-}
-
-void IntegratorPass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !ctx.scene) return;
-    
-    // TODO: Perform CPU ray tracing
-    // - Trace rays through the scene
-    // - Accumulate samples
-    // - Output HDR result + auxiliary buffers
-    std::cout << "[IntegratorPass] Ray tracing scene with " << m_sampleCount << " samples\n";
-}
-
-void IntegratorPass::teardown(const PassContext& ctx) {
-    // Raytracer cleanup handled elsewhere
-}
-
-// DenoisePass implementation
-bool DenoisePass::setup(const PassContext& ctx) {
-    // TODO: Check for OIDN availability
-    m_oidnAvailable = false; // Placeholder
-    std::cout << "[DenoisePass] Setup completed (OIDN available: " << m_oidnAvailable << ")\n";
-    return true;
-}
-
-void DenoisePass::execute(const PassContext& ctx) {
-    if (!ctx.rhi || !m_oidnAvailable) return;
-    
-    // TODO: Apply AI denoising
-    // - Load color, normal, albedo buffers
-    // - Run OIDN filter
-    // - Output denoised result
-    std::cout << "[DenoisePass] Denoising ray traced result\n";
-}
-
-void DenoisePass::teardown(const PassContext& ctx) {
-    // No resources to clean up
-}
-
-// TonemapPass implementation
-bool TonemapPass::setup(const PassContext& ctx) {
-    std::cout << "[TonemapPass] Setup completed\n";
-    return true;
-}
-
-void TonemapPass::execute(const PassContext& ctx) {
+void DeferredLightingPass::teardown(const PassContext& ctx) {
     if (!ctx.rhi) return;
-    
-    // TODO: Apply HDR tone mapping
-    // - Convert from linear HDR to display-ready LDR
-    // - Apply exposure and gamma
-    std::cout << "[TonemapPass] Tone mapping HDR to LDR\n";
+
+    if (m_outputRT != INVALID_HANDLE) {
+        ctx.rhi->destroyRenderTarget(m_outputRT);
+        m_outputRT = INVALID_HANDLE;
+    }
+    if (m_outputTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_outputTex);
+        m_outputTex = INVALID_HANDLE;
+    }
 }
 
-void TonemapPass::teardown(const PassContext& ctx) {
-    // No resources to clean up for this simple implementation
+// Ray Integrator Pass Implementation
+bool RayIntegratorPass::setup(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return false;
+    if (!ctx.rhi) return false;
+
+    // Create output texture for raytraced result
+    int width = ctx.viewportWidth > 0 ? ctx.viewportWidth : 1024;
+    int height = ctx.viewportHeight > 0 ? ctx.viewportHeight : 768;
+
+    TextureDesc desc{};
+    desc.width = width;
+    desc.height = height;
+    desc.format = TextureFormat::RGBA32F; // High precision for HDR raytracing
+    desc.debugName = "RayIntegrator_Output";
+    m_outputTex = ctx.rhi->createTexture(desc);
+
+    return m_outputTex != INVALID_HANDLE;
 }
+
+void RayIntegratorPass::execute(const PassContext& ctx) {
+    if (!ensureRenderer(ctx, getName())) return;
+    if (!ctx.enableRay || m_outputTex == INVALID_HANDLE) return;
+
+    // Call the updated raytracer pass that produces a texture
+    ctx.renderer->passRayIntegrator(ctx, m_outputTex, m_sampleCount, m_maxDepth);
+
+    // Add ray traced result texture to context for use by other passes
+    PassContext* mutableCtx = const_cast<PassContext*>(&ctx);
+    mutableCtx->textures["rayTraceResult"] = m_outputTex;
+}
+
+void RayIntegratorPass::teardown(const PassContext& ctx) {
+    if (!ctx.rhi) return;
+
+    if (m_outputTex != INVALID_HANDLE) {
+        ctx.rhi->destroyTexture(m_outputTex);
+        m_outputTex = INVALID_HANDLE;
+    }
+}
+
+

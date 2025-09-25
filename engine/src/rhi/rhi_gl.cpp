@@ -1,4 +1,5 @@
 #include "rhi/rhi_gl.h"
+#include "path_utils.h"
 #include <iostream>
 #include <sstream>
 
@@ -171,8 +172,8 @@ TextureHandle RhiGL::createTexture(const TextureDesc& desc) {
     glBindTexture(target, glTexture.id);
     
     GLenum internalFormat = textureFormatToGL(desc.format);
-    GLenum format = internalFormat; // Simplified mapping
-    GLenum type = GL_UNSIGNED_BYTE; // Simplified for now
+    GLenum format, type;
+    getTextureFormatAndType(desc.format, format, type);
     
     // Allocate texture storage
     switch (desc.type) {
@@ -395,11 +396,49 @@ void RhiGL::updateBuffer(BufferHandle buffer, const void* data, size_t size, siz
         std::cerr << "[RhiGL] Invalid buffer handle\n";
         return;
     }
-    
+
     GLenum target = bufferTypeToGL(it->second.desc.type);
     glBindBuffer(target, it->second.id);
     glBufferSubData(target, offset, size, data);
     glBindBuffer(target, 0);
+}
+
+void RhiGL::updateTexture(TextureHandle texture, const void* data,
+                         int width, int height, TextureFormat format,
+                         int x, int y, int mipLevel) {
+    auto it = m_textures.find(texture);
+    if (it == m_textures.end()) {
+        std::cerr << "[RhiGL] Invalid texture handle\n";
+        return;
+    }
+
+    // Convert format to OpenGL format and type
+    GLenum glFormat, glType;
+    switch (format) {
+        case TextureFormat::RGBA8:
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case TextureFormat::RGB8:
+            glFormat = GL_RGB;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case TextureFormat::RGBA32F:
+            glFormat = GL_RGBA;
+            glType = GL_FLOAT;
+            break;
+        case TextureFormat::RGB32F:
+            glFormat = GL_RGB;
+            glType = GL_FLOAT;
+            break;
+        default:
+            std::cerr << "[RhiGL] Unsupported texture format for updateTexture\n";
+            return;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, it->second.id);
+    glTexSubImage2D(GL_TEXTURE_2D, mipLevel, x, y, width, height, glFormat, glType, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void RhiGL::bindRenderTarget(RenderTargetHandle renderTarget) {
@@ -563,6 +602,41 @@ GLenum RhiGL::textureFormatToGL(TextureFormat format) const {
         case TextureFormat::Depth24Stencil8: return GL_DEPTH24_STENCIL8;
         case TextureFormat::Depth32F: return GL_DEPTH_COMPONENT32F;
         default: return GL_RGBA8;
+    }
+}
+
+void RhiGL::getTextureFormatAndType(TextureFormat format, GLenum& outFormat, GLenum& outType) const {
+    switch (format) {
+        case TextureFormat::RGBA8:
+            outFormat = GL_RGBA; outType = GL_UNSIGNED_BYTE; break;
+        case TextureFormat::RGBA16F:
+            outFormat = GL_RGBA; outType = GL_HALF_FLOAT; break;
+        case TextureFormat::RGBA32F:
+            outFormat = GL_RGBA; outType = GL_FLOAT; break;
+        case TextureFormat::RGB8:
+            outFormat = GL_RGB; outType = GL_UNSIGNED_BYTE; break;
+        case TextureFormat::RGB16F:
+            outFormat = GL_RGB; outType = GL_HALF_FLOAT; break;
+        case TextureFormat::RGB32F:
+            outFormat = GL_RGB; outType = GL_FLOAT; break;
+        case TextureFormat::RG8:
+            outFormat = GL_RG; outType = GL_UNSIGNED_BYTE; break;
+        case TextureFormat::RG16F:
+            outFormat = GL_RG; outType = GL_HALF_FLOAT; break;
+        case TextureFormat::RG32F:
+            outFormat = GL_RG; outType = GL_FLOAT; break;
+        case TextureFormat::R8:
+            outFormat = GL_RED; outType = GL_UNSIGNED_BYTE; break;
+        case TextureFormat::R16F:
+            outFormat = GL_RED; outType = GL_HALF_FLOAT; break;
+        case TextureFormat::R32F:
+            outFormat = GL_RED; outType = GL_FLOAT; break;
+        case TextureFormat::Depth24Stencil8:
+            outFormat = GL_DEPTH_STENCIL; outType = GL_UNSIGNED_INT_24_8; break;
+        case TextureFormat::Depth32F:
+            outFormat = GL_DEPTH_COMPONENT; outType = GL_FLOAT; break;
+        default:
+            outFormat = GL_RGBA; outType = GL_UNSIGNED_BYTE; break;
     }
 }
 

@@ -168,7 +168,22 @@ public:
      * @param offset Byte offset in buffer (default 0)
      */
     virtual void updateBuffer(BufferHandle buffer, const void* data, size_t size, size_t offset = 0) = 0;
-    
+
+    /**
+     * @brief Update texture data with new pixel data
+     * @param texture Texture handle to update
+     * @param data Pointer to pixel data
+     * @param width Width of the update region
+     * @param height Height of the update region
+     * @param format Pixel format of the source data
+     * @param x X offset in texture (default 0)
+     * @param y Y offset in texture (default 0)
+     * @param mipLevel Mip level to update (default 0)
+     */
+    virtual void updateTexture(TextureHandle texture, const void* data,
+                              int width, int height, TextureFormat format,
+                              int x = 0, int y = 0, int mipLevel = 0) = 0;
+
     /**
      * @brief Bind a render target for subsequent draw commands
      * @param renderTarget Render target handle, or INVALID_HANDLE for default framebuffer

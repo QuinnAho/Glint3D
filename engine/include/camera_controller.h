@@ -1,6 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
-#include "render_system.h"
+#include "camera_state.h"
 #include "config_defaults.h"
 
 // Forward declarations
@@ -90,3 +90,4 @@ private:
     void updateVectors();
     void updateOrbitPosition();
 };
+

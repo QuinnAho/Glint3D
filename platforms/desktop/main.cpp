@@ -264,14 +264,16 @@ int main(int argc, char** argv)
                     materials.push_back(mc);
                 }
                 RenderConfig cfg; // defaults: Auto + preview=false
-                RenderModeSelector selector;
-                RenderMode sel = selector.selectMode(materials, cfg);
-                if (sel == RenderMode::Ray) {
+                RenderPipelineModeSelector selector;
+                RenderPipelineMode sel = selector.selectMode(materials, cfg);
+                if (sel == RenderPipelineMode::Ray) {
                     app->setRaytraceMode(true);
                 } else {
                     app->setRaytraceMode(false);
                 }
-                Logger::info(std::string("Auto mode selected: ") + RenderModeUtils::renderModeToString(sel));
+                const char* modeStr = (sel == RenderPipelineMode::Ray) ? "ray" :
+                                     (sel == RenderPipelineMode::Raster) ? "raster" : "auto";
+                Logger::info(std::string("Auto mode selected: ") + modeStr);
             }
         } else if (parseResult.options.forceRaytrace) {
             // Back-compat fallback

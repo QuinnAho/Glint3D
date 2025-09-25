@@ -60,12 +60,10 @@ struct MaterialCore {
     bool isMetal() const { return metallic > 0.9f; }
     bool needsRaytracing() const { return isTransparent() && (thickness > 0.0f || ior > 1.05f); }
     
-    // Convert from legacy material systems (for migration)
-    static MaterialCore fromLegacyMaterial(const class Material& legacy);
+    // Convert from PBR material system (for asset loading)
     static MaterialCore fromPBRMaterial(const struct PBRMaterial& pbr);
-    
-    // Convert to legacy systems (temporary compatibility)
-    void toLegacyMaterial(class Material& legacy) const;
+
+    // Convert to PBR system (for export compatibility)
     void toPBRMaterial(struct PBRMaterial& pbr) const;
     
     // Validation

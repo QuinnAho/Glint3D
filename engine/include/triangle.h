@@ -3,7 +3,7 @@
 
 #include <glm/glm.hpp>
 #include "ray.h"                
-#include "material.h"          
+#include "material_core.h"          
 
 
 class Triangle
@@ -14,7 +14,7 @@ public:
         const glm::vec3& b,
         const glm::vec3& c,
         float refl = 0.0f,
-        const Material& mat = Material())    // <-- Added material param
+        const MaterialCore& mat = MaterialCore())    // <-- Added material param
         : v0(a), v1(b), v2(c), reflectivity(refl), material(mat)
     {
         /* geometric normal (unit length) */
@@ -81,7 +81,7 @@ public:
     glm::vec3 v0, v1, v2;
     glm::vec3 normal;         // Face normal (unit vector)
     float reflectivity = 0.0f; // 0 = matte, 1 = mirror
-    Material material;         // NEW: material data
+    MaterialCore material;     // Unified material data
 };
 
 #endif /* TRIANGLE_H */

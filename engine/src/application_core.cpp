@@ -2,13 +2,14 @@
 #include "gl_platform.h"
 #include <GLFW/glfw3.h>
 #include "scene_manager.h"
-#include "render_system.h" 
+#include "render_system.h"
 #include "camera_controller.h"
 #include "light.h"
 #include "ui_bridge.h"
 #include "imgui_ui_layer.h"
 #include "ray_utils.h"
 #include "json_ops.h"
+#include "path_utils.h"
 #ifndef WEB_USE_HTML_UI
 #include "imgui.h"
 #endif
@@ -161,7 +162,7 @@ void ApplicationCore::frame()
         
         // Clear and render scene
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        m_renderer->render(*m_scene, *m_lights);
+        m_renderer->renderUnified(*m_scene, *m_lights);
         
         // Render UI
         if (!m_headless) {
@@ -284,7 +285,7 @@ bool ApplicationCore::isDenoiseEnabled() const
     return m_renderer->isDenoiseEnabled();
 }
 
-void ApplicationCore::setRaytraceMode(bool enabled) 
+void ApplicationCore::setRaytraceMode(bool enabled)  // Is this still needed?
 {
     m_renderer->setRenderMode(enabled ? RenderMode::Raytrace : RenderMode::Solid);
 }
@@ -304,7 +305,7 @@ int ApplicationCore::getReflectionSpp() const
     return m_renderer->getReflectionSpp();
 }
 
-void ApplicationCore::handleMouseMove(double xpos, double ypos)
+void ApplicationCore::handleMouseMove(double xpos, double ypos) // Should this be moved?
 {
     if (m_firstMouse) {
         m_lastMouseX = xpos;
@@ -367,7 +368,7 @@ void ApplicationCore::handleMouseMove(double xpos, double ypos)
     }
 }
 
-void ApplicationCore::handleMouseButton(int button, int action, int mods)
+void ApplicationCore::handleMouseButton(int button, int action, int mods) // Should this be moved?
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         m_leftMousePressed = (action == GLFW_PRESS);
@@ -520,7 +521,7 @@ void ApplicationCore::handleFramebufferResize(int width, int height)
     }
 }
 
-void ApplicationCore::handleKey(int key, int scancode, int action, int mods)
+void ApplicationCore::handleKey(int key, int scancode, int action, int mods) // Should this be moved?
 {
     // Camera preset hotkeys (1-8 keys)
     if (action == GLFW_PRESS && mods == 0) {
@@ -685,7 +686,7 @@ void ApplicationCore::createDefaultScene()
         m_scene->loadObject("Sphere", "assets/models/sphere.obj", glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(1.0f));
 }
 
-void ApplicationCore::cleanupGL()
+void ApplicationCore::cleanupGL() // should we remove this?
 {
     // OpenGL cleanup is handled by the systems themselves
 }
@@ -693,28 +694,16 @@ void ApplicationCore::cleanupGL()
 void ApplicationCore::setWindowIcon()
 {
     if (!m_window) return;
-    
-    // Try multiple possible icon paths for different build systems
-    const std::vector<std::string> iconPaths = {
-        "assets/img/Glint3DIcon.png",           // CMake build from repo root
-        "../assets/img/Glint3DIcon.png",        // If running from build dir
-        "../../assets/img/Glint3DIcon.png"      // Alternative build dir structure
-    };
-    
+
+    // Use the path resolution utility to find the icon
+    std::string iconPath = "assets/img/Glint3DIcon.png";
+    std::string resolvedPath = PathUtils::resolveAssetPath(iconPath);
+
     int width, height, channels;
-    unsigned char* data = nullptr;
-    std::string successPath;
-    
-    for (const auto& path : iconPaths) {
-        data = stbi_load(path.c_str(), &width, &height, &channels, 4); // Force RGBA
-        if (data) {
-            successPath = path;
-            break;
-        }
-    }
-    
+    unsigned char* data = stbi_load(resolvedPath.c_str(), &width, &height, &channels, 4); // Force RGBA
+
     if (!data) {
-        std::cerr << "Failed to load window icon from any of the attempted paths" << std::endl;
+        std::cerr << "Failed to load window icon from: " << iconPath << " (resolved to: " << resolvedPath << ")" << std::endl;
         return;
     }
     
@@ -729,7 +718,7 @@ void ApplicationCore::setWindowIcon()
 }
 
 // GLFW callback wrappers
-void ApplicationCore::mouseCallback(GLFWwindow* window, double xpos, double ypos)
+void ApplicationCore::mouseCallback(GLFWwindow* window, double xpos, double ypos) // Should this be moved?
 {
     ApplicationCore* app = static_cast<ApplicationCore*>(glfwGetWindowUserPointer(window));
     if (app) {
@@ -737,7 +726,7 @@ void ApplicationCore::mouseCallback(GLFWwindow* window, double xpos, double ypos
     }
 }
 
-void ApplicationCore::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+void ApplicationCore::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) // Should this be moved?
 {
     ApplicationCore* app = static_cast<ApplicationCore*>(glfwGetWindowUserPointer(window));
     if (app) {
@@ -753,7 +742,7 @@ void ApplicationCore::framebufferSizeCallback(GLFWwindow* window, int width, int
     }
 }
 
-void ApplicationCore::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void ApplicationCore::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) // Should this be moved?
 {
     ApplicationCore* app = static_cast<ApplicationCore*>(glfwGetWindowUserPointer(window));
     if (app) {
@@ -761,7 +750,7 @@ void ApplicationCore::keyCallback(GLFWwindow* window, int key, int scancode, int
     }
 }
 
-void ApplicationCore::dropCallback(GLFWwindow* window, int count, const char** paths)
+void ApplicationCore::dropCallback(GLFWwindow* window, int count, const char** paths) // Should this be moved? 
 {
     ApplicationCore* app = static_cast<ApplicationCore*>(glfwGetWindowUserPointer(window));
     if (app) {
@@ -769,7 +758,7 @@ void ApplicationCore::dropCallback(GLFWwindow* window, int count, const char** p
     }
 }
 
-void ApplicationCore::handleFileDrop(int count, const char** paths)
+void ApplicationCore::handleFileDrop(int count, const char** paths) // Should this be moved?
 {
     if (!m_uiBridge) return;
     for (int i = 0; i < count; ++i) {

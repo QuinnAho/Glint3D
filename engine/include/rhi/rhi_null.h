@@ -40,6 +40,7 @@ public:
     void bindTexture(TextureHandle, uint32_t) override {}
     void bindUniformBuffer(BufferHandle, uint32_t) override {}
     void updateBuffer(BufferHandle, const void*, size_t, size_t = 0) override {}
+    void updateTexture(TextureHandle, const void*, int, int, TextureFormat, int = 0, int = 0, int = 0) override {}
     void bindRenderTarget(RenderTargetHandle) override {}
     void resolveRenderTarget(RenderTargetHandle, TextureHandle, const int* = nullptr, const int* = nullptr) override {}
     void resolveToDefaultFramebuffer(RenderTargetHandle, const int* = nullptr, const int* = nullptr) override {}
