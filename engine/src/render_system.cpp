@@ -44,245 +44,24 @@ std::string RenderSystem::loadTextFile(const std::string& path)
 // UBO Helper Methods (FEAT-0249)
 // ===============================
 
-void RenderSystem::updateTransformUniforms()
-{
-    if (!m_rhi) return;
-
-    // Update transform data
-    m_transformData.model = glm::mat4(1.0f); // Default identity, will be updated per-object
-    m_transformData.view = m_cameraManager.viewMatrix();
-    m_transformData.projection = m_cameraManager.projectionMatrix();
-    // lightSpaceMatrix will be set when needed for shadows
-
-    // Allocate UBO if not already allocated
-    if (m_transformBlock.handle == INVALID_HANDLE) {
-        UniformAllocationDesc desc{};
-        desc.size = sizeof(TransformBlock);
-        desc.alignment = 256; // UBO alignment
-        desc.debugName = "TransformBlock";
-
-        m_transformBlock = m_rhi->allocateUniforms(desc);
-    }
-
-    // Update UBO data
-    if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
-        memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
-        // Note: Binding will be done when shader is bound
-    }
-}
-
-void RenderSystem::updateLightingUniforms(const Light& lights)
-{
-    if (!m_rhi) return;
-
-    // Update lighting data - for now use defaults until Light class is extended
-    m_lightingData.numLights = static_cast<int>(lights.getLightCount());
-    m_lightingData.viewPos = m_cameraManager.camera().position;
-    m_lightingData.globalAmbient = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f); // Default ambient
-
-    // TODO: Populate actual light data when Light class getters are available
-    // For now, set reasonable defaults
-    for (int i = 0; i < 10; ++i) {
-        auto& lightData = m_lightingData.lights[i];
-        lightData.type = 0; // Point light
-        lightData.position = glm::vec3(0.0f, 5.0f, 0.0f);
-        lightData.direction = glm::vec3(0.0f, -1.0f, 0.0f);
-        lightData.color = glm::vec3(1.0f);
-        lightData.intensity = (i == 0) ? 1.0f : 0.0f; // Only first light enabled
-        lightData.innerCutoff = 0.9f;
-        lightData.outerCutoff = 0.8f;
-        lightData._padding = 0.0f;
-    }
-
-    // Allocate UBO if not already allocated
-    if (m_lightingBlock.handle == INVALID_HANDLE) {
-        UniformAllocationDesc desc{};
-        desc.size = sizeof(LightingBlock);
-        desc.alignment = 256; // UBO alignment
-        desc.debugName = "LightingBlock";
-
-        m_lightingBlock = m_rhi->allocateUniforms(desc);
-    }
-
-    // Update UBO data
-    if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
-        memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
-        // Note: Binding will be done when shader is bound
-    }
-}
-
-void RenderSystem::updateMaterialUniforms()
-{
-    if (!m_rhi) return;
-
-    // Set default material data (will be overridden per-object)
-    m_materialData.baseColorFactor = glm::vec4(1.0f);
-    m_materialData.metallicFactor = 0.0f;
-    m_materialData.roughnessFactor = 0.5f;
-    m_materialData.ior = 1.5f;
-    m_materialData.transmission = 0.0f;
-    m_materialData.thickness = 1.0f;
-    m_materialData.attenuationDistance = 1000.0f;
-    m_materialData.attenuationColor = glm::vec3(1.0f);
-    m_materialData.clearcoat = 0.0f;
-    m_materialData.clearcoatRoughness = 0.0f;
-
-    // Allocate UBO if not already allocated
-    if (m_materialBlock.handle == INVALID_HANDLE) {
-        UniformAllocationDesc desc{};
-        desc.size = sizeof(MaterialBlock);
-        desc.alignment = 256; // UBO alignment
-        desc.debugName = "MaterialBlock";
-
-        m_materialBlock = m_rhi->allocateUniforms(desc);
-    }
-
-    // Update UBO data
-    if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
-        memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
-        // Note: Binding will be done when shader is bound
-    }
-}
-
-void RenderSystem::updateMaterialUniformsForObject(const SceneObject& obj)
-{
-    if (!m_rhi) return;
-
-    // Convert SceneObject's MaterialCore to MaterialBlock format
-    const auto& mc = obj.materialCore;
-    m_materialData.baseColorFactor = mc.baseColor;
-    m_materialData.metallicFactor = mc.metallic;
-    m_materialData.roughnessFactor = mc.roughness;
-    m_materialData.ior = mc.ior;
-    m_materialData.transmission = mc.transmission;
-    m_materialData.thickness = mc.thickness;
-    m_materialData.attenuationDistance = mc.attenuationDistance;
-    // Note: MaterialCore doesn't have attenuationColor, use base color as default
-    m_materialData.attenuationColor = glm::vec3(mc.baseColor);
-    m_materialData.clearcoat = mc.clearcoat;
-    m_materialData.clearcoatRoughness = mc.clearcoatRoughness;
-
-    // Set texture flags (bools as ints for std140)
-    m_materialData.hasBaseColorMap = obj.baseColorTex ? 1 : 0;
-    m_materialData.hasNormalMap = (obj.normalTex && obj.VBO_tangents != 0) ? 1 : 0;
-    m_materialData.hasMRMap = obj.mrTex ? 1 : 0;
-    m_materialData.hasTangents = obj.VBO_tangents != 0 ? 1 : 0;
-    m_materialData.useTexture = obj.texture ? 1 : 0; // Legacy texture flag
-
-    // Update UBO data
-    if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
-        memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
-    }
-}
-
-void RenderSystem::updateRenderingUniforms()
-{
-    if (!m_rhi) return;
-
-    // Update rendering state
-    m_renderingData.exposure = m_exposure;
-    m_renderingData.gamma = m_gamma;
-    m_renderingData.toneMappingMode = static_cast<int>(m_tonemap);
-    m_renderingData.shadingMode = static_cast<int>(m_shadingMode);
-    m_renderingData.iblIntensity = m_iblSystem ? m_iblSystem->getIntensity() : 1.0f;
-    m_renderingData.objectColor = glm::vec3(1.0f); // Default, will be overridden per object
-
-    // Allocate UBO if not already allocated
-    if (m_renderingBlock.handle == INVALID_HANDLE) {
-        UniformAllocationDesc desc{};
-        desc.size = sizeof(RenderingBlock);
-        desc.alignment = 256; // UBO alignment
-        desc.debugName = "RenderingBlock";
-
-        m_renderingBlock = m_rhi->allocateUniforms(desc);
-    }
-
-    // Update UBO data
-    if (m_renderingBlock.handle != INVALID_HANDLE && m_renderingBlock.mappedPtr) {
-        memcpy(m_renderingBlock.mappedPtr, &m_renderingData, sizeof(RenderingBlock));
-    }
-}
+// Legacy UBO helper methods removed - functionality moved to managers
 
 void RenderSystem::bindUniformBlocks()
 {
     if (!m_rhi) return;
 
-    // Bind transform block to binding point 0
-    if (m_transformBlock.handle != INVALID_HANDLE) {
-        // Create a buffer handle if needed - for now we'll create temporary buffers
-        // TODO: Improve this to use proper buffer handles from the ring allocator
-        BufferDesc bufferDesc{};
-        bufferDesc.type = BufferType::Uniform;
-        bufferDesc.usage = BufferUsage::Dynamic;
-        bufferDesc.size = sizeof(TransformBlock);
-        bufferDesc.debugName = "TransformUBO";
-
-        static BufferHandle transformBuffer = INVALID_HANDLE;
-        if (transformBuffer == INVALID_HANDLE) {
-            transformBuffer = m_rhi->createBuffer(bufferDesc);
-        }
-
-        m_rhi->updateBuffer(transformBuffer, &m_transformData, sizeof(TransformBlock));
-        m_rhi->bindUniformBuffer(transformBuffer, TransformBlock::BINDING_POINT);
-    }
-
-    // Bind lighting block to binding point 1
-    if (m_lightingBlock.handle != INVALID_HANDLE) {
-        BufferDesc bufferDesc{};
-        bufferDesc.type = BufferType::Uniform;
-        bufferDesc.usage = BufferUsage::Dynamic;
-        bufferDesc.size = sizeof(LightingBlock);
-        bufferDesc.debugName = "LightingUBO";
-
-        static BufferHandle lightingBuffer = INVALID_HANDLE;
-        if (lightingBuffer == INVALID_HANDLE) {
-            lightingBuffer = m_rhi->createBuffer(bufferDesc);
-        }
-
-        m_rhi->updateBuffer(lightingBuffer, &m_lightingData, sizeof(LightingBlock));
-        m_rhi->bindUniformBuffer(lightingBuffer, LightingBlock::BINDING_POINT);
-    }
-
-    // Bind material block to binding point 2
-    if (m_materialBlock.handle != INVALID_HANDLE) {
-        BufferDesc bufferDesc{};
-        bufferDesc.type = BufferType::Uniform;
-        bufferDesc.usage = BufferUsage::Dynamic;
-        bufferDesc.size = sizeof(MaterialBlock);
-        bufferDesc.debugName = "MaterialUBO";
-
-        static BufferHandle materialBuffer = INVALID_HANDLE;
-        if (materialBuffer == INVALID_HANDLE) {
-            materialBuffer = m_rhi->createBuffer(bufferDesc);
-        }
-
-        m_rhi->updateBuffer(materialBuffer, &m_materialData, sizeof(MaterialBlock));
-        m_rhi->bindUniformBuffer(materialBuffer, MaterialBlock::BINDING_POINT);
-    }
-
-    // Bind rendering block to binding point 3
-    if (m_renderingBlock.handle != INVALID_HANDLE) {
-        BufferDesc bufferDesc{};
-        bufferDesc.type = BufferType::Uniform;
-        bufferDesc.usage = BufferUsage::Dynamic;
-        bufferDesc.size = sizeof(RenderingBlock);
-        bufferDesc.debugName = "RenderingUBO";
-
-        static BufferHandle renderingBuffer = INVALID_HANDLE;
-        if (renderingBuffer == INVALID_HANDLE) {
-            renderingBuffer = m_rhi->createBuffer(bufferDesc);
-        }
-
-        m_rhi->updateBuffer(renderingBuffer, &m_renderingData, sizeof(RenderingBlock));
-        m_rhi->bindUniformBuffer(renderingBuffer, RenderingBlock::BINDING_POINT);
-    }
+    // Delegate all UBO binding to managers
+    m_transformManager.bindTransformUniforms();      // Binding point 0
+    m_lightingManager.bindLightingUniforms();        // Binding point 1
+    m_materialManager.bindMaterialUniforms();        // Binding point 2
+    m_renderingManager.bindRenderingUniforms();      // Binding point 3
 }
 
 void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
 {
     if (!m_rhi) return;
     bool hasNormals = (obj.rhiVboNormals != INVALID_HANDLE);
-    bool hasUVs = (obj.rhiVboUVs != INVALID_HANDLE);
+    bool hasUVs = (obj.rhiVboTexCoords != INVALID_HANDLE);
 
     // Always use PBR pipeline (standard shader eliminated)
     PipelineHandle& target = obj.rhiPipelinePbr;
@@ -299,7 +78,7 @@ void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
 
     VertexBinding bPos{}; bPos.binding = 0; bPos.stride = 3 * sizeof(float); bPos.buffer = obj.rhiVboPositions; pd.vertexBindings.push_back(bPos);
     if (hasNormals) { VertexBinding bN{}; bN.binding = 1; bN.stride = 3 * sizeof(float); bN.buffer = obj.rhiVboNormals; pd.vertexBindings.push_back(bN); }
-    if (hasUVs) { VertexBinding bUV{}; bUV.binding = 2; bUV.stride = 2 * sizeof(float); bUV.buffer = obj.rhiVboUVs; pd.vertexBindings.push_back(bUV); }
+    if (hasUVs) { VertexBinding bUV{}; bUV.binding = 2; bUV.stride = 2 * sizeof(float); bUV.buffer = obj.rhiVboTexCoords; pd.vertexBindings.push_back(bUV); }
 
     VertexAttribute aPos{}; aPos.location = 0; aPos.binding = 0; aPos.format = TextureFormat::RGB32F; aPos.offset = 0; pd.vertexAttributes.push_back(aPos);
     if (hasNormals) { VertexAttribute aN{}; aN.location = 1; aN.binding = 1; aN.format = TextureFormat::RGB32F; aN.offset = 0; pd.vertexAttributes.push_back(aN); }
@@ -344,21 +123,6 @@ RenderSystem::~RenderSystem()
 
 // File-scope RHI resources created alongside legacy GL placeholders
 static TextureHandle s_dummyShadowTexRhi = 0;
-static BufferHandle  s_materialUbo = 0;
-
-struct MaterialUboData {
-    glm::vec4 baseColor;
-    float metallic;
-    float roughness;
-    float ior;
-    float transmission;
-    float thickness;
-    float attenuationDistance;
-    float clearcoat;
-    float clearcoatRoughness;
-    glm::vec3 emissive;
-    float _pad0{0.0f};
-};
 
 bool RenderSystem::init(int windowWidth, int windowHeight)
 {
@@ -374,6 +138,32 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
         if (m_rhi) {
             RhiInit init{}; init.windowWidth = windowWidth; init.windowHeight = windowHeight; init.enableSRGB = m_framebufferSRGBEnabled;
             m_rhi->init(init);
+
+            // Initialize managers after RHI is ready
+            if (!m_lightingManager.init(m_rhi.get())) {
+                std::cerr << "Failed to initialize LightingManager" << std::endl;
+                return false;
+            }
+
+            if (!m_materialManager.init(m_rhi.get())) {
+                std::cerr << "Failed to initialize MaterialManager" << std::endl;
+                return false;
+            }
+
+            if (!m_pipelineManager.init(m_rhi.get())) {
+                std::cerr << "Failed to initialize PipelineManager" << std::endl;
+                return false;
+            }
+
+            if (!m_transformManager.init(m_rhi.get())) {
+                std::cerr << "Failed to initialize TransformManager" << std::endl;
+                return false;
+            }
+
+            if (!m_renderingManager.init(m_rhi.get())) {
+                std::cerr << "Failed to initialize RenderingManager" << std::endl;
+                return false;
+            }
         }
     }
     
@@ -533,21 +323,14 @@ void RenderSystem::shutdown()
     m_gridShader.reset();
     if (m_dummyShadowTex) { glDeleteTextures(1, &m_dummyShadowTex); m_dummyShadowTex = 0; }
 
-    // Cleanup UBO allocations (FEAT-0249)
-    if (m_rhi) {
-        if (m_transformBlock.handle != INVALID_HANDLE) {
-            m_rhi->freeUniforms(m_transformBlock);
-            m_transformBlock = {};
-        }
-        if (m_lightingBlock.handle != INVALID_HANDLE) {
-            m_rhi->freeUniforms(m_lightingBlock);
-            m_lightingBlock = {};
-        }
-        if (m_materialBlock.handle != INVALID_HANDLE) {
-            m_rhi->freeUniforms(m_materialBlock);
-            m_materialBlock = {};
-        }
-    }
+    // Shutdown managers (will handle UBO cleanup)
+    m_lightingManager.shutdown();
+    m_materialManager.shutdown();
+    m_pipelineManager.shutdown();
+    m_transformManager.shutdown();
+    m_renderingManager.shutdown();
+
+    // UBO cleanup now handled entirely by managers
     if (m_rhi && s_dummyShadowTexRhi != 0) { m_rhi->destroyTexture(s_dummyShadowTexRhi); s_dummyShadowTexRhi = 0; }
     destroyTargets();
 
@@ -572,19 +355,21 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
     // Reset per-frame stats counters
     m_stats = {};
 
-    // Update uniform blocks
-    updateTransformUniforms();
-    updateLightingUniforms(lights);
-    updateMaterialUniforms();
-    updateRenderingUniforms();
+    // Update uniform blocks using managers
+    m_transformManager.updateTransforms(glm::mat4(1.0f), m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
+    m_lightingManager.updateLighting(lights, m_cameraManager.camera().position);
+    // Material updates are per-object, handled in rendering loops
+    m_renderingManager.updateRenderingState(m_exposure, m_gamma, m_tonemap, m_shadingMode, m_iblSystem.get());
     bindUniformBlocks();
 
     // Select appropriate pipeline mode
     std::vector<MaterialCore> materials;
     for (const auto& obj : scene.getObjects()) {
-        materials.push_back(obj.material);
+        materials.push_back(obj.materialCore);
     }
-    RenderPipelineMode mode = m_pipelineSelector->selectMode(materials, m_pipelineOverride);
+    RenderConfig config;
+    config.mode = m_pipelineOverride;
+    RenderPipelineMode mode = m_pipelineSelector->selectMode(materials, config);
     m_activePipelineMode = mode;
 
     // Get the active render graph
@@ -642,11 +427,11 @@ void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
     // Reset per-frame stats counters
     m_stats = {};
 
-    // Update uniform blocks (FEAT-0249)
-    updateTransformUniforms();
-    updateLightingUniforms(lights);
-    updateMaterialUniforms();
-    updateRenderingUniforms();
+    // Update uniform blocks using managers (FEAT-0249)
+    m_transformManager.updateTransforms(glm::mat4(1.0f), m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
+    m_lightingManager.updateLighting(lights, m_cameraManager.camera().position);
+    // Material updates are per-object, handled in rendering loops
+    m_renderingManager.updateRenderingState(m_exposure, m_gamma, m_tonemap, m_shadingMode, m_iblSystem.get());
 
     // Bind uniform blocks to their binding points (FEAT-0249)
     bindUniformBlocks();
@@ -737,37 +522,18 @@ void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
         const auto& objs = scene.getObjects();
         if (selObj >= 0 && selObj < (int)objs.size() && m_pbrShader) {
             const auto& obj = objs[selObj];
-            if (obj.VAO != 0) {
+            if (obj.rhiVboPositions != INVALID_HANDLE) {
                 Shader* s = m_pbrShader.get(); // Always use PBR shader
                 if (m_rhi) {
                     ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
                     // FEAT-0249: Use UBO system for structured data
 
                     // Update transform UBO with object-specific data
-                    m_transformData.model = obj.modelMatrix;
-                    m_transformData.view = m_cameraManager.viewMatrix();
-                    m_transformData.projection = m_cameraManager.projectionMatrix();
-                    m_transformData.lightSpaceMatrix = glm::mat4(1.0f);
-                    if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
-                        memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
-                    }
+                    // Update transform for this object
+                    m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
 
-                    // Update lighting UBO for selection overlay (no lights, bright ambient)
-                    m_lightingData.numLights = 0;
-                    m_lightingData.viewPos = m_cameraManager.camera().position;
-                    m_lightingData.globalAmbient = glm::vec4(1.0f);
-                    if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
-                        memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
-                    }
-
-                    // Update material UBO for selection overlay (ambient = 1)
-                    m_materialData.baseColorFactor = glm::vec4(0.2f, 0.7f, 1.0f, 1.0f); // cyan-ish
-                    // Set other material fields to defaults for overlay
-                    m_materialData.metallicFactor = 0.0f;
-                    m_materialData.roughnessFactor = 1.0f;
-                    if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
-                        memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
-                    }
+                    // TODO: Add special overlay lighting/material mode to managers
+                    // For now, selection overlay lighting will use current scene lighting
 
                     // Non-UBO uniforms: only texture bindings
                     if (m_rhi) {
@@ -791,7 +557,7 @@ void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
                 if (m_rhi && ((obj.rhiPipelineBasic != INVALID_HANDLE) || m_basicPipeline != INVALID_HANDLE)) {
                     DrawDesc dd{};
                     dd.pipeline = (obj.rhiPipelineBasic != INVALID_HANDLE) ? obj.rhiPipelineBasic : m_basicPipeline;
-                    bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+                    bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
                     if (hasIndex) {
                         dd.indexBuffer = obj.rhiEbo;
                         dd.indexCount = obj.objLoader.getIndexCount();
@@ -800,8 +566,8 @@ void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
                     }
                     m_rhi->draw(dd);
                 } else {
-                    glBindVertexArray(obj.VAO);
-                    if (obj.EBO != 0) {
+                    // TODO: Bind RHI vertex buffers and pipeline instead of legacy VAO
+                    if (obj.rhiEbo != INVALID_HANDLE) {
                         glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
                     } else {
                         glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
@@ -1611,10 +1377,10 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
         // ðŸš¨ DEPRECATED CONVERSION: MaterialCore â†’ legacy Material for raytracer API
         // TODO CLEANUP: Update Raytracer::loadModel() to accept MaterialCore directly
         // CLEANUP TASK: Modify raytracer.h signature and eliminate this conversion
-        Material legacyMat;
-        mc.toLegacyMaterial(legacyMat);
+        // Using MaterialCore directly (no conversion needed)
+        
 
-        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, legacyMat);
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, mc);
     }
 
     // Create output buffer for raytraced image
@@ -1690,7 +1456,7 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
 void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
 {
     // Basic object rendering - optimized for minimal state changes
-    if (obj.VAO == 0) return;
+    if (obj.rhiVboPositions == INVALID_HANDLE) return;
 
     // Always use PBR shader (standard shader eliminated)
     Shader* s = m_pbrShader.get();
@@ -1710,23 +1476,13 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     // FEAT-0249: Update UBOs for this object instead of individual uniforms
     if (m_rhi) {
         // Update transform UBO with object-specific model matrix
-        m_transformData.model = obj.modelMatrix;
-        m_transformData.view = m_cameraManager.viewMatrix();
-        m_transformData.projection = m_cameraManager.projectionMatrix();
-
-        // Update transform UBO
-        if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
-            memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
-        }
+        // Update transform UBO using manager
+        m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
 
         // Update material UBO for this object
-        updateMaterialUniformsForObject(obj);
+        m_materialManager.updateMaterialForObject(obj);
 
-        // Update lighting UBO (camera position)
-        m_lightingData.viewPos = m_cameraManager.camera().position;
-        if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
-            memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
-        }
+        // Lighting UBO is now handled by LightingManager via bindUniformBlocks()
 
         // Note: shadingMode now in RenderingBlock UBO
     }
@@ -1740,26 +1496,8 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         // Use unified MaterialCore (eliminates dual storage) - RHI only
         const auto& mc = obj.materialCore;
 
-        // Begin migration: populate a material UBO (shader still reads legacy uniforms for now)
-        if (s_materialUbo == 0) {
-            BufferDesc bd{}; bd.type = BufferType::Uniform; bd.usage = BufferUsage::Dynamic; bd.size = sizeof(MaterialUboData); bd.debugName = "MaterialUbo";
-            s_materialUbo = m_rhi->createBuffer(bd);
-        }
-        if (s_materialUbo != 0) {
-            MaterialUboData u{};
-            u.baseColor = mc.baseColor;
-            u.metallic = mc.metallic;
-            u.roughness = mc.roughness;
-            u.ior = mc.ior;
-            u.transmission = mc.transmission;
-            u.thickness = mc.thickness;
-            u.attenuationDistance = mc.attenuationDistance;
-            u.clearcoat = mc.clearcoat;
-            u.clearcoatRoughness = mc.clearcoatRoughness;
-            u.emissive = mc.emissive;
-            m_rhi->updateBuffer(s_materialUbo, &u, sizeof(u));
-            m_rhi->bindUniformBuffer(s_materialUbo, 0);
-        }
+        // Use MaterialManager for unified material handling
+        m_materialManager.updateMaterialForObject(obj);
         // FEAT-0249: PBR material data now uses MaterialBlock UBO instead of individual uniforms
         // Material data is set via updateMaterialUniformsForObject() -> MaterialBlock UBO
         // Note: Texture flags now in MaterialBlock UBO (set by updateMaterialUniformsForObject)
@@ -1773,7 +1511,7 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
             m_rhi->setUniformInt("baseColorTex", unit);
             unit++;
         }
-        if (obj.normalTex && obj.VBO_tangents != 0) {
+        if (obj.normalTex) {
             // RHI-only texture binding
             m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
             m_rhi->setUniformInt("normalTex", unit);
@@ -1802,23 +1540,17 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
             obj.texture->bind(0);
             m_rhi->setUniformInt("cowTexture", 0);
             // Set useTexture in MaterialBlock UBO
-            m_materialData.useTexture = 1; // true
+            // Material texture flags now handled by MaterialManager
         } else {
-            // Set useTexture in MaterialBlock UBO
-            m_materialData.useTexture = 0; // false
+            // Material texture flags now handled by MaterialManager
             // Set object color in RenderingBlock UBO
-            m_renderingData.objectColor = obj.color;
-            if (m_renderingBlock.handle != INVALID_HANDLE && m_renderingBlock.mappedPtr) {
-                memcpy(m_renderingBlock.mappedPtr, &m_renderingData, sizeof(RenderingBlock));
-            }
+            // Update object color in rendering manager
+            m_renderingManager.setObjectColor(obj.color);
         }
-        // Update MaterialBlock for useTexture flag
-        if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
-            memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
-        }
+        // Material UBO now handled by MaterialManager
     }
 
-    glBindVertexArray(obj.VAO);
+    // TODO: Replace with RHI vertex buffer binding and pipeline
 
     // Optimized render mode handling - cache state
     static RenderMode lastRenderMode = static_cast<RenderMode>(-1);
@@ -1857,7 +1589,7 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         dd.pipeline = (s == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
                                                : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
         // Use indexed draw if either legacy GL EBO exists or RHI index buffer was created
-        bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+        bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
         if (hasIndex) {
             dd.indexBuffer = obj.rhiEbo;
             dd.indexCount = obj.objLoader.getIndexCount();
@@ -1866,7 +1598,7 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         }
         m_rhi->draw(dd);
     } else {
-        if (obj.EBO != 0) {
+        if (obj.rhiEbo != INVALID_HANDLE) {
             glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
         } else {
             glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
@@ -2059,7 +1791,9 @@ void RenderSystem::renderDebugElements(const SceneManager& scene, const Light& l
     }
     if (m_showAxes && m_axisRenderer) {
         glm::mat4 I(1.0f);
-        m_axisRenderer->render(I, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
+        glm::mat4 view = m_cameraManager.viewMatrix();
+        glm::mat4 proj = m_cameraManager.projectionMatrix();
+        m_axisRenderer->render(I, view, proj);
         m_stats.drawCalls += 1;
     }
     
@@ -2080,39 +1814,26 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
     const auto& objs = scene.getObjects();
     if (selObj >= 0 && selObj < (int)objs.size() && m_basicShader) {
         const auto& obj = objs[selObj];
-        if (obj.VAO != 0) {
+        if (obj.rhiVboPositions != INVALID_HANDLE) {
             Shader* s = m_basicShader.get();
             s->use();
             // Post-processing uniforms for standard shader (selection overlay respects gamma/exposure) - RHI only
             // Update per-object data in UBOs
-            // Set model matrix in TransformBlock
-            m_transformData.model = obj.modelMatrix;
-            if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
-                memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
-            }
+            // Update transform and rendering state using managers
+            m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
 
-            // Set object color in RenderingBlock
-            m_renderingData.objectColor = glm::vec3(0.2f, 0.7f, 1.0f); // cyan-ish for selection
-            if (m_renderingBlock.handle != INVALID_HANDLE && m_renderingBlock.mappedPtr) {
-                memcpy(m_renderingBlock.mappedPtr, &m_renderingData, sizeof(RenderingBlock));
-            }
+            // Set object color for selection
+            m_renderingManager.setObjectColor(glm::vec3(0.2f, 0.7f, 1.0f)); // cyan-ish for selection
 
             // Set material useTexture flag
-            m_materialData.useTexture = 0; // false for solid highlight
-            if (m_materialBlock.handle != INVALID_HANDLE && m_materialBlock.mappedPtr) {
-                memcpy(m_materialBlock.mappedPtr, &m_materialData, sizeof(MaterialBlock));
-            }
+            // Material UBO now handled by MaterialManager
             // Force bright ambient and no direct lights
             m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
             m_rhi->setUniformInt("shadowMap", 7);
             // Note: lightSpaceMatrix now in TransformBlock UBO
             // Note: numLights, globalAmbient now in LightingBlock UBO
-            // Force bright ambient by setting globalAmbient in LightingBlock
-            m_lightingData.globalAmbient = glm::vec4(1.0f);
-            m_lightingData.numLights = 0; // No direct lights for selection
-            if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
-                memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
-            }
+            // TODO: Add selection overlay lighting mode to LightingManager
+            // For now, selection will use current scene lighting
 
             // Note: Legacy Material uniform struct eliminated - using MaterialBlock UBO only
 
@@ -2125,8 +1846,8 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glLineWidth(1.5f);
 #endif
-            glBindVertexArray(obj.VAO);
-            if (obj.EBO != 0) {
+            // TODO: Replace with RHI vertex buffer binding and pipeline
+            if (obj.rhiEbo != INVALID_HANDLE) {
                 glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
             } else {
                 glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
@@ -2185,7 +1906,7 @@ void RenderSystem::renderObjectsBatched(const SceneManager& scene, const Light& 
     std::vector<const SceneObject*> pbrShaderObjects;
 
     for (const auto& obj : objects) {
-        if (obj.VAO == 0) continue;
+        if (obj.rhiVboPositions == INVALID_HANDLE) continue;
         pbrShaderObjects.push_back(&obj);
     }
     
@@ -2208,17 +1929,11 @@ void RenderSystem::setupCommonUniforms(Shader* shader)
 {
     // Prefer RHI-bound current program; fall back to shader wrapper
     if (m_rhi) {
-        // FEAT-0249: Use UBO system for structured data
-        m_transformData.view = m_cameraManager.viewMatrix();
-        m_transformData.projection = m_cameraManager.projectionMatrix();
-        if (m_transformBlock.handle != INVALID_HANDLE && m_transformBlock.mappedPtr) {
-            memcpy(m_transformBlock.mappedPtr, &m_transformData, sizeof(TransformBlock));
-        }
+        // FEAT-0249: Use manager-based UBO system
+        // Note: Transform UBO is now handled by TransformManager, updated per-object
+        // This method is legacy and should be phased out in favor of manager calls
 
-        m_lightingData.viewPos = m_cameraManager.camera().position;
-        if (m_lightingBlock.handle != INVALID_HANDLE && m_lightingBlock.mappedPtr) {
-            memcpy(m_lightingBlock.mappedPtr, &m_lightingData, sizeof(LightingBlock));
-        }
+        // Lighting UBO now handled by LightingManager
 
         // Note: shadingMode, exposure, gamma, toneMappingMode now in RenderingBlock UBO
     }
@@ -2258,7 +1973,7 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
         m_rhi->setUniformInt("baseColorTex", unit);
         unit++;
     }
-    if (obj.normalTex && obj.VBO_tangents != 0) {
+    if (obj.normalTex) {
         // RHI-only texture binding
         m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
         m_rhi->setUniformInt("normalTex", unit);
@@ -2283,7 +1998,7 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
     if (m_rhi) {
         DrawDesc dd{};
         dd.pipeline = obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline; // Always use PBR pipeline
-        bool hasIndex = (obj.EBO != 0) || (obj.rhiEbo != INVALID_HANDLE);
+        bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
         if (hasIndex) {
             dd.indexBuffer = obj.rhiEbo;
             dd.indexCount = obj.objLoader.getIndexCount();
@@ -2292,8 +2007,8 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
         }
         m_rhi->draw(dd);
     } else {
-        glBindVertexArray(obj.VAO);
-        if (obj.EBO != 0) {
+        // TODO: Replace with RHI vertex buffer binding and pipeline
+        if (obj.rhiEbo != INVALID_HANDLE) {
             glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
         } else {
             glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
@@ -2439,39 +2154,214 @@ RenderGraph* RenderSystem::getActiveGraph(RenderPipelineMode mode)
     }
 }
 
-void RenderSystem::passFrameSetup(const PassContext& /*ctx*/)
+void RenderSystem::passFrameSetup(const PassContext& ctx)
 {
-    // TODO: integrate modern frame setup (uniform updates, target binding)
+    if (!ctx.rhi) return;
+
+    // Clear screen with background color using RHI
+    ctx.rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
+
+    // Update uniform blocks using managers
+    m_transformManager.updateTransforms(glm::mat4(1.0f), m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
+    m_lightingManager.updateLighting(*ctx.lights, m_cameraManager.camera().position);
+    // Material updates are per-object, handled in rendering loops
+    m_renderingManager.updateRenderingState(m_exposure, m_gamma, m_tonemap, m_shadingMode, m_iblSystem.get());
+
+    // Bind uniform blocks (now delegates to managers)
+    bindUniformBlocks();
+
+    // Render state is now handled by RHI pipeline configuration
+    // Depth testing, culling, and winding order are set per-pipeline in createPipeline()
+    // No direct GL state calls needed here
 }
 
-void RenderSystem::passRaster(const PassContext& /*ctx*/)
+void RenderSystem::passRaster(const PassContext& ctx)
 {
-    // TODO: route rasterization through render graph
+    if (!ctx.scene || !ctx.lights) return;
+
+    // Update managers for this frame
+    m_lightingManager.updateLighting(*ctx.lights, m_cameraManager.camera().position);
+
+    // Bind all uniform blocks via managers
+    m_lightingManager.bindLightingUniforms();
+    m_materialManager.bindMaterialUniforms();
+
+    // Render skybox first as background
+    if (m_showSkybox && m_skybox) {
+        m_skybox->render(ctx.viewMatrix, ctx.projMatrix);
+        m_stats.drawCalls += 1;
+    }
+
+    // Render scene objects with batched approach using manager pipeline
+    renderObjectsBatchedWithManagers(*ctx.scene, *ctx.lights);
 }
 
-void RenderSystem::passRaytrace(const PassContext& /*ctx*/, int /*sampleCount*/, int /*maxDepth*/)
+void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int maxDepth)
 {
-    // TODO: integrate ray tracing path through render graph
+    if (!ctx.scene || !ctx.lights) return;
+
+    if (!m_raytracer) {
+        std::cerr << "[RenderSystem] Raytracer not initialized\n";
+        return;
+    }
+
+    if (!m_screenQuadShader) {
+        std::cerr << "[RenderSystem] Screen quad shader not loaded\n";
+        return;
+    }
+
+    if (!m_screenQuadVAO)
+        initScreenQuad();
+    if (!m_raytraceTexture)
+        initRaytraceTexture();
+
+    // Clear existing raytracer data and load all scene objects
+    m_raytracer = std::make_unique<Raytracer>();
+
+    // Set the seed for deterministic rendering
+    m_raytracer->setSeed(m_seed);
+
+    // Set reflection samples per pixel for glossy reflections
+    m_raytracer->setReflectionSpp(m_reflectionSpp);
+
+    const auto& objects = ctx.scene->getObjects();
+    std::cout << "[RenderSystem] Loading " << objects.size() << " objects into raytracer\n";
+
+    for (const auto& obj : objects) {
+        if (obj.objLoader.getVertCount() == 0) continue; // Skip objects with no geometry
+
+        // Load object into raytracer with its transform and material
+        // Calculate reflectivity from unified MaterialCore
+        const auto& mc = obj.materialCore;
+        float reflectivity = 0.1f; // Default reflectivity
+
+        // For metallic materials, use metallic value as reflectivity multiplier
+        if (mc.metallic > 0.1f) {
+            reflectivity = 0.3f + (mc.metallic * 0.7f); // Range 0.3 to 1.0 based on metallic
+        }
+
+        // 🚨 DEPRECATED CONVERSION: MaterialCore → legacy Material for raytracer API
+        // TODO CLEANUP: Update Raytracer::loadModel() to accept MaterialCore directly
+        // CLEANUP TASK: Modify raytracer.h signature and eliminate this conversion
+        // Using MaterialCore directly (no conversion needed)
+        
+
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, mc);
+    }
+
+    // Create output buffer for raytraced image
+    std::vector<glm::vec3> raytraceBuffer(m_raytraceWidth * m_raytraceHeight);
+
+    std::cout << "[RenderSystem] Raytracing " << m_raytraceWidth << "x" << m_raytraceHeight << " image...\n";
+
+    // Render the image using the raytracer
+    if (m_raytracer) {
+        m_raytracer->setSeed(m_seed);
+    }
+
+    // Use camera from CameraManager directly
+    const auto& cameraState = m_cameraManager.camera();
+
+    m_raytracer->renderImage(raytraceBuffer, m_raytraceWidth, m_raytraceHeight,
+                            cameraState.position, cameraState.front, cameraState.up,
+                            cameraState.fov, *ctx.lights);
+
+    // Apply OIDN denoising if enabled
+    if (m_denoiseEnabled) {
+        std::cout << "[RenderSystem] Applying OIDN denoising...\n";
+        if (!denoise(raytraceBuffer, m_raytraceWidth, m_raytraceHeight)) {
+            std::cerr << "[RenderSystem] Denoising failed, using raw raytraced image\n";
+        }
+    }
+
+    // Upload raytraced image to texture
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
+        // Use RHI to update texture data
+        m_rhi->updateBuffer(INVALID_HANDLE, raytraceBuffer.data(), raytraceBuffer.size() * sizeof(glm::vec3));
+        // TODO: Implement texture update via RHI - for now fall back to GL
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
+                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
+                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    // Render full-screen quad with raytraced texture
+    if (m_screenQuadVAO && m_screenQuadShader) {
+        m_screenQuadShader->use();
+        m_screenQuadShader->setInt("screenTexture", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+
+        glBindVertexArray(m_screenQuadVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        m_stats.drawCalls += 1;
+    }
 }
 
-void RenderSystem::passRayDenoise(const PassContext& /*ctx*/, TextureHandle /*inputTexture*/, TextureHandle /*outputTexture*/)
+void RenderSystem::passRayDenoise(const PassContext& ctx, TextureHandle inputTexture, TextureHandle outputTexture)
 {
-    // TODO: hook denoiser pass
+    // Denoising is currently integrated into the raytracing pass itself
+    // In the future, this could be separated to operate on texture handles
+    // For now, denoising happens inline with ray rendering
+    if (m_denoiseEnabled) {
+        // Denoising logic is handled within passRaytrace for now
+        // TODO: Extract to separate pass that operates on RHI textures
+    }
 }
 
-void RenderSystem::passOverlays(const PassContext& /*ctx*/)
+void RenderSystem::passOverlays(const PassContext& ctx)
 {
-    // TODO: render debug overlays via render graph
+    if (!ctx.scene || !ctx.lights) return;
+    if (!ctx.enableOverlays) return;
+
+    // Batch debug element rendering to minimize state changes
+    if (m_showGrid && m_grid) {
+        m_grid->render(ctx.viewMatrix, ctx.projMatrix);
+        m_stats.drawCalls += 1;
+    }
+    if (m_showAxes && m_axisRenderer) {
+        glm::mat4 I(1.0f);
+        glm::mat4 view = ctx.viewMatrix;
+        glm::mat4 proj = ctx.projMatrix;
+        m_axisRenderer->render(I, view, proj);
+        m_stats.drawCalls += 1;
+    }
+
+    // Light indicators
+    ctx.lights->renderIndicators(ctx.viewMatrix, ctx.projMatrix, m_selectedLightIndex);
+    m_stats.drawCalls += 1;
+
+    // Selection outline for currently selected object (wireframe overlay)
+    renderSelectionOutline(*ctx.scene);
+
+    // Draw gizmo at selected object's or light's center
+    renderGizmo(*ctx.scene, *ctx.lights);
 }
 
-void RenderSystem::passResolve(const PassContext& /*ctx*/)
+void RenderSystem::passResolve(const PassContext& ctx)
 {
-    // TODO: resolve MSAA / blit results as part of render graph
+    // For now, MSAA resolve is handled automatically by OpenGL default framebuffer
+    // In the future, we would implement explicit resolve from MSAA rendertarget
+    if (ctx.resolveMsaa) {
+        // TODO: Implement explicit MSAA resolve via RHI when custom render targets are used
+    }
 }
 
-void RenderSystem::passPresent(const PassContext& /*ctx*/)
+void RenderSystem::passPresent(const PassContext& ctx)
 {
-    // TODO: finalize RHI frame / swap buffers
+    // Present operation is handled by RHI endFrame() in renderUnified()
+    // This pass is primarily for future custom framebuffer presentation
+    if (ctx.finalizeFrame) {
+        // Frame finalization is already handled at the RenderSystem level
+        // Future: implement custom present operations here
+    }
 }
 
 void RenderSystem::passReadback(const PassContext& /*ctx*/)
@@ -2494,6 +2384,78 @@ void RenderSystem::passDeferredLighting(const PassContext& /*ctx*/, RenderTarget
 void RenderSystem::passRayIntegrator(const PassContext& /*ctx*/, TextureHandle /*outputTexture*/, int /*sampleCount*/, int /*maxDepth*/)
 {
     // TODO: integrate ray integrator pass
+}
+
+void RenderSystem::renderObjectsBatchedWithManagers(const SceneManager& scene, const Light& lights)
+{
+    if (!m_rhi) return;
+
+    const auto& objects = scene.getObjects();
+    if (objects.empty()) return;
+
+    // Batch objects by material/pipeline to minimize state changes
+    for (const auto& obj : objects) {
+        if (obj.rhiVboPositions == INVALID_HANDLE) continue; // Skip objects without valid geometry
+
+        // Ensure the object has a valid pipeline using PipelineManager
+        // Cast away const since we need to modify pipeline handles
+        SceneObject& mutableObj = const_cast<SceneObject&>(obj);
+        m_pipelineManager.ensureObjectPipeline(mutableObj, true);  // Use PBR pipeline
+
+        // Update material for this specific object
+        m_materialManager.updateMaterialForObject(obj);
+
+        // Use the object's PBR pipeline
+        PipelineHandle pipeline = m_pipelineManager.getObjectPipeline(obj, true);
+        if (pipeline == INVALID_HANDLE) {
+            continue;  // Skip if no valid pipeline
+        }
+
+        // Bind pipeline and render
+        m_rhi->bindPipeline(pipeline);
+
+        // Set per-object transform uniform (model matrix)
+        // TODO: This should also be managed by a TransformManager
+        m_rhi->setUniformMat4("model", obj.modelMatrix);
+
+        // Bind textures if available
+        int textureUnit = 0;
+        if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("baseColorTex", textureUnit);
+            textureUnit++;
+        }
+
+        if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.normalTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("normalTex", textureUnit);
+            textureUnit++;
+        }
+
+        if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.mrTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("metallicRoughnessTex", textureUnit);
+            textureUnit++;
+        }
+
+        // Draw the object using RHI draw command
+        DrawDesc drawDesc{};
+        drawDesc.pipeline = pipeline;
+        if (obj.rhiEbo != INVALID_HANDLE) {
+            // Indexed drawing
+            drawDesc.indexBuffer = obj.rhiEbo;
+            drawDesc.indexCount = obj.objLoader.getIndexCount();
+            drawDesc.vertexCount = 0;  // Not used for indexed drawing
+        } else {
+            // Non-indexed drawing
+            drawDesc.vertexCount = obj.objLoader.getVertCount();
+            drawDesc.indexCount = 0;  // Not used for non-indexed drawing
+        }
+        m_rhi->draw(drawDesc);
+
+        m_stats.drawCalls++;
+        m_stats.totalTriangles += obj.objLoader.getIndexCount() / 3;  // Convert indices to triangles
+    }
 }
 
 

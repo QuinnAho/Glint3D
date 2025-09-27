@@ -22,6 +22,11 @@ set(APP_SOURCES
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
     ${SRC_DIR}/managers/camera_manager.cpp
+    ${SRC_DIR}/managers/lighting_manager.cpp
+    ${SRC_DIR}/managers/material_manager.cpp
+    ${SRC_DIR}/managers/pipeline_manager.cpp
+    ${SRC_DIR}/managers/transform_manager.cpp
+    ${SRC_DIR}/managers/rendering_manager.cpp
     ${SRC_DIR}/camera_controller.cpp
     ${SRC_DIR}/ui_bridge.cpp
     ${SRC_DIR}/json_ops.cpp
@@ -29,6 +34,7 @@ set(APP_SOURCES
     ${SRC_DIR}/render_settings.cpp
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
+    ${SRC_DIR}/path_utils.cpp
     # ${SRC_DIR}/render_offscreen.cpp  # legacy (Application-based); excluded from build
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
@@ -72,11 +78,17 @@ set(CORE_SOURCES
     ${SRC_DIR}/scene_manager.cpp
     ${SRC_DIR}/render_system.cpp
     ${SRC_DIR}/managers/camera_manager.cpp
+    ${SRC_DIR}/managers/lighting_manager.cpp
+    ${SRC_DIR}/managers/material_manager.cpp
+    ${SRC_DIR}/managers/pipeline_manager.cpp
+    ${SRC_DIR}/managers/transform_manager.cpp
+    ${SRC_DIR}/managers/rendering_manager.cpp
     ${SRC_DIR}/camera_controller.cpp
     ${SRC_DIR}/ui_bridge.cpp
     ${SRC_DIR}/cli_parser.cpp
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
+    ${SRC_DIR}/path_utils.cpp
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp

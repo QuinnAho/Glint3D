@@ -311,7 +311,7 @@ bool SceneManager::duplicateObject(const std::string& sourceName, const std::str
     // Clear RHI handles (they will be regenerated in pure RHI implementation)
     newObj.rhiVboPositions = INVALID_HANDLE;
     newObj.rhiVboNormals = INVALID_HANDLE;
-    newObj.rhiVboUVs = INVALID_HANDLE;
+    newObj.rhiVboTexCoords = INVALID_HANDLE;
     newObj.rhiEbo = INVALID_HANDLE;
     
     // Add to scene
@@ -366,7 +366,7 @@ void SceneManager::setupObjectOpenGL(SceneObject& obj)
         BufferDesc bd{}; bd.type = BufferType::Vertex; bd.usage = BufferUsage::Static;
         bd.size = Nv * 2 * sizeof(float); bd.initialData = obj.objLoader.getTexcoords();
         bd.debugName = obj.name + ":uvs";
-        obj.rhiVboUVs = m_rhi->createBuffer(bd);
+        obj.rhiVboTexCoords = m_rhi->createBuffer(bd);
     }
     if (obj.objLoader.getIndexCount() > 0) {
         BufferDesc bd{}; bd.type = BufferType::Index; bd.usage = BufferUsage::Static;
@@ -388,7 +388,7 @@ void SceneManager::cleanupObjectOpenGL(SceneObject& obj)
     }
     if (m_rhi && obj.rhiVboPositions != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboPositions); obj.rhiVboPositions = INVALID_HANDLE; }
     if (m_rhi && obj.rhiVboNormals != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboNormals); obj.rhiVboNormals = INVALID_HANDLE; }
-    if (m_rhi && obj.rhiVboUVs != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboUVs); obj.rhiVboUVs = INVALID_HANDLE; }
+    if (m_rhi && obj.rhiVboTexCoords != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiVboTexCoords); obj.rhiVboTexCoords = INVALID_HANDLE; }
     if (m_rhi && obj.rhiEbo != INVALID_HANDLE) { m_rhi->destroyBuffer(obj.rhiEbo); obj.rhiEbo = INVALID_HANDLE; }
     if (m_rhi && obj.rhiPipelineGBuffer != INVALID_HANDLE) { m_rhi->destroyPipeline(obj.rhiPipelineGBuffer); obj.rhiPipelineGBuffer = INVALID_HANDLE; }
     if (m_rhi && obj.rhiPipelinePbr != INVALID_HANDLE) { m_rhi->destroyPipeline(obj.rhiPipelinePbr); obj.rhiPipelinePbr = INVALID_HANDLE; }

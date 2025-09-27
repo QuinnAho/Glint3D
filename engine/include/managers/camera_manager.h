@@ -14,6 +14,7 @@ public:
 
     void updateViewMatrix();
     void updateProjectionMatrix(int width, int height);
+    void setProjectionMatrix(const glm::mat4& projection);
 
     const glm::mat4& viewMatrix() const;
     const glm::mat4& projectionMatrix() const;

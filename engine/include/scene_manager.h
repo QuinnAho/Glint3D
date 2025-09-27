@@ -20,10 +20,12 @@ struct SceneObject
     // RHI buffer handles (pure RHI implementation - legacy VAO/VBO removed)
     BufferHandle rhiVboPositions = INVALID_HANDLE;
     BufferHandle rhiVboNormals = INVALID_HANDLE;
-    BufferHandle rhiVboUVs = INVALID_HANDLE;
+    BufferHandle rhiVboTexCoords = INVALID_HANDLE;  // Renamed from rhiVboUVs for consistency
+    BufferHandle rhiVboTangents = INVALID_HANDLE;   // For PBR tangent data
     BufferHandle rhiEbo = INVALID_HANDLE;
-    PipelineHandle rhiPipelineGBuffer = INVALID_HANDLE;
-    PipelineHandle rhiPipelinePbr = INVALID_HANDLE;
+    PipelineHandle rhiPipelineBasic = INVALID_HANDLE;   // Basic shader pipeline
+    PipelineHandle rhiPipelinePbr = INVALID_HANDLE;     // PBR shader pipeline
+    PipelineHandle rhiPipelineGBuffer = INVALID_HANDLE; // Deferred G-buffer pipeline
     glm::mat4 modelMatrix{ 1.0f };        // World transform (computed from hierarchy)
     
     // Hierarchy support

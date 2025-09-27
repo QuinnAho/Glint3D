@@ -53,4 +53,7 @@ const glm::mat4& CameraManager::projectionMatrix() const
     return m_projection;
 }
 
-\r\nvoid CameraManager::setViewMatrix(const glm::mat4& view)\r\n{\r\n    m_view = view;\r\n}\r\n\r\nvoid CameraManager::setProjectionMatrix(const glm::mat4& proj)\r\n{\r\n    m_projection = proj;\r\n}\r\n
+void CameraManager::setProjectionMatrix(const glm::mat4& projection)
+{
+    m_projection = projection;
+}

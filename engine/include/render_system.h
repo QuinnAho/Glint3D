@@ -6,12 +6,18 @@
 #include <cstdint>
 #include "camera_state.h"
 #include "managers/camera_manager.h"
+#include "managers/lighting_manager.h"
+#include "managers/material_manager.h"
+#include "managers/pipeline_manager.h"
+#include "managers/transform_manager.h"
+#include "managers/rendering_manager.h"
 #include "gl_platform.h"
 #include "gizmo.h"
 // RHI types for pipeline handles
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
 #include "render_mode_selector.h"
+#include "render_pass.h"
 
 using namespace glint3d;
 
@@ -51,7 +57,7 @@ enum class ShadingMode {
     Gouraud = 1
 };
 
-struct PassTiming; // Forward declaration
+// PassTiming is defined in render_pass.h
 
 struct RenderStats {
     int drawCalls = 0;
@@ -180,6 +186,10 @@ public:
     
     // RHI access (for SceneManager to create buffers)
     RHI* getRHI() const { return m_rhi.get(); }
+
+    // Manager access
+    PipelineManager& getPipelineManager() { return m_pipelineManager; }
+    const PipelineManager& getPipelineManager() const { return m_pipelineManager; }
     
     // Gizmo/selection configuration
     void setGizmoMode(GizmoMode mode) { m_gizmoMode = mode; }
@@ -196,6 +206,11 @@ public:
 private:
     // Core rendering state
     CameraManager m_cameraManager;
+    LightingManager m_lightingManager;
+    MaterialManager m_materialManager;
+    PipelineManager m_pipelineManager;
+    TransformManager m_transformManager;
+    RenderingManager m_renderingManager;
 
     std::unique_ptr<RenderGraph> m_rasterGraph;
     std::unique_ptr<RenderGraph> m_rayGraph;
@@ -263,25 +278,8 @@ private:
     void setUniformInt(const char* name, int v);
     void setUniformBool(const char* name, bool v);
 
-    // Uniform Block Allocations (FEAT-0249)
-    UniformAllocation m_transformBlock = {};
-    UniformAllocation m_lightingBlock = {};
-    UniformAllocation m_materialBlock = {};
-    UniformAllocation m_renderingBlock = {};
-
-    // Cached uniform block data
-    TransformBlock m_transformData = {};
-    LightingBlock m_lightingData = {};
-    MaterialBlock m_materialData = {};
-    RenderingBlock m_renderingData = {};
-
-    // UBO helper methods
-    void updateTransformUniforms();
-    void updateLightingUniforms(const Light& lights);
-    void updateMaterialUniforms();
-    void updateMaterialUniformsForObject(const SceneObject& obj); // Update material UBO for specific object
-    void updateRenderingUniforms(); // Update rendering state (exposure, gamma, etc.)
-    void bindUniformBlocks(); // Bind all UBOs to their binding points
+    // UBO binding - delegates entirely to managers
+    void bindUniformBlocks(); // Delegates to all managers
 
     // Shaders
     std::unique_ptr<Shader> m_basicShader;
@@ -308,6 +306,7 @@ private:
     void renderSelectionOutline(const SceneManager& scene);
     void renderGizmo(const SceneManager& scene, const Light& lights);
     void renderObjectsBatched(const SceneManager& scene, const Light& lights);
+    void renderObjectsBatchedWithManagers(const SceneManager& scene, const Light& lights);  // New manager-based method
     void setupCommonUniforms(Shader* shader);
     void renderObjectFast(const SceneObject& obj, const Light& lights, Shader* shader);
     
@@ -345,15 +344,21 @@ private:
     void initializeRenderGraphs();
     void destroyRenderGraphs();
 
+    // Render graph management
+    void initRenderGraphs();
+    RenderGraph* getActiveGraph(RenderPipelineMode mode);
+
 public:
     // Render Pass Methods (called by render graph passes)
     void passFrameSetup(const PassContext& ctx);
     void passRaster(const PassContext& ctx);
     void passRaytrace(const PassContext& ctx, int sampleCount = 1, int maxDepth = 8);
-    void passGBuffer(const PassContext& ctx);
-    void passDeferredLighting(const PassContext& ctx);
-    void passRayIntegrator(const PassContext& ctx);
-    void passRayDenoise(const PassContext& ctx);
+    void passGBuffer(const PassContext& ctx, RenderTargetHandle gBufferRT);
+    void passDeferredLighting(const PassContext& ctx, RenderTargetHandle outputRT,
+                             TextureHandle gBaseColor, TextureHandle gNormal,
+                             TextureHandle gPosition, TextureHandle gMaterial);
+    void passRayIntegrator(const PassContext& ctx, TextureHandle outputTex, int sampleCount, int maxDepth);
+    void passRayDenoise(const PassContext& ctx, TextureHandle inputTex, TextureHandle outputTex);
     void passOverlays(const PassContext& ctx);
     void passResolve(const PassContext& ctx);
     void passPresent(const PassContext& ctx);
