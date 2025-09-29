@@ -1,8 +1,11 @@
 # OpenGL Migration Artifacts
 
-This directory contains all outputs from the OpenGL to RHI migration task.
+This directory will contain outputs from the OpenGL to RHI migration task.
 
-## Expected Artifacts
+## **STATUS: NOT YET GENERATED**
+**⚠️ Migration is still in progress - no artifacts have been completed yet.**
+
+## Expected Artifacts (When Complete)
 
 ### Code Artifacts (`code/`)
 - **rhi_framebuffer.h/cpp** - RHI framebuffer abstraction implementation
@@ -57,14 +60,16 @@ cmake --build builds/desktop/cmake --config Release
 ./validation/visual_regression_test.exe --reference validation/reference_images/ --output validation/test_output/
 ```
 
-## Migration Checklist
+## Migration Checklist (Current Reality)
 
-- [ ] Complete OpenGL call audit documented
-- [ ] All framebuffer operations migrated to RHI
-- [ ] All rendering state changes use RHI
-- [ ] All resource management uses RHI
-- [ ] Screen quad utility implemented with RHI
-- [ ] Automated OpenGL detection returns zero matches
-- [ ] Visual regression tests pass
-- [ ] Performance benchmarks show acceptable impact
-- [ ] All artifacts generated and validated
+- [x] **Limited Progress**: OpenGL call audit completed (80+ calls identified)
+- [ ] **TODO**: All framebuffer operations migrated to RHI
+- [ ] **TODO**: All rendering state changes use RHI
+- [ ] **TODO**: All resource management uses RHI
+- [ ] **TODO**: Screen quad utility actually used (RHI utility exists but not used)
+- [ ] **TODO**: Automated OpenGL detection returns zero matches
+- [ ] **TODO**: Visual regression tests pass
+- [ ] **TODO**: Performance benchmarks show acceptable impact
+- [ ] **TODO**: All artifacts generated and validated
+
+**CURRENT STATUS**: Only PNG fallback path migrated. Core rendering still uses direct OpenGL.

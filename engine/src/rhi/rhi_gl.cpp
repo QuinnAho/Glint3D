@@ -17,11 +17,14 @@ bool RhiGL::init(const RhiInit& desc) {
     
     // Enable depth testing by default
     glEnable(GL_DEPTH_TEST);
-    
+
+    // Enable MSAA by default
+    glEnable(GL_MULTISAMPLE);
+
     // Enable face culling
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-    
+
     // Configure sRGB if requested
     if (desc.enableSRGB) {
         glEnable(GL_FRAMEBUFFER_SRGB);

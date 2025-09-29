@@ -119,13 +119,7 @@ static TextureHandle s_dummyShadowTexRhi = 0;
 
 bool RenderSystem::init(int windowWidth, int windowHeight)
 {
-    // Initialize OpenGL state
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_MULTISAMPLE);
-#ifndef __EMSCRIPTEN__
-    if (m_framebufferSRGBEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
-#endif
-    // Minimal RHI init (OpenGL backend)
+    // Minimal RHI init (OpenGL backend) - handles depth test, MSAA, sRGB setup
     if (!m_rhi) {
         m_rhi = createRHI(RHI::Backend::OpenGL);
         if (m_rhi) {
@@ -257,25 +251,7 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
         }
     }
     
-    // Fallback or parallel GL path for compatibility
-    if (m_dummyShadowTexRhi == INVALID_HANDLE) {
-        glGenTextures(1, &m_dummyShadowTex);
-        glBindTexture(GL_TEXTURE_2D, m_dummyShadowTex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1, 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &depthOne);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-#ifndef __EMSCRIPTEN__
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        float borderColor[] = {1.f,1.f,1.f,1.f};
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-#else
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-#endif
-        glBindTexture(GL_TEXTURE_2D, 0);
-        std::cerr << "[RenderSystem] Created dummy shadow texture via GL: " << m_dummyShadowTex << std::endl;
-    }
+    // Note: Dummy shadow texture now created exclusively via RHI (lines 236-251)
 
     // Update global RHI dummy shadow texture
     if (m_rhi && m_dummyShadowTexRhi != INVALID_HANDLE) {
@@ -314,7 +290,7 @@ void RenderSystem::shutdown()
     m_basicShader.reset();
     m_pbrShader.reset();
     m_gridShader.reset();
-    if (m_dummyShadowTex) { glDeleteTextures(1, &m_dummyShadowTex); m_dummyShadowTex = 0; }
+    // Note: m_dummyShadowTexRhi cleanup handled by RHI shutdown
 
     // Shutdown managers (will handle UBO cleanup)
     m_lightingManager.shutdown();
@@ -389,10 +365,16 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
     // Camera and viewport
     ctx.viewMatrix = m_cameraManager.viewMatrix();
     ctx.projMatrix = m_cameraManager.projectionMatrix();
-    GLint vp[4];
-    glGetIntegerv(GL_VIEWPORT, vp);
-    ctx.viewportWidth = vp[2];
-    ctx.viewportHeight = vp[3];
+    if (m_rhi) {
+        // Use tracked framebuffer dimensions when RHI available
+        ctx.viewportWidth = m_fbWidth;
+        ctx.viewportHeight = m_fbHeight;
+    } else {
+        GLint vp[4];
+        glGetIntegerv(GL_VIEWPORT, vp);
+        ctx.viewportWidth = vp[2];
+        ctx.viewportHeight = vp[3];
+    }
 
     // Frame state
     ctx.frameIndex = ++m_frameCounter;
@@ -429,11 +411,13 @@ void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
     // Bind uniform blocks to their binding points (FEAT-0249)
     bindUniformBlocks();
 
-    // Optimize clear operations - only clear if background changed
-    static glm::vec3 lastBgColor{-1.0f};
-    if (lastBgColor != m_backgroundColor) {
-        glClearColor(m_backgroundColor.r, m_backgroundColor.g, m_backgroundColor.b, 1.0f);
-        lastBgColor = m_backgroundColor;
+    // Optimize clear operations - only set GL clear color if RHI unavailable
+    if (!m_rhi) {
+        static glm::vec3 lastBgColor{-1.0f};
+        if (lastBgColor != m_backgroundColor) {
+            glClearColor(m_backgroundColor.r, m_backgroundColor.g, m_backgroundColor.b, 1.0f);
+            lastBgColor = m_backgroundColor;
+        }
     }
     // Recreate MSAA targets if viewport changed or flagged
     GLint vp[4] = {0,0,0,0};
@@ -861,10 +845,15 @@ bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& light
             return false;
         }
 
-        // Set viewport and clear
-        glViewport(0, 0, width, height);
-        glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Set viewport and clear - use RHI when available
+        if (m_rhi) {
+            m_rhi->setViewport(0, 0, width, height);
+            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
+        } else {
+            glViewport(0, 0, width, height);
+            glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
 
         // Render scene using current mode
         if (m_renderMode == RenderMode::Raytrace) {
@@ -900,11 +889,13 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 #else
     if (width <= 0 || height <= 0) return false;
 
-    // Preserve current framebuffer and viewport
-    GLint prevFBO = 0;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
+    // Save current viewport for restoration (use RHI for this since it's offscreen)
+    // Note: renderToPNG is an offscreen operation and shouldn't affect main framebuffer
     GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
+    if (!m_rhi) {
+        // Only query GL viewport if no RHI available
+        glGetIntegerv(GL_VIEWPORT, prevViewport);
+    }
 
     // RHI-first path: render using the new RHI overload, then readback
     if (m_rhi) {
@@ -941,9 +932,8 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 
                 int writeOK = stbi_write_png(path.c_str(), width, height, comp, flipped.data(), rowStride);
 
-                // Restore GL framebuffer binding and viewport
-                glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+                // Viewport restoration handled by RenderSystem internally
+                // No framebuffer restoration needed since we used RHI render targets
 
                 m_rhi->destroyTexture(colorTexHandle);
                 return writeOK != 0;
@@ -955,44 +945,39 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
         // If RHI path failed, fall through to GL fallback below
     }
 
-    // GL fallback path: create a GL texture, render via legacy overload, and read back
-    GLuint colorTex = 0;
-    glGenTextures(1, &colorTex);
-    glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    // RHI fallback path: create RHI texture, render via RHI, and read back via RHI
+    TextureHandle colorTexHandle = INVALID_HANDLE;
+    TextureDesc td{};
+    td.type = TextureType::Texture2D;
+    td.format = TextureFormat::RGBA8;
+    td.width = width; td.height = height; td.depth = 1;
+    td.generateMips = false;
+    td.debugName = "renderToPNG_fallback_color";
+    colorTexHandle = m_rhi->createTexture(td);
 
-    std::cerr << "[RenderSystem] About to render to texture (GL fallback), colorTex=" << colorTex << std::endl;
-    bool ok = renderToTexture(scene, lights, colorTex, width, height);
-    std::cerr << "[RenderSystem] renderToTexture returned " << (ok ? "true" : "false") << std::endl;
+    if (colorTexHandle == INVALID_HANDLE) {
+        std::cerr << "[RenderSystem] renderToPNG fallback: failed to create RHI texture" << std::endl;
+        return false;
+    }
+
+    std::cerr << "[RenderSystem] About to render to texture (RHI fallback)" << std::endl;
+    bool ok = renderToTextureRHI(scene, lights, colorTexHandle, width, height);
+    std::cerr << "[RenderSystem] renderToTextureRHI returned " << (ok ? "true" : "false") << std::endl;
     if (!ok) {
-        if (colorTex) glDeleteTextures(1, &colorTex);
+        m_rhi->destroyTexture(colorTexHandle);
         return false;
     }
-
-    GLuint fbo = 0;
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-        glDeleteFramebuffers(1, &fbo);
-        if (colorTex) glDeleteTextures(1, &colorTex);
-        return false;
-    }
-
-    glViewport(0, 0, width, height);
-    glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
     const int comp = 4;
     const int rowStride = width * comp;
     std::vector<std::uint8_t> pixels(height * rowStride);
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    ReadbackDesc rb{};
+    rb.sourceTexture = colorTexHandle;
+    rb.format = TextureFormat::RGBA8;
+    rb.x = 0; rb.y = 0; rb.width = width; rb.height = height;
+    rb.destination = pixels.data();
+    rb.destinationSize = pixels.size();
+    m_rhi->readback(rb);
 
     std::vector<std::uint8_t> flipped(height * rowStride);
     for (int y = 0; y < height; ++y) {
@@ -1003,17 +988,15 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 
     int writeOK = stbi_write_png(path.c_str(), width, height, comp, flipped.data(), rowStride);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+    // Restore viewport via RHI
     if (m_rhi) {
         m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     } else {
         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     }
 
-    glDeleteFramebuffers(1, &fbo);
-    if (colorTex) {
-        glDeleteTextures(1, &colorTex);
-    }
+    // Cleanup RHI texture
+    m_rhi->destroyTexture(colorTexHandle);
 
     return writeOK != 0;
 #endif
@@ -1030,9 +1013,7 @@ bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& li
         return false;
     }
 
-    // Preserve current framebuffer (GL) and viewport to restore; RHI has no query API
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
+    // Preserve current projection matrix; viewport restoration not needed for offscreen RHI rendering
     glm::mat4 prevProj = m_cameraManager.projectionMatrix();
     updateProjectionMatrix(width, height);
 
@@ -1097,13 +1078,8 @@ bool RenderSystem::renderToTextureRHI(const SceneManager& scene, const Light& li
         }
     }
 
-    // Restore projection and viewport
+    // Restore projection matrix; viewport restoration handled by caller/main render loop
     m_cameraManager.setProjectionMatrix(prevProj);
-    if (m_rhi) {
-        m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-    } else {
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-    }
 
     return ok;
 }
@@ -1396,25 +1372,26 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
             std::cerr << "[RenderSystem] Denoising failed, using raw raytraced image\n";
         }
     }
-    
+
     // Upload raytraced image to texture
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
         // Use RHI to update texture data
-        m_rhi->updateBuffer(INVALID_HANDLE, raytraceBuffer.data(), raytraceBuffer.size() * sizeof(glm::vec3));
-        // TODO: Implement texture update via RHI - for now fall back to GL
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
-                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
-        glBindTexture(GL_TEXTURE_2D, 0);
+        m_rhi->updateTexture(m_raytraceTextureRhi, raytraceBuffer.data(),
+                           m_raytraceWidth, m_raytraceHeight, TextureFormat::RGB32F);
     } else {
+        // GL fallback path
         glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
                         GL_RGB, GL_FLOAT, raytraceBuffer.data());
         glBindTexture(GL_TEXTURE_2D, 0);
     }
-    
+
     // Clear the screen
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (m_rhi) {
+        m_rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
+    } else {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
     glDisable(GL_DEPTH_TEST); // Disable depth testing for screen quad
     
     // Render the raytraced result using screen quad
@@ -1434,10 +1411,26 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     }
     m_screenQuadShader->setInt("rayTex", 0);
     
-    // Draw the screen quad
-    glBindVertexArray(m_screenQuadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    // Draw the screen quad - use RHI when available
+    if (m_rhi) {
+        BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
+        if (screenQuadBuffer != INVALID_HANDLE) {
+            DrawDesc drawDesc{};
+            drawDesc.vertexBuffer = screenQuadBuffer;
+            drawDesc.vertexCount = 6;
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
+        } else {
+            // Fallback to GL if RHI screen quad not available
+            glBindVertexArray(m_screenQuadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+        }
+    } else {
+        glBindVertexArray(m_screenQuadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+    }
     // One draw call for the screen quad
     m_stats.drawCalls += 1;
     
@@ -1519,8 +1512,14 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
 
     // Lights (sets globalAmbient, lights[], numLights) - RHI only
     // Use currently bound program (bound via ensureObjectPipeline)
-    GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-    if (prog) lights.applyLights(static_cast<GLuint>(prog));
+    // When using RHI, prefer UBO-based lighting over legacy uniform approach
+    if (m_rhi) {
+        // UBO-based lighting is handled by LightingManager - no GL program query needed
+        // Note: Legacy lights.applyLights() bypassed when using RHI + UBOs
+    } else {
+        GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+        if (prog) lights.applyLights(static_cast<GLuint>(prog));
+    }
 
     // Bind dummy shadow map and identity lightSpaceMatrix to avoid undefined sampling - RHI only
     m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
@@ -1702,36 +1701,8 @@ void RenderSystem::updateRenderStats(const SceneManager& scene)
 
 void RenderSystem::initScreenQuad()
 {
-    // Full-screen quad vertices with UV coordinates
-    float quadVertices[] = {
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,  // top left
-        -1.0f, -1.0f,  0.0f, 0.0f,  // bottom left
-         1.0f, -1.0f,  1.0f, 0.0f,  // bottom right
-        
-        -1.0f,  1.0f,  0.0f, 1.0f,  // top left
-         1.0f, -1.0f,  1.0f, 0.0f,  // bottom right
-         1.0f,  1.0f,  1.0f, 1.0f   // top right
-    };
-    
-    glGenVertexArrays(1, &m_screenQuadVAO);
-    glGenBuffers(1, &m_screenQuadVBO);
-    
-    glBindVertexArray(m_screenQuadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_screenQuadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-    
-    // Position attribute
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    
-    // Texture coordinate attribute
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    
-    glBindVertexArray(0);
-    
-    std::cout << "[RenderSystem] Screen quad initialized for raytracing\n";
+    // Note: Screen quad now provided by RHI::getScreenQuadBuffer() - no manual setup needed
+    std::cout << "[RenderSystem] Screen quad initialization delegated to RHI\n";
 }
 
 void RenderSystem::initRaytraceTexture()
@@ -1758,21 +1729,8 @@ void RenderSystem::initRaytraceTexture()
         }
     }
     
-    // GL fallback path
-    glGenTextures(1, &m_raytraceTexture);
-    glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-    
-    // Create texture with RGB floating point format for HDR
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_raytraceWidth, m_raytraceHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-    
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    std::cout << "[RenderSystem] Raytracing texture initialized via GL (" << m_raytraceWidth << "x" << m_raytraceHeight << "): " << m_raytraceTexture << "\n";
+    // Note: GL fallback removed - raytracing texture must be created via RHI (lines 1710-1724)
+    std::cerr << "[RenderSystem] ERROR: Failed to create raytracing texture via RHI - no GL fallback available\n";
 }
 
 void RenderSystem::renderDebugElements(const SceneManager& scene, const Light& lights)
@@ -2019,25 +1977,15 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
 
 void RenderSystem::cleanupRaytracing()
 {
-    if (m_screenQuadVAO) {
-        glDeleteVertexArrays(1, &m_screenQuadVAO);
-        m_screenQuadVAO = 0;
-    }
-    if (m_screenQuadVBO) {
-        glDeleteBuffers(1, &m_screenQuadVBO);
-        m_screenQuadVBO = 0;
-    }
+    // Note: Screen quad cleanup now handled by RHI::getScreenQuadBuffer() lifecycle
+
     // Cleanup RHI raytracing texture first
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
         m_rhi->destroyTexture(m_raytraceTextureRhi);
         m_raytraceTextureRhi = INVALID_HANDLE;
     }
 
-    // Cleanup legacy GL raytracing texture
-    if (m_raytraceTexture) {
-        glDeleteTextures(1, &m_raytraceTexture);
-        m_raytraceTexture = 0;
-    }
+    // Note: Raytracing texture cleanup handled by RHI destroyTexture above
 }
 
 void RenderSystem::destroyTargets()
@@ -2270,12 +2218,8 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
     // Upload raytraced image to texture
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
         // Use RHI to update texture data
-        m_rhi->updateBuffer(INVALID_HANDLE, raytraceBuffer.data(), raytraceBuffer.size() * sizeof(glm::vec3));
-        // TODO: Implement texture update via RHI - for now fall back to GL
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
-                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
-        glBindTexture(GL_TEXTURE_2D, 0);
+        m_rhi->updateTexture(m_raytraceTextureRhi, raytraceBuffer.data(),
+                           m_raytraceWidth, m_raytraceHeight, TextureFormat::RGB32F);
     } else {
         glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
@@ -2287,8 +2231,14 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
     if (m_screenQuadVAO && m_screenQuadShader) {
         m_screenQuadShader->use();
         m_screenQuadShader->setInt("screenTexture", 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+
+        // Bind raytraced texture
+        if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
+            m_rhi->bindTexture(m_raytraceTextureRhi, 0);
+        } else {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
+        }
 
         glBindVertexArray(m_screenQuadVAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

@@ -33,7 +33,7 @@ public:
     bool loadShaders();
     ShaderHandle getBasicShader() const { return m_basicShaderRhi; }
     ShaderHandle getPbrShader() const { return m_pbrShaderRhi; }
-    Shader* getBasicShaderLegacy() const { return m_basicShader.get(); }
+    Shader* getBasicShaderLegacy() const { return m_basicShader ? m_basicShader.get() : m_pbrShader.get(); }
     Shader* getPbrShaderLegacy() const { return m_pbrShader.get(); }
 
     // Pipeline querying

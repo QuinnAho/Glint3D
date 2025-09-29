@@ -77,15 +77,7 @@ void PipelineManager::shutdown()
 
 bool PipelineManager::loadShaders()
 {
-    // Load basic shader
-    m_basicShader = std::make_unique<Shader>();
-    if (!m_basicShader->load(m_basicVertPath, m_basicFragPath)) {
-        std::cerr << "PipelineManager: Failed to load basic shader from "
-                  << m_basicVertPath << ", " << m_basicFragPath << std::endl;
-        return false;
-    }
-
-    // Load PBR shader
+    // Load PBR shader (required)
     m_pbrShader = std::make_unique<Shader>();
     if (!m_pbrShader->load(m_pbrVertPath, m_pbrFragPath)) {
         std::cerr << "PipelineManager: Failed to load PBR shader from "
@@ -93,6 +85,15 @@ bool PipelineManager::loadShaders()
         return false;
     }
 
+    // Try to load basic shader (optional - fallback to PBR if missing)
+    m_basicShader = std::make_unique<Shader>();
+    if (!m_basicShader->load(m_basicVertPath, m_basicFragPath)) {
+        std::cerr << "PipelineManager: Basic shaders not found, using PBR shaders for all rendering" << std::endl;
+        // Use PBR shader as fallback for basic shader
+        m_basicShader.reset();
+    }
+
+    std::cerr << "PipelineManager: Successfully loaded legacy shaders" << std::endl;
     return true;
 }
 
@@ -100,29 +101,33 @@ bool PipelineManager::createRhiShaders()
 {
     if (!m_rhi) return false;
 
-    // Load shader source code
-    std::string basicVertSrc = loadTextFile(m_basicVertPath);
-    std::string basicFragSrc = loadTextFile(m_basicFragPath);
+    // Load PBR shader source (required)
     std::string pbrVertSrc = loadTextFile(m_pbrVertPath);
     std::string pbrFragSrc = loadTextFile(m_pbrFragPath);
 
-    if (basicVertSrc.empty() || basicFragSrc.empty() ||
-        pbrVertSrc.empty() || pbrFragSrc.empty()) {
-        std::cerr << "PipelineManager: Failed to load shader source files" << std::endl;
+    if (pbrVertSrc.empty() || pbrFragSrc.empty()) {
+        std::cerr << "PipelineManager: Failed to load PBR shader source files" << std::endl;
         return false;
     }
 
-    // Create basic shader
-    ShaderDesc basicDesc{};
-    basicDesc.stages = shaderStageBits(ShaderStage::Vertex) | shaderStageBits(ShaderStage::Fragment);
-    basicDesc.vertexSource = basicVertSrc;
-    basicDesc.fragmentSource = basicFragSrc;
-    basicDesc.debugName = "BasicShader";
+    // Try to load basic shader source (optional)
+    std::string basicVertSrc = loadTextFile(m_basicVertPath);
+    std::string basicFragSrc = loadTextFile(m_basicFragPath);
+    bool hasBasicShaders = !basicVertSrc.empty() && !basicFragSrc.empty();
 
-    m_basicShaderRhi = m_rhi->createShader(basicDesc);
-    if (m_basicShaderRhi == INVALID_HANDLE) {
-        std::cerr << "PipelineManager: Failed to create basic RHI shader" << std::endl;
-        return false;
+    if (hasBasicShaders) {
+        // Create basic shader
+        ShaderDesc basicDesc{};
+        basicDesc.stages = shaderStageBits(ShaderStage::Vertex) | shaderStageBits(ShaderStage::Fragment);
+        basicDesc.vertexSource = basicVertSrc;
+        basicDesc.fragmentSource = basicFragSrc;
+        basicDesc.debugName = "BasicShader";
+
+        m_basicShaderRhi = m_rhi->createShader(basicDesc);
+        if (m_basicShaderRhi == INVALID_HANDLE) {
+            std::cerr << "PipelineManager: Failed to create basic RHI shader, using PBR fallback" << std::endl;
+            hasBasicShaders = false;
+        }
     }
 
     // Create PBR shader
@@ -136,6 +141,12 @@ bool PipelineManager::createRhiShaders()
     if (m_pbrShaderRhi == INVALID_HANDLE) {
         std::cerr << "PipelineManager: Failed to create PBR RHI shader" << std::endl;
         return false;
+    }
+
+    // If no basic shader was loaded, use PBR shader as fallback
+    if (!hasBasicShaders) {
+        std::cerr << "PipelineManager: Using PBR shader for basic shader calls" << std::endl;
+        m_basicShaderRhi = m_pbrShaderRhi;
     }
 
     return true;
