@@ -75,6 +75,12 @@ void RhiGL::shutdown() {
     }
     m_textures.clear();
 
+    // Clean up utility resources
+    if (m_screenQuadBuffer != INVALID_HANDLE) {
+        destroyBuffer(m_screenQuadBuffer);
+        m_screenQuadBuffer = INVALID_HANDLE;
+    }
+
     // Shutdown uniform buffer ring allocator
     shutdownUniformRing();
 }
@@ -856,6 +862,35 @@ std::string RhiGL::getDebugInfo() const {
     info << "  Max Texture Units: " << getMaxTextureUnits() << "\n";
     info << "  Max Samples: " << getMaxSamples() << "\n";
     return info.str();
+}
+
+BufferHandle RhiGL::getScreenQuadBuffer() {
+    if (m_screenQuadBuffer != INVALID_HANDLE) {
+        return m_screenQuadBuffer; // Already created
+    }
+
+    // Screen quad vertices (NDC coordinates with UVs)
+    // Two triangles forming a full-screen quad
+    float quadVertices[] = {
+        // positions   // UVs
+        -1.0f,  1.0f,  0.0f, 1.0f,  // top-left
+        -1.0f, -1.0f,  0.0f, 0.0f,  // bottom-left
+         1.0f, -1.0f,  1.0f, 0.0f,  // bottom-right
+
+        -1.0f,  1.0f,  0.0f, 1.0f,  // top-left
+         1.0f, -1.0f,  1.0f, 0.0f,  // bottom-right
+         1.0f,  1.0f,  1.0f, 1.0f   // top-right
+    };
+
+    BufferDesc bufferDesc{};
+    bufferDesc.type = BufferType::Vertex;
+    bufferDesc.usage = BufferUsage::Static;
+    bufferDesc.size = sizeof(quadVertices);
+    bufferDesc.initialData = quadVertices;
+    bufferDesc.debugName = "RHI_ScreenQuad";
+
+    m_screenQuadBuffer = createBuffer(bufferDesc);
+    return m_screenQuadBuffer;
 }
 
 GLenum RhiGL::attachmentTypeToGL(AttachmentType type) const {

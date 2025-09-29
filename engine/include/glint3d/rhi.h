@@ -370,6 +370,17 @@ public:
      * @return Debug string with driver version, extensions, etc.
      */
     virtual std::string getDebugInfo() const = 0;
+
+    // Utility functions for common operations
+    /**
+     * @brief Get or create a screen quad buffer for full-screen passes
+     * @return Buffer handle containing screen-aligned quad vertices with UVs
+     *
+     * Returns a cached vertex buffer containing 6 vertices forming 2 triangles
+     * that cover the entire screen in NDC coordinates [-1,1] with UV mapping [0,1].
+     * Vertex format: position (vec2), UV (vec2).
+     */
+    virtual BufferHandle getScreenQuadBuffer() = 0;
 };
 
 // Command recording API (WebGPU-shaped)

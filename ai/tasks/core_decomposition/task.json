@@ -1,0 +1,33 @@
+{
+  "id": "core_decomposition",
+  "title": "Manager Architecture Decomposition",
+  "owner": "render_system_team",
+  "status": "completed",
+  "inputs": {
+    "files": [
+      "engine/src/render_system.cpp",
+      "engine/include/render_system.h"
+    ],
+    "schema_version": "legacy_monolithic"
+  },
+  "outputs": {
+    "artifacts": [
+      "engine/include/managers/*.h",
+      "engine/src/managers/*.cpp",
+      "UBO system integration"
+    ],
+    "events": []
+  },
+  "acceptance": [
+    "6 managers implemented: Camera, Lighting, Material, Pipeline, Transform, Rendering",
+    "UBO system managed exclusively by managers",
+    "RenderGraph framework active with pass execution",
+    "All legacy UBO handling eliminated from RenderSystem"
+  ],
+  "safety": {
+    "rate_limits": [],
+    "sandbox": false
+  },
+  "dependencies": [],
+  "seed_policy": "not_applicable"
+}

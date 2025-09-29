@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "opengl_migration", "event": "task_created", "phase": "audit", "status": "pending", "opengl_calls_found": 112, "categories": ["framebuffer", "state", "resources", "vertex_arrays", "viewport"], "priority": "critical_blocker"}

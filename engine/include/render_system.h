@@ -268,7 +268,6 @@ private:
     ShaderHandle m_pbrShaderRhi = INVALID_HANDLE;
 
     // Helpers
-    static std::string loadTextFile(const std::string& path);
     void ensureObjectPipeline(struct SceneObject& obj, bool usePbr);
     // Uniform helpers targeting current GL program
     void setUniformMat4(const char* name, const glm::mat4& m);
@@ -368,6 +367,19 @@ private:
 
     // Minimal RHI integration (initial cut)
     std::unique_ptr<RHI> m_rhi;
+
+    // Render pass pipeline handles
+    PipelineHandle m_gBufferPipeline = INVALID_HANDLE;
+    PipelineHandle m_deferredLightingPipeline = INVALID_HANDLE;
+
+    // Screen quad for full-screen passes
+    BufferHandle m_screenQuadVBORhi = INVALID_HANDLE;
+
+    // Helper methods for pass implementations
+    PipelineHandle getOrCreateGBufferPipeline();
+    PipelineHandle getOrCreateDeferredLightingPipeline();
+    void createScreenQuad();
+    std::string loadTextFileRhi(const std::string& path);
 };
 
 

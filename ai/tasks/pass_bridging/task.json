@@ -1,0 +1,41 @@
+{
+  "id": "pass_bridging",
+  "title": "RenderGraph Pass Bridge Implementation",
+  "owner": "render_system_team",
+  "status": "in_progress",
+  "inputs": {
+    "files": [
+      "engine/src/render_system.cpp:~2360-2628",
+      "engine/include/render_pass.h",
+      "engine/src/render_pass.cpp"
+    ],
+    "schema_version": "render_graph_v1"
+  },
+  "outputs": {
+    "artifacts": [
+      "passGBuffer implementation",
+      "passDeferredLighting implementation",
+      "passRayIntegrator implementation",
+      "passReadback implementation",
+      "RHI screen-quad utility"
+    ],
+    "events": [
+      "pass_start",
+      "pass_end",
+      "render_output_validation"
+    ]
+  },
+  "acceptance": [
+    "Raster graph produces lit frames (no black output)",
+    "Ray graph produces non-black texture output",
+    "Readback functionality works for headless rendering",
+    "Screen-quad utility enables full-screen composition",
+    "Pass timing validation shows reasonable performance"
+  ],
+  "safety": {
+    "rate_limits": ["max_render_time_5s"],
+    "sandbox": false
+  },
+  "dependencies": ["core_decomposition", "opengl_migration"],
+  "seed_policy": "deterministic_per_frame"
+}

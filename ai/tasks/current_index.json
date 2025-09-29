@@ -1,0 +1,89 @@
+{
+  "current_focus": {
+    "active_task": "opengl_migration",
+    "phase": "implementation",
+    "sub_issue": "rhi_abstraction_design",
+    "assigned_agent": null,
+    "started_at": "2024-12-29T00:00:00Z",
+    "estimated_completion": "2024-12-30T00:00:00Z"
+  },
+  "task_status": {
+    "core_decomposition": {
+      "status": "completed",
+      "completion_date": "2024-12-28",
+      "next_dependent": "opengl_migration"
+    },
+    "opengl_migration": {
+      "status": "in_progress",
+      "phase_a_completed": "2024-12-29",
+      "blocking": [],
+      "priority": "critical",
+      "estimated_effort": "high",
+      "sub_issues": [
+        "framebuffer_operations_inventory ✅",
+        "rhi_abstraction_design ✅",
+        "incremental_migration_execution",
+        "validation_framework"
+      ]
+    },
+    "pass_bridging": {
+      "status": "ready",
+      "blocked_by": [],
+      "ready_when": "rhi_screen_quad_utility_available ✅",
+      "prerequisites_met": "2024-12-29"
+    },
+    "state_accessibility": {
+      "status": "pending",
+      "blocked_by": "pass_bridging",
+      "preparation_work": ["manager_api_design", "json_schema_definition"]
+    },
+    "ndjson_telemetry": {
+      "status": "pending",
+      "blocked_by": "state_accessibility",
+      "preparation_work": ["event_schema_design", "buffered_writer_architecture"]
+    },
+    "determinism_hooks": {
+      "status": "pending",
+      "blocked_by": "ndjson_telemetry",
+      "preparation_work": ["prng_architecture_design", "time_audit"]
+    },
+    "resource_model": {
+      "status": "pending",
+      "blocked_by": "determinism_hooks",
+      "preparation_work": ["interface_design", "no_op_implementations"]
+    },
+    "json_ops_runner": {
+      "status": "pending",
+      "blocked_by": "resource_model",
+      "preparation_work": ["minimal_schema_definition", "cli_architecture"]
+    }
+  },
+  "critical_path": [
+    "opengl_migration",
+    "pass_bridging",
+    "state_accessibility",
+    "ndjson_telemetry",
+    "determinism_hooks",
+    "resource_model",
+    "json_ops_runner"
+  ],
+  "blockers": {
+    "immediate": [
+      {
+        "task": "opengl_migration",
+        "issue": "Phase B-E: Remaining 100+ OpenGL calls need migration to RHI",
+        "impact": "Complete framebuffer migration needed for full RHI compliance"
+      }
+    ],
+    "upcoming": [
+      {
+        "task": "pass_bridging",
+        "issue": "passGBuffer, passDeferredLighting, passRayIntegrator, passReadback are TODO stubs",
+        "impact": "Blocks functional rendering output",
+        "status": "ready_to_implement"
+      }
+    ]
+  },
+  "last_updated": "2024-12-29T00:00:00Z",
+  "updated_by": "claude_code_assistant"
+}

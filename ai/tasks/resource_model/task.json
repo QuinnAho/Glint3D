@@ -1,0 +1,44 @@
+{
+  "id": "resource_model",
+  "title": "Resource Handle Abstraction and Content-Addressed Cache",
+  "owner": "resource_management_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/include/glint3d/rhi.h (direct handles)",
+      "engine/src/texture_cache.cpp",
+      "engine/src/render_system.cpp (resource creation)"
+    ],
+    "schema_version": "resource_v1"
+  },
+  "outputs": {
+    "artifacts": [
+      "Handle table interface (stable IDs → RHI handles)",
+      "Content-addressed cache interface",
+      "Resource provenance tracking",
+      "No-op implementations for initial deployment",
+      "RHI capability query integration"
+    ],
+    "events": [
+      "resource_created",
+      "resource_cached",
+      "cache_hit",
+      "cache_miss",
+      "resource_destroyed",
+      "provenance_recorded"
+    ]
+  },
+  "acceptance": [
+    "Stable resource IDs survive RHI backend changes",
+    "Content-addressed cache operational with hash(asset+params) → handles",
+    "Minimal provenance manifest on readbacks",
+    "Interface design supports no-op implementations initially",
+    "Handle table prevents resource leaks"
+  ],
+  "safety": {
+    "rate_limits": ["max_resources_10000", "max_cache_size_1GB"],
+    "sandbox": false
+  },
+  "dependencies": ["determinism_hooks"],
+  "seed_policy": "deterministic_handle_generation_per_content_hash"
+}

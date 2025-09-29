@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "json_ops_runner", "event": "task_created", "phase": "schema_design", "status": "pending", "existing_ops": "json_ops_v1_full", "target_minimal": ["SceneOp", "MaterialOp", "CameraOp", "PassScheduleOp", "ReadbackOp"], "deterministic_execution": "not_implemented"}

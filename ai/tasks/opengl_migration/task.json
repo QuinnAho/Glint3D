@@ -1,0 +1,42 @@
+{
+  "id": "opengl_migration",
+  "title": "Complete OpenGL to RHI Migration",
+  "owner": "rhi_abstraction_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/src/render_system.cpp (112+ OpenGL calls)",
+      "engine/include/glint3d/rhi.h",
+      "engine/src/rhi/rhi_gl.cpp"
+    ],
+    "schema_version": "rhi_v1"
+  },
+  "outputs": {
+    "artifacts": [
+      "Zero direct OpenGL calls in render_system.cpp",
+      "RHI framebuffer abstraction",
+      "RHI rendering state management",
+      "RHI resource management layer",
+      "RHI screen-quad utility"
+    ],
+    "events": [
+      "opengl_call_audit",
+      "rhi_migration_progress",
+      "validation_success",
+      "migration_complete"
+    ]
+  },
+  "acceptance": [
+    "grep -r 'gl[A-Z]' engine/src/render_system.cpp returns zero matches",
+    "All framebuffer operations use RHI abstraction",
+    "All rendering state changes use RHI interfaces",
+    "All resource creation uses RHI factories",
+    "Agents can validate with automated OpenGL detection"
+  ],
+  "safety": {
+    "rate_limits": ["max_build_attempts_10_per_hour"],
+    "sandbox": false
+  },
+  "dependencies": ["core_decomposition"],
+  "seed_policy": "not_applicable"
+}

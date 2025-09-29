@@ -88,6 +88,9 @@ public:
     const char* getBackendName() const override { return "NullRHI"; }
     std::string getDebugInfo() const override { return "NullRHI for testing"; }
 
+    // Utility functions
+    BufferHandle getScreenQuadBuffer() override { return ++m_nextHandle; }
+
     uint32_t getDrawCallCount() const { return m_drawCalls; }
 
 private:

@@ -1,0 +1,41 @@
+{
+  "id": "determinism_hooks",
+  "title": "Deterministic PRNG and Byte-Stable Execution",
+  "owner": "determinism_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/include/seeded_rng.h",
+      "engine/src/raytracer.cpp",
+      "engine/src/render_system.cpp"
+    ],
+    "schema_version": "determinism_v1"
+  },
+  "outputs": {
+    "artifacts": [
+      "Thread-safe PRNG beyond raytracer",
+      "Deterministic sampling throughout pipeline",
+      "Byte-stability validation framework",
+      "Time-based behavior elimination"
+    ],
+    "events": [
+      "prng_seed_set",
+      "sampling_deterministic",
+      "byte_stability_check",
+      "determinism_violation"
+    ]
+  },
+  "acceptance": [
+    "Thread-safe PRNG plumbed through all sampling operations",
+    "No time-based behavior in render passes",
+    "Byte-stable outputs with fixed seed/inputs",
+    "Global seed propagation via {task_id, frame, pass}",
+    "Determinism validation tests pass consistently"
+  ],
+  "safety": {
+    "rate_limits": ["max_determinism_tests_50_per_hour"],
+    "sandbox": true
+  },
+  "dependencies": ["ndjson_telemetry"],
+  "seed_policy": "global_seed_propagation_task_id_frame_pass"
+}

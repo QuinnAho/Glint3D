@@ -1,0 +1,42 @@
+{
+  "id": "state_accessibility",
+  "title": "Manager State Management APIs",
+  "owner": "ai_integration_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/include/managers/*.h",
+      "engine/src/managers/*.cpp"
+    ],
+    "schema_version": "manager_v1",
+    "ops_version": "json_ops_v0.1"
+  },
+  "outputs": {
+    "artifacts": [
+      "getState/applyState/validateState APIs for all managers",
+      "JSON serialization for state structures",
+      "RenderSnapshot aggregate class",
+      "Atomic transaction support"
+    ],
+    "events": [
+      "state_snapshot",
+      "state_apply",
+      "state_validation",
+      "transaction_commit",
+      "transaction_rollback"
+    ]
+  },
+  "acceptance": [
+    "JSON round-trip snapshot/apply completes in <1ms",
+    "All 5 managers support getState/applyState/validateState",
+    "RenderSnapshot aggregates all manager states atomically",
+    "Agents can test state changes via JSON-Ops",
+    "State validation prevents invalid configurations"
+  ],
+  "safety": {
+    "rate_limits": ["max_state_operations_100_per_second"],
+    "sandbox": true
+  },
+  "dependencies": ["pass_bridging"],
+  "seed_policy": "deterministic_state_mutations_per_task_id"
+}

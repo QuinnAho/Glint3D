@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "ndjson_telemetry", "event": "task_created", "phase": "design", "status": "pending", "existing_infrastructure": ["PassTiming", "RenderStats"], "target_events": ["pass_start", "pass_end", "resource_alloc", "cache_hit", "cache_miss", "quality_metric", "warning", "error"]}

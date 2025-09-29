@@ -1,0 +1,42 @@
+{
+  "id": "json_ops_runner",
+  "title": "Deterministic JSON-Ops Job Runner",
+  "owner": "execution_engine_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "schemas/json_ops_v1.json (existing)",
+      "engine/src/json_ops.cpp (existing)"
+    ],
+    "schema_version": "json_ops_v0.1_minimal"
+  },
+  "outputs": {
+    "artifacts": [
+      "Minimal versioned schema (5 operations)",
+      "Strict schema validation on load",
+      "CLI runner with deterministic execution",
+      "Pure ops → state transitions",
+      "Reproducible output validation"
+    ],
+    "events": [
+      "job_start",
+      "job_end",
+      "op_execute",
+      "schema_validation",
+      "execution_error"
+    ]
+  },
+  "acceptance": [
+    "CLI runner executes ops deterministically",
+    "Minimal versioned schema locked (SceneOp, MaterialOp, CameraOp, PassScheduleOp, ReadbackOp)",
+    "Strict validation prevents malformed ops",
+    "Pure ops with no side effects",
+    "Agents can execute task.json specs with reproducible outputs"
+  ],
+  "safety": {
+    "rate_limits": ["execution_timeout_30s"],
+    "sandbox": true
+  },
+  "dependencies": ["pass_bridging", "state_accessibility", "ndjson_telemetry", "determinism_hooks", "resource_model"],
+  "seed_policy": "global_seed_per_task_id_deterministic_execution"
+}

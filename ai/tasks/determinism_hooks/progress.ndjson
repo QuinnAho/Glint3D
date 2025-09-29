@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "determinism_hooks", "event": "task_created", "phase": "audit", "status": "pending", "existing_prng": "SeededRng_raytracer_only", "scope_target": "global_task_id_frame_pass", "byte_stability": "not_implemented"}

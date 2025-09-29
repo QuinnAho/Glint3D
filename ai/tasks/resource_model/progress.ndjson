@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "resource_model", "event": "task_created", "phase": "design", "status": "pending", "current_state": "direct_rhi_handles", "target_abstraction": ["handle_table", "content_addressed_cache", "provenance_tracking"]}

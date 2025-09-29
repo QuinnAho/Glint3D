@@ -87,6 +87,9 @@ public:
     Backend getBackend() const override { return Backend::OpenGL; }
     const char* getBackendName() const override { return "OpenGL"; }
     std::string getDebugInfo() const override;
+
+    // Utility functions
+    BufferHandle getScreenQuadBuffer() override;
     
     // OpenGL-specific methods
     GLuint getGLTexture(TextureHandle handle) const;
@@ -178,6 +181,9 @@ private:
     // Current state
     PipelineHandle m_currentPipeline = INVALID_HANDLE;
     RenderTargetHandle m_currentRenderTarget = INVALID_HANDLE;
+
+    // Cached utility resources
+    BufferHandle m_screenQuadBuffer = INVALID_HANDLE;
     
     // OpenGL capabilities
     bool m_supportsCompute = false;

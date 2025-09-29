@@ -26,16 +26,9 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <sstream>
 
 using namespace glint3d;
-
-std::string RenderSystem::loadTextFile(const std::string& path)
-{
-    std::ifstream f(path, std::ios::binary);
-    if (!f) return {};
-    std::ostringstream ss; ss << f.rdbuf();
-    return ss.str();
-}
 
 // FEAT-0249: Legacy uniform helpers REMOVED
 // All transform, lighting, and material data now uses UBO system
@@ -215,8 +208,8 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     if (m_rhi) {
         // Create RHI shaders - unified PBR pipeline only
         ShaderDesc sdPbr{};
-        sdPbr.vertexSource = loadTextFile("engine/shaders/pbr.vert");
-        sdPbr.fragmentSource = loadTextFile("engine/shaders/pbr.frag");
+        sdPbr.vertexSource = loadTextFileRhi("engine/shaders/pbr.vert");
+        sdPbr.fragmentSource = loadTextFileRhi("engine/shaders/pbr.frag");
         sdPbr.debugName = "pbr";
         m_pbrShaderRhi = m_rhi->createShader(sdPbr);
 
@@ -2364,26 +2357,430 @@ void RenderSystem::passPresent(const PassContext& ctx)
     }
 }
 
-void RenderSystem::passReadback(const PassContext& /*ctx*/)
+void RenderSystem::passReadback(const PassContext& ctx)
 {
-    // TODO: perform readback via RHI when requested
+    if (!m_rhi) return;
+
+    // Only perform readback if requested and we have an output texture
+    if (!ctx.readback || ctx.outputTexture == INVALID_HANDLE) {
+        return;
+    }
+
+    // Use RHI to perform readback from the output texture
+    if (ctx.readback->destination && ctx.readback->size > 0) {
+        // Create ReadbackDesc from the ReadbackRequest
+        ReadbackDesc readbackDesc{};
+        readbackDesc.sourceTexture = ctx.outputTexture;
+        readbackDesc.format = ctx.readback->format;
+        readbackDesc.x = ctx.readback->x;
+        readbackDesc.y = ctx.readback->y;
+        readbackDesc.width = ctx.readback->width;
+        readbackDesc.height = ctx.readback->height;
+        readbackDesc.destination = ctx.readback->destination;
+        readbackDesc.destinationSize = ctx.readback->size;
+
+        // Perform the actual readback via RHI
+        m_rhi->readback(readbackDesc);
+
+        std::cout << "[RenderSystem::passReadback] Successfully read back "
+                  << ctx.readback->size << " bytes from output texture\n";
+    } else {
+        std::cerr << "[RenderSystem::passReadback] No readback buffer provided\n";
+    }
 }
 
-void RenderSystem::passGBuffer(const PassContext& /*ctx*/, RenderTargetHandle /*gBufferRT*/)
+void RenderSystem::passGBuffer(const PassContext& ctx, RenderTargetHandle gBufferRT)
 {
-    // TODO: move G-buffer rendering into render graph
+    if (!m_rhi) return;
+
+    // Bind G-buffer render target
+    m_rhi->bindRenderTarget(gBufferRT);
+
+    // Set viewport
+    m_rhi->setViewport(0, 0, ctx.viewportWidth, ctx.viewportHeight);
+
+    // Clear G-buffer attachments
+    m_rhi->clear(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f), 1.0f, 0);
+
+    // Get or create G-buffer pipeline
+    PipelineHandle gBufferPipeline = getOrCreateGBufferPipeline();
+    if (gBufferPipeline == INVALID_HANDLE) {
+        std::cerr << "RenderSystem::passGBuffer: Failed to create G-buffer pipeline" << std::endl;
+        return;
+    }
+
+    // Bind the G-buffer pipeline
+    m_rhi->bindPipeline(gBufferPipeline);
+
+    // Render all objects to G-buffer using the managers for uniform data
+    const auto& objects = ctx.scene->getObjects();
+    for (const auto& obj : objects) {
+        if (obj.rhiVboPositions == INVALID_HANDLE) continue;
+
+        // Update material for this object via MaterialManager
+        m_materialManager.updateMaterialForObject(obj);
+
+        // Update per-object transform (model matrix)
+        glm::mat4 model = obj.modelMatrix;
+        m_rhi->setUniformMat4("model", model);
+
+        // Bind textures if available
+        int textureUnit = 0;
+        if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("baseColorTex", textureUnit);
+            textureUnit++;
+        }
+
+        if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.normalTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("normalTex", textureUnit);
+            textureUnit++;
+        }
+
+        if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(obj.mrTex->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("mrTex", textureUnit);
+            textureUnit++;
+        }
+
+        // Draw the object
+        DrawDesc drawDesc{};
+        drawDesc.pipeline = gBufferPipeline;
+        if (obj.rhiEbo != INVALID_HANDLE) {
+            drawDesc.indexBuffer = obj.rhiEbo;
+            drawDesc.indexCount = obj.objLoader.getIndexCount();
+            drawDesc.vertexCount = 0;
+        } else {
+            drawDesc.vertexCount = obj.objLoader.getVertCount();
+            drawDesc.indexCount = 0;
+        }
+        m_rhi->draw(drawDesc);
+
+        // Update stats
+        m_stats.drawCalls++;
+        m_stats.totalTriangles += obj.objLoader.getIndexCount() / 3;
+    }
 }
 
-void RenderSystem::passDeferredLighting(const PassContext& /*ctx*/, RenderTargetHandle /*outputRT*/,
-                                       TextureHandle /*gBaseColor*/, TextureHandle /*gNormal*/,
-                                       TextureHandle /*gPosition*/, TextureHandle /*gMaterial*/)
+void RenderSystem::passDeferredLighting(const PassContext& ctx, RenderTargetHandle outputRT,
+                                       TextureHandle gBaseColor, TextureHandle gNormal,
+                                       TextureHandle gPosition, TextureHandle gMaterial)
 {
-    // TODO: implement deferred lighting pass routing
+    if (!m_rhi) return;
+
+    // Ensure screen quad is created
+    createScreenQuad();
+    if (m_screenQuadVBORhi == INVALID_HANDLE) {
+        std::cerr << "RenderSystem::passDeferredLighting: Failed to create screen quad" << std::endl;
+        return;
+    }
+
+    // Get or create deferred lighting pipeline
+    PipelineHandle deferredPipeline = getOrCreateDeferredLightingPipeline();
+    if (deferredPipeline == INVALID_HANDLE) {
+        std::cerr << "RenderSystem::passDeferredLighting: Failed to create deferred lighting pipeline" << std::endl;
+        return;
+    }
+
+    // Bind output render target
+    m_rhi->bindRenderTarget(outputRT);
+
+    // Set viewport
+    m_rhi->setViewport(0, 0, ctx.viewportWidth, ctx.viewportHeight);
+
+    // Clear output
+    m_rhi->clear(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0);
+
+    // Bind deferred lighting pipeline
+    m_rhi->bindPipeline(deferredPipeline);
+
+    // Bind G-buffer textures to texture units
+    int textureUnit = 0;
+    if (gBaseColor != INVALID_HANDLE) {
+        m_rhi->bindTexture(gBaseColor, textureUnit);
+        m_rhi->setUniformInt("gBaseColor", textureUnit);
+        textureUnit++;
+    }
+
+    if (gNormal != INVALID_HANDLE) {
+        m_rhi->bindTexture(gNormal, textureUnit);
+        m_rhi->setUniformInt("gNormal", textureUnit);
+        textureUnit++;
+    }
+
+    if (gPosition != INVALID_HANDLE) {
+        m_rhi->bindTexture(gPosition, textureUnit);
+        m_rhi->setUniformInt("gPosition", textureUnit);
+        textureUnit++;
+    }
+
+    if (gMaterial != INVALID_HANDLE) {
+        m_rhi->bindTexture(gMaterial, textureUnit);
+        m_rhi->setUniformInt("gMaterial", textureUnit);
+        textureUnit++;
+    }
+
+    // TODO: Bind IBL textures if available (temporarily disabled due to type issues)
+    // This needs to be fixed once IBL system RHI integration is completed
+    /*
+    if (m_iblSystem) {
+        auto irradianceMap = m_iblSystem->getIrradianceMap();
+        auto prefilterMap = m_iblSystem->getPrefilterMap();
+        auto brdfLUT = m_iblSystem->getBRDFLUT();
+
+        if (irradianceMap && irradianceMap->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(irradianceMap->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("irradianceMap", textureUnit);
+            textureUnit++;
+        }
+
+        if (prefilterMap && prefilterMap->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(prefilterMap->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("prefilterMap", textureUnit);
+            textureUnit++;
+        }
+
+        if (brdfLUT && brdfLUT->rhiHandle() != INVALID_HANDLE) {
+            m_rhi->bindTexture(brdfLUT->rhiHandle(), textureUnit);
+            m_rhi->setUniformInt("brdfLUT", textureUnit);
+            textureUnit++;
+        }
+    }
+    */
+
+    // Draw screen quad (6 vertices, no index buffer)
+    DrawDesc drawDesc{};
+    drawDesc.pipeline = deferredPipeline;
+    drawDesc.vertexBuffer = m_screenQuadVBORhi;
+    drawDesc.vertexCount = 6;
+    drawDesc.indexCount = 0;
+    m_rhi->draw(drawDesc);
+
+    // Update stats
+    m_stats.drawCalls++;
 }
 
-void RenderSystem::passRayIntegrator(const PassContext& /*ctx*/, TextureHandle /*outputTexture*/, int /*sampleCount*/, int /*maxDepth*/)
+void RenderSystem::passRayIntegrator(const PassContext& ctx, TextureHandle outputTexture, int sampleCount, int maxDepth)
 {
-    // TODO: integrate ray integrator pass
+    if (!ctx.scene || !ctx.lights || outputTexture == INVALID_HANDLE) return;
+
+    if (!m_raytracer) {
+        std::cerr << "[RenderSystem::passRayIntegrator] Raytracer not initialized\n";
+        return;
+    }
+
+    if (!m_rhi) {
+        std::cerr << "[RenderSystem::passRayIntegrator] RHI not available\n";
+        return;
+    }
+
+    // Clear existing raytracer data and load all scene objects
+    m_raytracer = std::make_unique<Raytracer>();
+
+    // Set the seed for deterministic rendering
+    m_raytracer->setSeed(m_seed);
+
+    // Set reflection samples per pixel for glossy reflections
+    m_raytracer->setReflectionSpp(m_reflectionSpp);
+
+    const auto& objects = ctx.scene->getObjects();
+    std::cout << "[RenderSystem::passRayIntegrator] Loading " << objects.size() << " objects into raytracer\n";
+
+    for (const auto& obj : objects) {
+        if (obj.objLoader.getVertCount() == 0) continue; // Skip objects with no geometry
+
+        // Load object into raytracer with its transform and material
+        // Calculate reflectivity from unified MaterialCore
+        const auto& mc = obj.materialCore;
+        float reflectivity = 0.1f; // Default reflectivity
+
+        // For metallic materials, use metallic value as reflectivity multiplier
+        if (mc.metallic > 0.1f) {
+            reflectivity = 0.3f + (mc.metallic * 0.7f); // Range 0.3 to 1.0 based on metallic
+        }
+
+        m_raytracer->loadModel(obj.objLoader, obj.modelMatrix, reflectivity, mc);
+    }
+
+    // Create output buffer for raytraced image
+    std::vector<glm::vec3> raytraceBuffer(ctx.viewportWidth * ctx.viewportHeight);
+
+    std::cout << "[RenderSystem::passRayIntegrator] Raytracing " << ctx.viewportWidth << "x" << ctx.viewportHeight << " image...\n";
+
+    // Render the image using the raytracer with provided samples and max depth
+    if (m_raytracer) {
+        m_raytracer->setSeed(m_seed);
+    }
+
+    // Use camera from CameraManager directly
+    const auto& cameraState = m_cameraManager.camera();
+
+    m_raytracer->renderImage(raytraceBuffer, ctx.viewportWidth, ctx.viewportHeight,
+                            cameraState.position, cameraState.front, cameraState.up,
+                            cameraState.fov, *ctx.lights);
+
+    // Upload raytraced image to output texture using RHI
+    m_rhi->updateTexture(outputTexture, raytraceBuffer.data(),
+                        ctx.viewportWidth, ctx.viewportHeight, TextureFormat::RGB32F);
+
+    std::cout << "[RenderSystem::passRayIntegrator] Ray integration complete\n";
+}
+
+PipelineHandle RenderSystem::getOrCreateGBufferPipeline()
+{
+    if (m_gBufferPipeline != INVALID_HANDLE) {
+        return m_gBufferPipeline;
+    }
+
+    if (!m_rhi) {
+        std::cerr << "RenderSystem::getOrCreateGBufferPipeline: RHI is null" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Load G-buffer shaders
+    std::string vertexSource = loadTextFileRhi("engine/shaders/gbuffer.vert");
+    std::string fragmentSource = loadTextFileRhi("engine/shaders/gbuffer.frag");
+
+    if (vertexSource.empty() || fragmentSource.empty()) {
+        std::cerr << "Failed to load G-buffer shader files" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Create shader using both vertex and fragment sources
+    ShaderDesc gBufferShaderDesc{};
+    gBufferShaderDesc.stages = shaderStageBits(ShaderStage::Vertex) | shaderStageBits(ShaderStage::Fragment);
+    gBufferShaderDesc.vertexSource = vertexSource;
+    gBufferShaderDesc.fragmentSource = fragmentSource;
+    gBufferShaderDesc.debugName = "GBufferShader";
+
+    ShaderHandle gBufferShader = m_rhi->createShader(gBufferShaderDesc);
+    if (gBufferShader == INVALID_HANDLE) {
+        std::cerr << "Failed to create G-buffer shader" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Create pipeline descriptor
+    PipelineDesc pipelineDesc{};
+    pipelineDesc.shader = gBufferShader;
+
+    // Set vertex attributes to match gbuffer.vert
+    pipelineDesc.vertexAttributes = {
+        {0, 0, TextureFormat::RGB32F, 0},  // aPos (vec3) at location 0
+        {1, 0, TextureFormat::RGB32F, 12}, // aNormal (vec3) at location 1, offset 3*4 bytes
+        {2, 0, TextureFormat::RG32F, 24},  // aUV (vec2) at location 2, offset 6*4 bytes
+        {3, 0, TextureFormat::RGB32F, 32}  // aTangent (vec3) at location 3, offset 8*4 bytes
+    };
+
+    // Enable depth testing for G-buffer pass
+    pipelineDesc.depthTestEnable = true;
+    pipelineDesc.depthWriteEnable = true;
+
+    m_gBufferPipeline = m_rhi->createPipeline(pipelineDesc);
+
+    // Clean up shader handle (pipeline holds references)
+    m_rhi->destroyShader(gBufferShader);
+
+    if (m_gBufferPipeline == INVALID_HANDLE) {
+        std::cerr << "Failed to create G-buffer pipeline" << std::endl;
+    }
+
+    return m_gBufferPipeline;
+}
+
+std::string RenderSystem::loadTextFileRhi(const std::string& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+void RenderSystem::createScreenQuad()
+{
+    if (m_screenQuadVBORhi != INVALID_HANDLE || !m_rhi) {
+        return; // Already created or no RHI
+    }
+
+    // Screen quad vertices (NDC coordinates with UVs)
+    float quadVertices[] = {
+        // positions   // UVs
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+
+    BufferDesc bufferDesc{};
+    bufferDesc.type = BufferType::Vertex;
+    bufferDesc.usage = BufferUsage::Static;
+    bufferDesc.size = sizeof(quadVertices);
+    bufferDesc.initialData = quadVertices;
+
+    m_screenQuadVBORhi = m_rhi->createBuffer(bufferDesc);
+}
+
+PipelineHandle RenderSystem::getOrCreateDeferredLightingPipeline()
+{
+    if (m_deferredLightingPipeline != INVALID_HANDLE) {
+        return m_deferredLightingPipeline;
+    }
+
+    if (!m_rhi) {
+        std::cerr << "RenderSystem::getOrCreateDeferredLightingPipeline: RHI is null" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Load deferred lighting shaders
+    std::string vertexSource = loadTextFileRhi("engine/shaders/deferred.vert");
+    std::string fragmentSource = loadTextFileRhi("engine/shaders/deferred.frag");
+
+    if (vertexSource.empty() || fragmentSource.empty()) {
+        std::cerr << "Failed to load deferred lighting shader files" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Create shader using both vertex and fragment sources
+    ShaderDesc deferredShaderDesc{};
+    deferredShaderDesc.stages = shaderStageBits(ShaderStage::Vertex) | shaderStageBits(ShaderStage::Fragment);
+    deferredShaderDesc.vertexSource = vertexSource;
+    deferredShaderDesc.fragmentSource = fragmentSource;
+    deferredShaderDesc.debugName = "DeferredLightingShader";
+
+    ShaderHandle deferredShader = m_rhi->createShader(deferredShaderDesc);
+    if (deferredShader == INVALID_HANDLE) {
+        std::cerr << "Failed to create deferred lighting shader" << std::endl;
+        return INVALID_HANDLE;
+    }
+
+    // Create pipeline descriptor for screen quad
+    PipelineDesc pipelineDesc{};
+    pipelineDesc.shader = deferredShader;
+
+    // Set vertex attributes for screen quad (position + UV)
+    pipelineDesc.vertexAttributes = {
+        {0, 0, TextureFormat::RG32F, 0},  // aPos (vec2) at location 0
+        {1, 0, TextureFormat::RG32F, 8}   // aUV (vec2) at location 1, offset 2*4 bytes
+    };
+
+    // Disable depth testing for full-screen pass
+    pipelineDesc.depthTestEnable = false;
+    pipelineDesc.depthWriteEnable = false;
+
+    m_deferredLightingPipeline = m_rhi->createPipeline(pipelineDesc);
+
+    // Clean up shader handle
+    m_rhi->destroyShader(deferredShader);
+
+    if (m_deferredLightingPipeline == INVALID_HANDLE) {
+        std::cerr << "Failed to create deferred lighting pipeline" << std::endl;
+    }
+
+    return m_deferredLightingPipeline;
 }
 
 void RenderSystem::renderObjectsBatchedWithManagers(const SceneManager& scene, const Light& lights)

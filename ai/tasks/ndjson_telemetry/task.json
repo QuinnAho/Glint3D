@@ -1,0 +1,45 @@
+{
+  "id": "ndjson_telemetry",
+  "title": "Structured NDJSON Telemetry Engine",
+  "owner": "telemetry_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/include/render_pass.h (PassTiming)",
+      "engine/include/render_system.h (RenderStats)"
+    ],
+    "schema_version": "telemetry_v0.1"
+  },
+  "outputs": {
+    "artifacts": [
+      "NDJSON event emission infrastructure",
+      "Structured pass_start/pass_end events",
+      "Resource allocation tracking",
+      "Frame context with task_id/seed/commit",
+      "Buffered writer with file sink"
+    ],
+    "events": [
+      "pass_start",
+      "pass_end",
+      "resource_alloc",
+      "cache_hit",
+      "cache_miss",
+      "quality_metric",
+      "warning",
+      "error"
+    ]
+  },
+  "acceptance": [
+    "All operations emit structured NDJSON v0.1 events",
+    "Agents can parse telemetry for automated analysis",
+    "Buffered writer prevents performance impact",
+    "Frame records include task_id, seed, scene_id, commit hash",
+    "Telemetry overhead <1% of total frame time"
+  ],
+  "safety": {
+    "rate_limits": ["max_events_1000_per_second", "max_log_size_100MB"],
+    "sandbox": false
+  },
+  "dependencies": ["state_accessibility"],
+  "seed_policy": "event_correlation_via_task_id_frame_pass"
+}

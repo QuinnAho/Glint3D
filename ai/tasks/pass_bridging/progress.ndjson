@@ -1,0 +1,1 @@
+{"ts": "2024-12-28T00:00:00Z", "task_id": "pass_bridging", "event": "task_started", "phase": "pass_implementation", "status": "in_progress", "current_issue": "pass_stubs_cause_black_frames", "passes_todo": ["passGBuffer", "passDeferredLighting", "passRayIntegrator", "passReadback"]}

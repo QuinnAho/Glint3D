@@ -141,7 +141,7 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 ## Architecture Overview
 
 ### Highlights (v0.3.0 + RHI Updates)
-- **✅ RHI Modernization**: FEAT-0248 completed - WebGPU-shaped API with CommandEncoder, RenderPassEncoder, Queue, BindGroups. All uniform operations now route through RHI abstraction.
+- **✅ RHI Modernization**: FEAT-0248 completed - WebGPU-shaped API with CommandEncoder, RenderPassEncoder, Queue, BindGroups. All uniform operations now route through RHI abstraction. Screen-quad utility added for pass bridging.
 - **✅ Unified Render System**: RenderSystem::renderUnified() uses RenderGraph with pass-based architecture. Raytracer integrated as RHI texture output.
 - **✅ MaterialCore Unification**: Single material system eliminates dual storage confusion. Legacy Material struct deprecated.
 - **✅ Intelligent Mode Selection**: --mode raster|ray|auto with automatic scene analysis via RenderPipelineModeSelector.
@@ -185,6 +185,7 @@ glint --ops examples/json-ops/directional-light-test.json --render output.png --
 - **RayGraph**: CPU ray tracing with BVH acceleration, physically accurate transmission
 - **RenderPipelineModeSelector**: Intelligent mode selection based on scene material analysis
 - **RHI Integration**: Both pipelines output to RHI textures for seamless composition
+- **RHI Utilities**: Screen-quad buffer utility (`getScreenQuadBuffer()`) for full-screen passes
 
 #### 5. UI Architecture
 - **Desktop UI**: ImGui panels integrated directly into Application
@@ -357,29 +358,35 @@ Glint3D/
 
 ---
 
-## Safe Edits & Workflow
+## Development Workflow
 
-1. Outline change and affected files.
-2. Apply minimal diffs (no broad renames unless requested).
-3. Build desktop + web.
-4. Run unit, integration, and golden tests.
-5. If goldens change intentionally, regenerate candidates and update references.
+### AI-Driven Task Workflow
+1. **Check active task**: Read `ai/tasks/current_index.json` for current focus
+2. **Follow task specification**: Read task README.md, coverage.md for requirements
+3. **Update task progress**: Maintain progress documentation as work proceeds
+4. **Apply minimal changes**: Keep edits surgical and task-focused
+5. **Build and test**: Verify desktop + web builds, run relevant tests
+6. **Update documentation**: Keep task files and project docs synchronized
 
-### Useful Requests
-- "Abstract GL calls into RHI"
-- "Add JSON op and update schema/docs/tests"
-- "Write golden test for headless renderer"
-- "Decouple ImGui/GLFW dependencies from Engine Core"
+### Task-Aligned Requests (2024-12-29 Priority)
+Current architecture focus based on active tasks:
+- "Migrate renderToTextureRHI to use RHI-only calls" (Phase B)
+- "Implement passGBuffer/passDeferredLighting using RHI" (Phase B)
+- "Replace screen quad VAO with RHI::getScreenQuadBuffer()" (Ready)
+- "Add RHI texture readback for offscreen rendering" (Phase B)
+
+### Legacy Useful Requests (General)
 - "Add new pass to RenderGraph (e.g., `SSAOPass`, `BloomPass`)"
-- "Implement screen-space refraction in `SSRRefractionPass`"
 - "Add material property to MaterialCore and update JSON schema"
+- "Write golden test for headless renderer"
 - "Optimize mode selection in `RenderPipelineModeSelector`"
 
 ### Workflow Guidelines
-- Keep edits surgical; avoid repo-wide renames without explicit request
-- Don't change public APIs unless asked; if changed, update docs/tests
-- Never modify binary assets or third-party code
-- Prefer adapter-level fixes before touching Engine Core
+- **Task-first approach**: Always align work with current active task
+- **RHI-only graphics**: No new direct OpenGL calls (use RHI abstraction)
+- **Surgical edits**: Avoid repo-wide renames without explicit request
+- **API stability**: Don't change public APIs unless required by task
+- **Quality gates**: Maintain performance budgets and test coverage
 
 ---
 
@@ -408,6 +415,55 @@ Glint3D/
 - **Headless paths**: must run from repo root or use absolute paths
 - **ImGui**: keep out of Engine Core; treat as view/controller only
 - **Shadows**: disabled by default in shaders for deterministic CI until a real shadow-map implementation is added (see TODO). Re-enable via `useShadows` when implemented.
+
+---
+
+## AI Workflow Integration
+
+### Task-Based Development System
+The project uses a modern AI task capsule system located in `ai/` for systematic development:
+
+```bash
+# Check current active task
+cat ai/tasks/current_index.json
+
+# Follow task specifications
+# 1. Read current_index.json to identify active task
+# 2. Read ai/tasks/<task>/README.md for task overview
+# 3. Read ai/tasks/<task>/coverage.md for detailed requirements
+# 4. Update ai/tasks/<task>/progress.ndjson as work progresses
+```
+
+### Current Architecture Priorities (2024-12-29)
+Based on `ai/tasks/current_index.json`, the system is focused on:
+
+**✅ Phase A Complete**: OpenGL migration prerequisites
+- Framebuffer operations audit completed
+- RHI abstraction verified complete
+- Screen-quad utility implemented (`RHI::getScreenQuadBuffer()`)
+
+**🔄 Current Focus**: OpenGL→RHI migration Phase B
+- Replace direct GL calls in `renderToTextureRHI()`/PNG paths
+- Implement RHI-only pass system (GBuffer, DeferredLighting, RayIntegrator, Readback)
+
+**🚀 Ready Tasks**: `pass_bridging` now unblocked
+- Can implement pass-based rendering using RHI utilities
+- Critical path: opengl_migration → pass_bridging → state_accessibility → ndjson_telemetry
+
+### AI Assistant Guidelines
+When working with Claude Code on this project:
+
+1. **Always start by reading the current task status**: `ai/tasks/current_index.json`
+2. **Follow task specifications**: Each task has detailed README.md, coverage.md, and mapping.md
+3. **Use the task capsule system**: Update progress files as work is completed
+4. **Respect architectural constraints**: RHI-first, no direct OpenGL, MaterialCore unified
+5. **Follow phase-based approach**: Complete current phase before moving to next
+
+### Quality Gates
+- All new graphics code must use RHI abstraction
+- Golden tests must pass for any rendering changes
+- Architecture compliance verified via task validation
+- Performance budgets maintained (frame time, draw calls, memory)
 
 ---
 
