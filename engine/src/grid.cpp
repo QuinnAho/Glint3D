@@ -1,23 +1,31 @@
 #include "grid.h"
-#include "gl_platform.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <glint3d/rhi.h>
 
-// Static RHI instance for uniform bridging
-glint3d::RHI* Grid::s_rhi = nullptr;
-
-Grid::Grid() : m_VAO(0), m_VBO(0), m_shader(nullptr), m_lineCount(200) {}
+Grid::Grid()
+    : m_rhi(nullptr)
+    , m_vertexBuffer(glint3d::INVALID_HANDLE)
+    , m_shaderHandle(glint3d::INVALID_HANDLE)
+    , m_pipeline(glint3d::INVALID_HANDLE)
+    , m_shader(nullptr)
+    , m_lineCount(200)
+    , m_spacing(1.0f)
+{}
 
 Grid::~Grid() {
     cleanup();
 }
 
-bool Grid::init(Shader* shader, int lineCount, float spacing)
+bool Grid::init(glint3d::RHI* rhi, Shader* shader, int lineCount, float spacing)
 {
-    m_shader = shader;
+    m_rhi = rhi;
+    m_shader = shader;  // Keep for compatibility, but won't be used for rendering
     m_lineCount = lineCount;
+    m_spacing = spacing;
+
+    if (!m_rhi) return false;
 
     std::vector<glm::vec3> lines;
     float halfSize = static_cast<float>(lineCount) / 2.0f;
@@ -38,49 +46,103 @@ bool Grid::init(Shader* shader, int lineCount, float spacing)
 
     m_lineVertices = lines;
 
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
+    // Create vertex buffer via RHI
+    glint3d::BufferDesc bufferDesc;
+    bufferDesc.type = glint3d::BufferType::Vertex;
+    bufferDesc.usage = glint3d::BufferUsage::Static;
+    bufferDesc.initialData = lines.data();
+    bufferDesc.size = lines.size() * sizeof(glm::vec3);
+    m_vertexBuffer = m_rhi->createBuffer(bufferDesc);
 
-    glBindVertexArray(m_VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, lines.size() * sizeof(glm::vec3), lines.data(), GL_STATIC_DRAW);
+    // Create shader via RHI
+    const char* vertexShaderSource = R"(
+    #version 330 core
+    layout (location = 0) in vec3 aPos;
+    uniform mat4 model;
+    uniform mat4 view;
+    uniform mat4 projection;
+    void main() {
+        gl_Position = projection * view * model * vec4(aPos, 1.0);
+    })";
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-    glEnableVertexAttribArray(0);
+    const char* fragmentShaderSource = R"(
+    #version 330 core
+    out vec4 FragColor;
+    uniform vec3 gridColor;
+    void main() {
+        FragColor = vec4(gridColor, 1.0);
+    })";
 
-    glBindVertexArray(0);
+    glint3d::ShaderDesc shaderDesc;
+    shaderDesc.vertexSource = vertexShaderSource;
+    shaderDesc.fragmentSource = fragmentShaderSource;
+    m_shaderHandle = m_rhi->createShader(shaderDesc);
+
+    // Create pipeline
+    glint3d::PipelineDesc pipelineDesc;
+    pipelineDesc.shader = m_shaderHandle;
+    pipelineDesc.topology = glint3d::PrimitiveTopology::Lines;
+
+    // Position attribute (location 0)
+    glint3d::VertexAttribute posAttr;
+    posAttr.location = 0;
+    posAttr.binding = 0;
+    posAttr.format = glint3d::TextureFormat::RGB32F;
+    posAttr.offset = 0;
+    pipelineDesc.vertexAttributes.push_back(posAttr);
+
+    // Vertex binding
+    glint3d::VertexBinding binding;
+    binding.binding = 0;
+    binding.stride = sizeof(glm::vec3);
+    binding.perInstance = false;
+    binding.buffer = m_vertexBuffer;
+    pipelineDesc.vertexBindings.push_back(binding);
+
+    m_pipeline = m_rhi->createPipeline(pipelineDesc);
+
     return true;
 }
 
 void Grid::render(const glm::mat4& view, const glm::mat4& projection)
 {
-    if (!m_shader) return;
-    m_shader->use();
+    if (!m_rhi || !m_shader) return;
+
+    // Bind pipeline
+    m_rhi->bindPipeline(m_pipeline);
 
     glm::mat4 model = glm::mat4(1.0f);
 
-    // Route uniforms through RHI only (no direct shader calls)
-    if (s_rhi) {
-        s_rhi->setUniformMat4("model", model);
-        s_rhi->setUniformMat4("view", view);
-        s_rhi->setUniformMat4("projection", projection);
-        s_rhi->setUniformVec3("gridColor", Colors::LightGray);
-    }
+    // Set uniforms via RHI
+    m_rhi->setUniformMat4("model", model);
+    m_rhi->setUniformMat4("view", view);
+    m_rhi->setUniformMat4("projection", projection);
+    m_rhi->setUniformVec3("gridColor", Colors::LightGray);
 
-    glBindVertexArray(m_VAO);
-    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_lineVertices.size()));
-    glBindVertexArray(0);
+    // Draw via RHI
+    glint3d::DrawDesc drawDesc;
+    drawDesc.pipeline = m_pipeline;
+    drawDesc.vertexBuffer = m_vertexBuffer;
+    drawDesc.vertexCount = static_cast<uint32_t>(m_lineVertices.size());
+    drawDesc.instanceCount = 1;
+
+    m_rhi->draw(drawDesc);
 }
 
 void Grid::cleanup()
 {
-    glDeleteVertexArrays(1, &m_VAO);
-    glDeleteBuffers(1, &m_VBO);
-    m_VAO = 0;
-    m_VBO = 0;
-}
+    if (!m_rhi) return;
 
-void Grid::setRHI(glint3d::RHI* rhi)
-{
-    s_rhi = rhi;
+    if (m_pipeline != glint3d::INVALID_HANDLE) {
+        m_rhi->destroyPipeline(m_pipeline);
+        m_pipeline = glint3d::INVALID_HANDLE;
+    }
+    if (m_shaderHandle != glint3d::INVALID_HANDLE) {
+        m_rhi->destroyShader(m_shaderHandle);
+        m_shaderHandle = glint3d::INVALID_HANDLE;
+    }
+    if (m_vertexBuffer != glint3d::INVALID_HANDLE) {
+        m_rhi->destroyBuffer(m_vertexBuffer);
+        m_vertexBuffer = glint3d::INVALID_HANDLE;
+    }
 }

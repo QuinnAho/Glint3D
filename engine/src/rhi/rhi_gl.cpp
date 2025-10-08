@@ -120,6 +120,51 @@ void RhiGL::draw(const DrawDesc& desc) {
 
     if (vaoToUse != 0) glBindVertexArray(vaoToUse);
 
+    // Apply pipeline state
+    if (desc.pipeline != INVALID_HANDLE) {
+        auto pipelineIt = m_pipelines.find(desc.pipeline);
+        if (pipelineIt != m_pipelines.end()) {
+            const auto& pipelineDesc = pipelineIt->second.desc;
+
+            // Polygon mode (wireframe, fill, point)
+            glPolygonMode(GL_FRONT_AND_BACK, polygonModeToGL(pipelineDesc.polygonMode));
+
+            // Line width (for wireframe)
+            if (pipelineDesc.polygonMode == PolygonMode::Line) {
+                glLineWidth(pipelineDesc.lineWidth);
+            }
+
+            // Blending
+            if (pipelineDesc.blendEnable) {
+                glEnable(GL_BLEND);
+                glBlendFuncSeparate(
+                    blendFactorToGL(pipelineDesc.srcColorBlendFactor),
+                    blendFactorToGL(pipelineDesc.dstColorBlendFactor),
+                    blendFactorToGL(pipelineDesc.srcAlphaBlendFactor),
+                    blendFactorToGL(pipelineDesc.dstAlphaBlendFactor)
+                );
+            } else {
+                glDisable(GL_BLEND);
+            }
+
+            // Depth test and depth write
+            if (pipelineDesc.depthTestEnable) {
+                glEnable(GL_DEPTH_TEST);
+                glDepthMask(pipelineDesc.depthWriteEnable ? GL_TRUE : GL_FALSE);
+            } else {
+                glDisable(GL_DEPTH_TEST);
+            }
+
+            // Polygon offset (for decals, wireframes on top of solid)
+            if (pipelineDesc.polygonOffsetEnable) {
+                glEnable(GL_POLYGON_OFFSET_FILL);
+                glPolygonOffset(pipelineDesc.polygonOffsetFactor, pipelineDesc.polygonOffsetUnits);
+            } else {
+                glDisable(GL_POLYGON_OFFSET_FILL);
+            }
+        }
+    }
+
     // Optional VBO/IBO binding if provided
     if (desc.vertexBuffer != INVALID_HANDLE) {
         auto bufferIt = m_buffers.find(desc.vertexBuffer);
@@ -379,10 +424,10 @@ void RhiGL::bindPipeline(PipelineHandle pipeline) {
 void RhiGL::bindTexture(TextureHandle texture, uint32_t slot) {
     auto it = m_textures.find(texture);
     if (it == m_textures.end()) {
-        std::cerr << "[RhiGL] Invalid texture handle\n";
+        std::cerr << "[RhiGL] Invalid texture handle " << texture << "\n";
         return;
     }
-    
+
     glActiveTexture(GL_TEXTURE0 + slot);
     GLenum target = textureTypeToGL(it->second.desc.type);
     glBindTexture(target, it->second.id);
@@ -448,6 +493,23 @@ void RhiGL::updateTexture(TextureHandle texture, const void* data,
     glBindTexture(GL_TEXTURE_2D, it->second.id);
     glTexSubImage2D(GL_TEXTURE_2D, mipLevel, x, y, width, height, glFormat, glType, data);
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void RhiGL::generateMipmaps(TextureHandle texture) {
+    auto it = m_textures.find(texture);
+    if (it == m_textures.end()) {
+        std::cerr << "[RhiGL] Invalid texture handle for mipmap generation\n";
+        return;
+    }
+
+    // Determine the OpenGL texture target based on texture type
+    GLenum target = (it->second.desc.type == TextureType::TextureCube)
+                   ? GL_TEXTURE_CUBE_MAP
+                   : GL_TEXTURE_2D;
+
+    glBindTexture(target, it->second.id);
+    glGenerateMipmap(target);
+    glBindTexture(target, 0);
 }
 
 void RhiGL::bindRenderTarget(RenderTargetHandle renderTarget) {
@@ -694,6 +756,33 @@ GLenum RhiGL::primitiveTopologyToGL(PrimitiveTopology topology) const {
     }
 }
 
+GLenum RhiGL::polygonModeToGL(PolygonMode mode) const {
+    switch (mode) {
+        case PolygonMode::Fill: return GL_FILL;
+        case PolygonMode::Line: return GL_LINE;
+        case PolygonMode::Point: return GL_POINT;
+        default: return GL_FILL;
+    }
+}
+
+GLenum RhiGL::blendFactorToGL(BlendFactor factor) const {
+    switch (factor) {
+        case BlendFactor::Zero: return GL_ZERO;
+        case BlendFactor::One: return GL_ONE;
+        case BlendFactor::SrcColor: return GL_SRC_COLOR;
+        case BlendFactor::OneMinusSrcColor: return GL_ONE_MINUS_SRC_COLOR;
+        case BlendFactor::DstColor: return GL_DST_COLOR;
+        case BlendFactor::OneMinusDstColor: return GL_ONE_MINUS_DST_COLOR;
+        case BlendFactor::SrcAlpha: return GL_SRC_ALPHA;
+        case BlendFactor::OneMinusSrcAlpha: return GL_ONE_MINUS_SRC_ALPHA;
+        case BlendFactor::DstAlpha: return GL_DST_ALPHA;
+        case BlendFactor::OneMinusDstAlpha: return GL_ONE_MINUS_DST_ALPHA;
+        case BlendFactor::ConstantColor: return GL_CONSTANT_COLOR;
+        case BlendFactor::OneMinusConstantColor: return GL_ONE_MINUS_CONSTANT_COLOR;
+        default: return GL_ONE;
+    }
+}
+
 bool RhiGL::compileShader(GLuint& program, const ShaderDesc& desc) {
     program = glCreateProgram();
     
@@ -915,9 +1004,9 @@ GLenum RhiGL::attachmentTypeToGL(AttachmentType type) const {
 bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
     GLint prevFBO;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
-    
+
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    
+
     // Attach color attachments
     for (const auto& attachment : desc.colorAttachments) {
         auto texIt = m_textures.find(attachment.texture);
@@ -926,12 +1015,22 @@ bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
             glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
             return false;
         }
-        
+
         GLenum attachPoint = attachmentTypeToGL(attachment.type);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D, 
-                              texIt->second.id, attachment.mipLevel);
+
+        // Determine texture target based on texture type and arrayLayer
+        if (texIt->second.desc.type == TextureType::TextureCube) {
+            // Cubemap: use GL_TEXTURE_CUBE_MAP_POSITIVE_X + arrayLayer
+            GLenum cubeFace = GL_TEXTURE_CUBE_MAP_POSITIVE_X + attachment.arrayLayer;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, cubeFace,
+                                  texIt->second.id, attachment.mipLevel);
+        } else {
+            // Regular 2D texture
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D,
+                                  texIt->second.id, attachment.mipLevel);
+        }
     }
-    
+
     // Attach depth attachment if specified
     if (desc.depthAttachment.texture != INVALID_HANDLE) {
         auto texIt = m_textures.find(desc.depthAttachment.texture);
@@ -940,12 +1039,20 @@ bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
             glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
             return false;
         }
-        
+
         GLenum attachPoint = attachmentTypeToGL(desc.depthAttachment.type);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D,
-                              texIt->second.id, desc.depthAttachment.mipLevel);
+
+        // Determine texture target for depth attachment
+        if (texIt->second.desc.type == TextureType::TextureCube) {
+            GLenum cubeFace = GL_TEXTURE_CUBE_MAP_POSITIVE_X + desc.depthAttachment.arrayLayer;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, cubeFace,
+                                  texIt->second.id, desc.depthAttachment.mipLevel);
+        } else {
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, GL_TEXTURE_2D,
+                                  texIt->second.id, desc.depthAttachment.mipLevel);
+        }
     }
-    
+
     // Check framebuffer completeness
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -953,7 +1060,7 @@ bool RhiGL::setupRenderTarget(GLuint fbo, const RenderTargetDesc& desc) {
         glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
         return false;
     }
-    
+
     glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
     return true;
 }

@@ -33,35 +33,11 @@ Texture* TextureCache::get(const std::string& path, bool flipY)
     Key key{resolved, flipY};
     auto it = m_cache.find(key);
     if (it != m_cache.end()) return it->second.get();
+
+    // Create texture via Texture class (which now uses RHI internally)
     auto tex = std::make_unique<Texture>();
     if (!tex->loadFromFile(resolved, flipY)) return nullptr;
 
-    // If an RHI is registered, create a matching RHI texture from CPU pixels
-    if (Texture::getRHI() && tex->rhiHandle() == glint3d::INVALID_HANDLE) {
-        ImageIO::ImageData8 img;
-        if (ImageIO::LoadImage8(resolved, img, flipY)) {
-            glint3d::TextureDesc td{};
-            td.type = glint3d::TextureType::Texture2D;
-            // Choose format by channel count (1..4). Use RGBA8 as default for 4, RGB8 for 3, R8/RG8 otherwise.
-            switch (img.channels) {
-                case 4: td.format = glint3d::TextureFormat::RGBA8; break;
-                case 3: td.format = glint3d::TextureFormat::RGB8; break;
-                case 2: td.format = glint3d::TextureFormat::RG8; break;
-                default: td.format = glint3d::TextureFormat::R8; break;
-            }
-            td.width = img.width; td.height = img.height; td.mipLevels = 1;
-            td.initialData = img.pixels.data();
-            td.initialDataSize = img.pixels.size();
-            td.debugName = resolved;
-            auto* rhi = Texture::getRHI();
-            if (rhi) {
-                auto handle = rhi->createTexture(td);
-                if (handle != glint3d::INVALID_HANDLE) {
-                    tex->setRHIHandle(handle);
-                }
-            }
-        }
-    }
     Texture* out = tex.get();
     m_cache.emplace(std::move(key), std::move(tex));
     return out;

@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include <glm/glm.hpp>
 #include <cstdint>
 #include "camera_state.h"
@@ -86,10 +87,8 @@ public:
     void renderUnified(const SceneManager& scene, const Light& lights);
     
     // Offscreen rendering
-    // Legacy GL path: renders into a raw GL texture via FBO (kept for compatibility)
-    bool renderToTexture(const SceneManager& scene, const Light& lights, 
-                        GLuint textureId, int width, int height);
-    // RHI path: renders into an RHI TextureHandle using RHI render targets (preferred)
+    // renderToTexture() REMOVED (FEAT-0253) - use renderToTextureRHI() instead
+    // RHI path: renders into an RHI TextureHandle using RHI render targets
     bool renderToTextureRHI(const SceneManager& scene, const Light& lights,
                            TextureHandle textureHandle, int width, int height);
     bool renderToPNG(const SceneManager& scene, const Light& lights,
@@ -239,8 +238,11 @@ private:
     bool m_showGrid = true;
     bool m_showAxes = true;
     bool m_showSkybox = false;
-    
-    // Utility renderers
+
+    // RHI - MUST be declared before systems that depend on it for proper destruction order
+    std::unique_ptr<RHI> m_rhi;
+
+    // Utility renderers (depend on m_rhi)
     std::unique_ptr<AxisRenderer> m_axisRenderer;
     std::unique_ptr<Grid> m_grid;
     std::unique_ptr<Gizmo> m_gizmo;
@@ -266,6 +268,7 @@ private:
     PipelineHandle m_pbrPipeline = INVALID_HANDLE;
     ShaderHandle m_basicShaderRhi = INVALID_HANDLE;
     ShaderHandle m_pbrShaderRhi = INVALID_HANDLE;
+    std::unordered_map<const SceneObject*, PipelineHandle> m_wireframePipelines; // Cache for selection wireframes
 
     // Helpers
     void ensureObjectPipeline(struct SceneObject& obj, bool usePbr);
@@ -294,7 +297,7 @@ private:
     RenderStats m_stats;
     
     // Private methods
-    void renderLegacy(const SceneManager& scene, const Light& lights);
+    // renderLegacy() removed - now using renderUnified() with RenderGraph exclusively
     void renderRasterized(const SceneManager& scene, const Light& lights);
     void renderRaytraced(const SceneManager& scene, const Light& lights);
     void renderObject(const SceneObject& obj, const Light& lights);
@@ -365,8 +368,7 @@ public:
 
 private:
 
-    // Minimal RHI integration (initial cut)
-    std::unique_ptr<RHI> m_rhi;
+    // Note: m_rhi moved earlier in declaration order for proper cleanup sequencing
 
     // Render pass pipeline handles
     PipelineHandle m_gBufferPipeline = INVALID_HANDLE;

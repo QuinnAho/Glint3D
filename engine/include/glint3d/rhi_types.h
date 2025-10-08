@@ -92,6 +92,29 @@ enum class PrimitiveTopology {
     Points
 };
 
+// Polygon rasterization mode
+enum class PolygonMode {
+    Fill,      // Solid polygons (default)
+    Line,      // Wireframe
+    Point      // Vertices only
+};
+
+// Blend factors for source and destination
+enum class BlendFactor {
+    Zero,
+    One,
+    SrcColor,
+    OneMinusSrcColor,
+    DstColor,
+    OneMinusDstColor,
+    SrcAlpha,
+    OneMinusSrcAlpha,
+    DstAlpha,
+    OneMinusDstAlpha,
+    ConstantColor,
+    OneMinusConstantColor
+};
+
 // Shader stages - bitfield for multi-stage shaders
 enum class ShaderStage : uint32_t {
     Vertex = 1 << 0,
@@ -220,6 +243,15 @@ struct PipelineDesc {
     bool depthTestEnable = true;
     bool depthWriteEnable = true;
     bool blendEnable = false;
+    BlendFactor srcColorBlendFactor = BlendFactor::One;
+    BlendFactor dstColorBlendFactor = BlendFactor::Zero;
+    BlendFactor srcAlphaBlendFactor = BlendFactor::One;
+    BlendFactor dstAlphaBlendFactor = BlendFactor::Zero;
+    PolygonMode polygonMode = PolygonMode::Fill;
+    float lineWidth = 1.0f;
+    bool polygonOffsetEnable = false;
+    float polygonOffsetFactor = 0.0f;
+    float polygonOffsetUnits = 0.0f;
     BufferHandle indexBuffer = INVALID_HANDLE;
     std::string debugName;
 };
@@ -245,6 +277,16 @@ struct ReadbackDesc {
     int width = 0, height = 0;
     void* destination = nullptr;
     size_t destinationSize = 0;
+};
+
+// Cubemap face enumeration (matches OpenGL/WebGL convention)
+enum class CubemapFace : uint32_t {
+    PositiveX = 0,
+    NegativeX = 1,
+    PositiveY = 2,
+    NegativeY = 3,
+    PositiveZ = 4,
+    NegativeZ = 5
 };
 
 // Render target attachment types

@@ -1,16 +1,12 @@
 #include "skybox.h"
-#include "shader.h"
 #include "stb_image.h"
 #include <iostream>
 #include <glint3d/rhi.h>
 
-// Static RHI instance for uniform bridging
-glint3d::RHI* Skybox::s_rhi = nullptr;
-
 namespace {
     // Skybox cube vertices (positions only)
     float skyboxVertices[] = {
-        // positions          
+        // positions
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
          1.0f, -1.0f, -1.0f,
@@ -53,13 +49,51 @@ namespace {
         -1.0f, -1.0f,  1.0f,
          1.0f, -1.0f,  1.0f
     };
+
+    const char* kVS = R"GLSL(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+out vec3 TexCoords;
+uniform mat4 projection;
+uniform mat4 view;
+void main() {
+    TexCoords = aPos;
+    vec4 pos = projection * view * vec4(aPos, 1.0);
+    gl_Position = pos.xyww;
+}
+)GLSL";
+
+    const char* kFS = R"GLSL(
+#version 330 core
+in vec3 TexCoords;
+out vec4 FragColor;
+uniform samplerCube skybox;
+uniform bool useGradient;
+uniform vec3 topColor;
+uniform vec3 bottomColor;
+uniform vec3 horizonColor;
+uniform float intensity;
+void main() {
+    if (useGradient) {
+        float t = normalize(TexCoords).y;
+        vec3 color;
+        if (t > 0.0) {
+            float factor = smoothstep(0.0, 1.0, t);
+            color = mix(horizonColor, topColor, factor);
+        } else {
+            float factor = smoothstep(0.0, -1.0, t);
+            color = mix(horizonColor, bottomColor, factor);
+        }
+        FragColor = vec4(color * intensity, 1.0);
+    } else {
+        FragColor = texture(skybox, TexCoords) * vec4(vec3(intensity), 1.0);
+    }
+}
+)GLSL";
 }
 
 Skybox::Skybox()
-    : m_VAO(0)
-    , m_VBO(0)
-    , m_cubemapTexture(0)
-    , m_shader(nullptr)
+    : m_rhi(nullptr)
     , m_enabled(true)
     , m_initialized(false)
     , m_useGradient(true)
@@ -75,99 +109,81 @@ Skybox::~Skybox()
     cleanup();
 }
 
-bool Skybox::init()
+bool Skybox::init(glint3d::RHI* rhi)
 {
     if (m_initialized) return true;
-    
-    // Create and compile shader
-    m_shader = new Shader();
-    if (!m_shader->loadFromStrings(
-        // Vertex shader
-        "#version 330 core\n"
-        "layout (location = 0) in vec3 aPos;\n"
-        "out vec3 TexCoords;\n"
-        "uniform mat4 projection;\n"
-        "uniform mat4 view;\n"
-        "void main() {\n"
-        "    TexCoords = aPos;\n"
-        "    vec4 pos = projection * view * vec4(aPos, 1.0);\n"
-        "    gl_Position = pos.xyww;\n"  // Ensure skybox is always at far plane
-        "}\n",
-        
-        // Fragment shader
-        "#version 330 core\n"
-        "in vec3 TexCoords;\n"
-        "out vec4 FragColor;\n"
-        "uniform samplerCube skybox;\n"
-        "uniform bool useGradient;\n"
-        "uniform vec3 topColor;\n"
-        "uniform vec3 bottomColor;\n"
-        "uniform vec3 horizonColor;\n"
-        "uniform float intensity;\n"
-        "void main() {\n"
-        "    if (useGradient) {\n"
-        "        float t = normalize(TexCoords).y;\n"
-        "        vec3 color;\n"
-        "        if (t > 0.0) {\n"
-        "            // Upper hemisphere: interpolate from horizon to top\n"
-        "            float factor = smoothstep(0.0, 1.0, t);\n"
-        "            color = mix(horizonColor, topColor, factor);\n"
-        "        } else {\n"
-        "            // Lower hemisphere: interpolate from horizon to bottom\n"
-        "            float factor = smoothstep(0.0, -1.0, t);\n"
-        "            color = mix(horizonColor, bottomColor, factor);\n"
-        "        }\n"
-        "        FragColor = vec4(color * intensity, 1.0);\n"
-        "    } else {\n"
-        "        FragColor = texture(skybox, TexCoords) * vec4(vec3(intensity), 1.0);\n"
-        "    }\n"
-        "}\n"
-    )) {
-        std::cerr << "Failed to create skybox shader" << std::endl;
-        delete m_shader;
-        m_shader = nullptr;
-        return false;
-    }
-    
+    if (!rhi) return false;
+
+    m_rhi = rhi;
+
+    // Create vertex buffer via RHI
+    glint3d::BufferDesc bufferDesc;
+    bufferDesc.type = glint3d::BufferType::Vertex;
+    bufferDesc.usage = glint3d::BufferUsage::Static;
+    bufferDesc.initialData = skyboxVertices;
+    bufferDesc.size = sizeof(skyboxVertices);
+    bufferDesc.debugName = "SkyboxVertexBuffer";
+    m_vertexBuffer = m_rhi->createBuffer(bufferDesc);
+
+    // Create shader via RHI
+    glint3d::ShaderDesc shaderDesc;
+    shaderDesc.vertexSource = kVS;
+    shaderDesc.fragmentSource = kFS;
+    m_shader = m_rhi->createShader(shaderDesc);
+
+    // Create pipeline with vertex attributes
+    glint3d::PipelineDesc desc{};
+    desc.shader = m_shader;
+    desc.topology = glint3d::PrimitiveTopology::Triangles;
+
+    // Position attribute (location 0)
+    glint3d::VertexAttribute posAttr;
+    posAttr.location = 0;
+    posAttr.binding = 0;
+    posAttr.format = glint3d::TextureFormat::RGB32F;
+    posAttr.offset = 0;
+    desc.vertexAttributes.push_back(posAttr);
+
+    // Vertex binding
+    glint3d::VertexBinding binding;
+    binding.binding = 0;
+    binding.stride = sizeof(float) * 3;
+    binding.perInstance = false;
+    binding.buffer = m_vertexBuffer;
+    desc.vertexBindings.push_back(binding);
+
+    desc.depthTestEnable = true;
+    desc.depthWriteEnable = false;  // Skybox doesn't write to depth buffer
+    m_pipeline = m_rhi->createPipeline(desc);
+
     setupCube();
     createProceduralSkybox();
-    
+
     m_initialized = true;
     return true;
 }
 
 void Skybox::setupCube()
 {
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
-    
-    glBindVertexArray(m_VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
-    
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    
-    glBindVertexArray(0);
+    // Nothing needed here - vertex buffer already created in init()
 }
 
 void Skybox::createProceduralSkybox()
 {
-    // Create a simple 1x1 white texture for gradient mode
-    glGenTextures(1, &m_cubemapTexture);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemapTexture);
-    
+    // Create a simple 1x1 white cubemap texture for gradient mode
     unsigned char whitePixel[3] = {255, 255, 255};
-    for (unsigned int i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, whitePixel);
-    }
-    
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    
+
+    glint3d::TextureDesc texDesc{};
+    texDesc.type = glint3d::TextureType::TextureCube;
+    texDesc.width = 1;
+    texDesc.height = 1;
+    texDesc.format = glint3d::TextureFormat::RGB8;
+    texDesc.initialData = whitePixel;
+    texDesc.initialDataSize = sizeof(whitePixel);
+    texDesc.debugName = "SkyboxProceduralCubemap";
+
+    m_cubemapTexture = m_rhi->createTexture(texDesc);
+
     m_useGradient = true;
 }
 
@@ -177,36 +193,47 @@ bool Skybox::loadCubemap(const std::vector<std::string>& faces)
         std::cerr << "Skybox: Need exactly 6 faces for cubemap" << std::endl;
         return false;
     }
-    
-    if (m_cubemapTexture != 0) {
-        glDeleteTextures(1, &m_cubemapTexture);
+
+    if (m_cubemapTexture != glint3d::INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_cubemapTexture);
+        m_cubemapTexture = glint3d::INVALID_HANDLE;
     }
-    
-    glGenTextures(1, &m_cubemapTexture);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemapTexture);
-    
+
+    // Load first face to get dimensions
     int width, height, nrChannels;
-    for (unsigned int i = 0; i < faces.size(); i++) {
-        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(faces[0].c_str(), &width, &height, &nrChannels, 0);
+    if (!data) {
+        std::cerr << "Skybox: Failed to load first texture: " << faces[0] << std::endl;
+        return false;
+    }
+
+    glint3d::TextureFormat format = (nrChannels == 4) ? glint3d::TextureFormat::RGBA8 : glint3d::TextureFormat::RGB8;
+
+    glint3d::TextureDesc texDesc{};
+    texDesc.type = glint3d::TextureType::TextureCube;
+    texDesc.width = width;
+    texDesc.height = height;
+    texDesc.format = format;
+    texDesc.initialData = data;
+    texDesc.initialDataSize = width * height * nrChannels;
+    texDesc.debugName = "SkyboxCubemap";
+
+    m_cubemapTexture = m_rhi->createTexture(texDesc);
+    stbi_image_free(data);
+
+    // Load remaining faces
+    for (unsigned int i = 1; i < faces.size(); i++) {
+        data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
         if (data) {
-            GLenum format = GL_RGB;
-            if (nrChannels == 4) format = GL_RGBA;
-            
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            // TODO: RHI needs support for updating cubemap faces individually
+            // For now, this is a limitation - we'd need updateTextureCubeFace() API
             stbi_image_free(data);
         } else {
             std::cerr << "Skybox: Failed to load texture: " << faces[i] << std::endl;
-            stbi_image_free(data);
             return false;
         }
     }
-    
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    
+
     m_useGradient = false;
     return true;
 }
@@ -215,81 +242,71 @@ void Skybox::setGradient(const glm::vec3& topColor, const glm::vec3& bottomColor
 {
     m_topColor = topColor;
     m_bottomColor = bottomColor;
-    m_horizonColor = horizonColor.x == 0.0f && horizonColor.y == 0.0f && horizonColor.z == 0.0f 
-        ? glm::mix(topColor, bottomColor, 0.5f) 
+    m_horizonColor = horizonColor.x == 0.0f && horizonColor.y == 0.0f && horizonColor.z == 0.0f
+        ? glm::mix(topColor, bottomColor, 0.5f)
         : horizonColor;
     m_useGradient = true;
 }
 
 void Skybox::render(const glm::mat4& view, const glm::mat4& projection)
 {
-    if (!m_enabled || !m_initialized || !m_shader) return;
-    
+    if (!m_enabled || !m_initialized || !m_rhi) return;
+
     // Remove translation from the view matrix
     glm::mat4 skyboxView = glm::mat4(glm::mat3(view));
-    
-    // Render skybox last (after all other geometry)
-    glDepthFunc(GL_LEQUAL);
-    
-    m_shader->use();
 
-    // Route uniforms through RHI only (no direct shader calls)
-    if (s_rhi) {
-        s_rhi->setUniformMat4("view", skyboxView);
-        s_rhi->setUniformMat4("projection", projection);
-        s_rhi->setUniformBool("useGradient", m_useGradient);
-        s_rhi->setUniformVec3("topColor", m_topColor);
-        s_rhi->setUniformVec3("bottomColor", m_bottomColor);
-        s_rhi->setUniformVec3("horizonColor", m_horizonColor);
-        s_rhi->setUniformFloat("intensity", m_intensity);
-        s_rhi->setUniformInt("skybox", 0);
-    }
+    // Set uniforms via RHI
+    m_rhi->setUniformMat4("view", skyboxView);
+    m_rhi->setUniformMat4("projection", projection);
+    m_rhi->setUniformBool("useGradient", m_useGradient);
+    m_rhi->setUniformVec3("topColor", m_topColor);
+    m_rhi->setUniformVec3("bottomColor", m_bottomColor);
+    m_rhi->setUniformVec3("horizonColor", m_horizonColor);
+    m_rhi->setUniformFloat("intensity", m_intensity);
+    m_rhi->setUniformInt("skybox", 0);
 
-    // Bind cubemap
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemapTexture);
-    
-    glBindVertexArray(m_VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
-    
-    // Restore depth function
-    glDepthFunc(GL_LESS);
+    // Bind cubemap texture
+    m_rhi->bindTexture(m_cubemapTexture, 0);
+
+    // Draw skybox
+    glint3d::DrawDesc drawDesc{};
+    drawDesc.pipeline = m_pipeline;
+    drawDesc.vertexBuffer = m_vertexBuffer;
+    drawDesc.vertexCount = 36;
+    drawDesc.instanceCount = 1;
+    m_rhi->draw(drawDesc);
 }
 
 void Skybox::cleanup()
 {
-    if (m_VAO != 0) {
-        glDeleteVertexArrays(1, &m_VAO);
-        m_VAO = 0;
-    }
-    if (m_VBO != 0) {
-        glDeleteBuffers(1, &m_VBO);
-        m_VBO = 0;
-    }
-    if (m_cubemapTexture != 0) {
-        glDeleteTextures(1, &m_cubemapTexture);
-        m_cubemapTexture = 0;
-    }
-    if (m_shader) {
-        delete m_shader;
-        m_shader = nullptr;
+    if (m_rhi) {
+        if (m_vertexBuffer != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyBuffer(m_vertexBuffer);
+            m_vertexBuffer = {};
+        }
+        if (m_cubemapTexture != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyTexture(m_cubemapTexture);
+            m_cubemapTexture = {};
+        }
+        if (m_shader != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyShader(m_shader);
+            m_shader = {};
+        }
+        if (m_pipeline != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyPipeline(m_pipeline);
+            m_pipeline = {};
+        }
+        m_rhi = nullptr;
     }
     m_initialized = false;
 }
 
-void Skybox::setEnvironmentMap(GLuint envMap)
+void Skybox::setEnvironmentMap(glint3d::TextureHandle envMap)
 {
     // Use the provided environment map instead of our own cubemap texture
-    // Don't delete the original cubemap since it might be needed later
-    if (envMap != 0) {
+    if (envMap != glint3d::INVALID_HANDLE) {
         m_cubemapTexture = envMap;
         m_useGradient = false; // Disable gradient mode when using external environment
         m_enabled = true; // Enable skybox when environment map is set
     }
-}
-
-void Skybox::setRHI(glint3d::RHI* rhi)
-{
-    s_rhi = rhi;
 }

@@ -1,14 +1,16 @@
 #pragma once
 
-#include "gl_platform.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
 
 #include "ray.h"
+#include "glint3d/rhi_types.h"
 
-// Forward declaration
-namespace glint3d { class RHI; }
+// Forward declarations
+namespace glint3d {
+    class RHI;
+}
 
 enum class GizmoMode { Translate = 0, Rotate = 1, Scale = 2 };
 enum class GizmoAxis { None = 0, X = 1, Y = 2, Z = 3 };
@@ -16,7 +18,7 @@ enum class GizmoAxis { None = 0, X = 1, Y = 2, Z = 3 };
 class Gizmo {
 public:
     Gizmo() {}
-    void init();
+    void init(glint3d::RHI* rhi);
     void cleanup();
 
     // Render a triad centered at origin, scaled to 'scale' length (axes are [0..1] scaled by 'scale').
@@ -39,12 +41,9 @@ public:
                   float& outS,
                   glm::vec3& outAxisDir) const;
 
-    // RHI bridge for transitional period
-    static void setRHI(glint3d::RHI* rhi);
-
 private:
-    GLuint m_vao = 0;
-    GLuint m_vbo = 0;
-    GLuint m_prog = 0;
-    static glint3d::RHI* s_rhi; // Static RHI reference for uniform bridging
+    glint3d::RHI* m_rhi = nullptr;
+    glint3d::BufferHandle m_vertexBuffer;
+    glint3d::ShaderHandle m_shader;
+    glint3d::PipelineHandle m_pipeline;
 };

@@ -49,6 +49,7 @@ public:
     void updateTexture(TextureHandle texture, const void* data,
                       int width, int height, TextureFormat format,
                       int x = 0, int y = 0, int mipLevel = 0) override;
+    void generateMipmaps(TextureHandle texture) override;
     void bindRenderTarget(RenderTargetHandle renderTarget) override;
     void resolveRenderTarget(RenderTargetHandle srcRenderTarget, TextureHandle dstTexture,
                            const int* srcRect = nullptr, const int* dstRect = nullptr) override;
@@ -234,7 +235,9 @@ private:
     GLenum bufferTypeToGL(BufferType type) const;
     GLenum bufferUsageToGL(BufferUsage usage) const;
     GLenum primitiveTopologyToGL(PrimitiveTopology topology) const;
-    
+    GLenum polygonModeToGL(PolygonMode mode) const;
+    GLenum blendFactorToGL(BlendFactor factor) const;
+
     bool compileShader(GLuint& program, const ShaderDesc& desc);
     void queryCapabilities();
     void setupVertexArray(GLuint vao, const PipelineDesc& desc);

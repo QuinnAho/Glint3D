@@ -20,13 +20,7 @@ Light::Light()
 
 Light::~Light()
 {
-    if (m_indicatorVAO) glDeleteVertexArrays(1, &m_indicatorVAO);
-    if (m_indicatorVBO) glDeleteBuffers(1, &m_indicatorVBO);
-    if (m_arrowVAO) glDeleteVertexArrays(1, &m_arrowVAO);
-    if (m_arrowVBO) glDeleteBuffers(1, &m_arrowVBO);
-    if (m_spotVAO) glDeleteVertexArrays(1, &m_spotVAO);
-    if (m_spotVBO) glDeleteBuffers(1, &m_spotVBO);
-    if (m_indicatorShader) glDeleteProgram(m_indicatorShader);
+    cleanup();
 }
 
 void Light::addLight(const glm::vec3& position, const glm::vec3& color, float intensity)
@@ -69,92 +63,17 @@ void Light::addSpotLight(const glm::vec3& position, const glm::vec3& direction,
     m_lights.push_back(s);
 }
 
-void Light::applyLights(GLuint shaderProgram) const
-{
-    glUseProgram(shaderProgram);
-
-    // Send the global ambient
-    GLint ambientLoc = glGetUniformLocation(shaderProgram, "globalAmbient");
-    if (ambientLoc != -1)
-    {
-        glUniform4fv(ambientLoc, 1, &m_globalAmbient[0]);
-    }
-
-    GLint lightCountLoc = glGetUniformLocation(shaderProgram, "numLights");
-    if (lightCountLoc != -1)
-    {
-        glUniform1i(lightCountLoc, static_cast<int>(m_lights.size()));
-    }
-
-    for (size_t i = 0; i < m_lights.size(); i++)
-    {
-        std::string baseName = "lights[" + std::to_string(i) + "]";
-        GLint lightTypeLoc = glGetUniformLocation(shaderProgram, (baseName + ".type").c_str());
-        GLint lightPosLoc = glGetUniformLocation(shaderProgram, (baseName + ".position").c_str());
-        GLint lightDirLoc = glGetUniformLocation(shaderProgram, (baseName + ".direction").c_str());
-        GLint lightColorLoc = glGetUniformLocation(shaderProgram, (baseName + ".color").c_str());
-        GLint lightIntensityLoc = glGetUniformLocation(shaderProgram, (baseName + ".intensity").c_str());
-        GLint innerLoc = glGetUniformLocation(shaderProgram, (baseName + ".innerCutoff").c_str());
-        GLint outerLoc = glGetUniformLocation(shaderProgram, (baseName + ".outerCutoff").c_str());
-
-        float intensity = (m_lights[i].enabled) ? m_lights[i].intensity : 0.0f;
-
-        if (lightTypeLoc != -1)      glUniform1i(lightTypeLoc, static_cast<int>(m_lights[i].type));
-        if (lightPosLoc != -1)       glUniform3fv(lightPosLoc, 1, glm::value_ptr(m_lights[i].position));
-        if (lightDirLoc != -1)       glUniform3fv(lightDirLoc, 1, glm::value_ptr(m_lights[i].direction));
-        if (lightColorLoc != -1)     glUniform3fv(lightColorLoc, 1, glm::value_ptr(m_lights[i].color));
-        if (lightIntensityLoc != -1) glUniform1f(lightIntensityLoc, intensity);
-        // Spot cone angles (pass cosines of radians)
-        if (innerLoc != -1) {
-            float innerRad = glm::radians(m_lights[i].innerConeDeg);
-            glUniform1f(innerLoc, cosf(innerRad));
-        }
-        if (outerLoc != -1) {
-            float outerRad = glm::radians(m_lights[i].outerConeDeg);
-            glUniform1f(outerLoc, cosf(outerRad));
-        }
-    }
-}
-
-void Light::applyLightsRHI(glint3d::RHI* rhi) const
-{
-    if (!rhi) return;
-
-    // Send the global ambient
-    rhi->setUniformVec4("globalAmbient", m_globalAmbient);
-
-    // Send light count
-    rhi->setUniformInt("numLights", static_cast<int>(m_lights.size()));
-
-    // Apply each light via RHI uniform helpers
-    for (size_t i = 0; i < m_lights.size(); i++)
-    {
-        std::string baseName = "lights[" + std::to_string(i) + "]";
-
-        float intensity = (m_lights[i].enabled) ? m_lights[i].intensity : 0.0f;
-
-        rhi->setUniformInt((baseName + ".type").c_str(), static_cast<int>(m_lights[i].type));
-        rhi->setUniformVec3((baseName + ".position").c_str(), m_lights[i].position);
-        rhi->setUniformVec3((baseName + ".direction").c_str(), m_lights[i].direction);
-        rhi->setUniformVec3((baseName + ".color").c_str(), m_lights[i].color);
-        rhi->setUniformFloat((baseName + ".intensity").c_str(), intensity);
-
-        // Spot cone angles (pass cosines of radians)
-        float innerRad = glm::radians(m_lights[i].innerConeDeg);
-        float outerRad = glm::radians(m_lights[i].outerConeDeg);
-        rhi->setUniformFloat((baseName + ".innerCutoff").c_str(), cosf(innerRad));
-        rhi->setUniformFloat((baseName + ".outerCutoff").c_str(), cosf(outerRad));
-    }
-}
-
 size_t Light::getLightCount() const
 {
     return m_lights.size();
 }
 
 // Initialize indicator geometry (cube for point lights, arrow for directional lights, cone for spot lights)
-void Light::initIndicator()
+void Light::initIndicator(glint3d::RHI* rhi)
 {
+    m_rhi = rhi;
+    if (!m_rhi) return;
+
     // Cube vertices for point lights
     float cubeVertices[] = {
         // positions for 12 triangles (36 vertices)
@@ -201,15 +120,14 @@ void Light::initIndicator()
         -0.1f,  0.1f, -0.1f
     };
 
-    // Initialize cube geometry for point lights
-    glGenVertexArrays(1, &m_indicatorVAO);
-    glGenBuffers(1, &m_indicatorVBO);
-    glBindVertexArray(m_indicatorVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_indicatorVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    // Create cube vertex buffer via RHI
+    glint3d::BufferDesc cubeBufferDesc;
+    cubeBufferDesc.type = glint3d::BufferType::Vertex;
+    cubeBufferDesc.usage = glint3d::BufferUsage::Static;
+    cubeBufferDesc.initialData = cubeVertices;
+    cubeBufferDesc.size = sizeof(cubeVertices);
+    cubeBufferDesc.debugName = "LightIndicatorCubeBuffer";
+    m_indicatorVBO = m_rhi->createBuffer(cubeBufferDesc);
 
     // Arrow vertices for directional lights (shaft + arrowhead)
     float arrowVertices[] = {
@@ -221,15 +139,14 @@ void Light::initIndicator()
         0.0f, 0.0f, -0.8f,   0.0f, -0.2f, -0.6f, // Bottom arrowhead line
     };
 
-    // Initialize arrow geometry for directional lights
-    glGenVertexArrays(1, &m_arrowVAO);
-    glGenBuffers(1, &m_arrowVBO);
-    glBindVertexArray(m_arrowVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_arrowVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(arrowVertices), arrowVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    // Create arrow vertex buffer via RHI
+    glint3d::BufferDesc arrowBufferDesc;
+    arrowBufferDesc.type = glint3d::BufferType::Vertex;
+    arrowBufferDesc.usage = glint3d::BufferUsage::Static;
+    arrowBufferDesc.initialData = arrowVertices;
+    arrowBufferDesc.size = sizeof(arrowVertices);
+    arrowBufferDesc.debugName = "LightIndicatorArrowBuffer";
+    m_arrowVBO = m_rhi->createBuffer(arrowBufferDesc);
 
     // Spot light cone outline (unit, pointing down -Z)
     {
@@ -251,44 +168,17 @@ void Light::initIndicator()
             push(0,0,0); push(r*cosf(a), r*sinf(a), -0.9f);
         }
 
-        glGenVertexArrays(1, &m_spotVAO);
-        glGenBuffers(1, &m_spotVBO);
-        glBindVertexArray(m_spotVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, m_spotVBO);
-        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        glBindVertexArray(0);
+        // Create spot cone vertex buffer via RHI
+        glint3d::BufferDesc spotBufferDesc;
+        spotBufferDesc.type = glint3d::BufferType::Vertex;
+        spotBufferDesc.usage = glint3d::BufferUsage::Static;
+        spotBufferDesc.initialData = verts.data();
+        spotBufferDesc.size = verts.size() * sizeof(float);
+        spotBufferDesc.debugName = "LightIndicatorSpotBuffer";
+        m_spotVBO = m_rhi->createBuffer(spotBufferDesc);
     }
-}
 
-// Initialize the indicator shader within the Light class
-bool Light::initIndicatorShader()
-{
-#ifdef __EMSCRIPTEN__
-    const char* vertexShaderSource = R"(
-        #version 300 es
-        layout(location = 0) in vec3 aPos;
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-        void main()
-        {
-            gl_Position = projection * view * model * vec4(aPos, 1.0);
-        }
-    )";
-
-    const char* fragmentShaderSource = R"(
-        #version 300 es
-        precision highp float;
-        out vec4 FragColor;
-        uniform vec3 indicatorColor;
-        void main()
-        {
-            FragColor = vec4(indicatorColor, 1.0);
-        }
-    )";
-#else
+    // Create shader via RHI
     const char* vertexShaderSource = R"(
         #version 330 core
         layout(location = 0) in vec3 aPos;
@@ -310,85 +200,84 @@ bool Light::initIndicatorShader()
             FragColor = vec4(indicatorColor, 1.0);
         }
     )";
-#endif
 
-    // Compile vertex shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
-    GLint success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cerr << "Indicator Vertex Shader Compilation Error:\n" << infoLog << std::endl;
-        return false;
-    }
+    glint3d::ShaderDesc shaderDesc;
+    shaderDesc.vertexSource = vertexShaderSource;
+    shaderDesc.fragmentSource = fragmentShaderSource;
+    m_indicatorShader = m_rhi->createShader(shaderDesc);
 
-    // Compile fragment shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cerr << "Indicator Fragment Shader Compilation Error:\n" << infoLog << std::endl;
-        return false;
-    }
+    // Create pipeline for triangles (cube)
+    glint3d::PipelineDesc cubePipeDesc{};
+    cubePipeDesc.shader = m_indicatorShader;
+    cubePipeDesc.topology = glint3d::PrimitiveTopology::Triangles;
 
-    // Link shader program
-    m_indicatorShader = glCreateProgram();
-    glAttachShader(m_indicatorShader, vertexShader);
-    glAttachShader(m_indicatorShader, fragmentShader);
-    glLinkProgram(m_indicatorShader);
-    glGetProgramiv(m_indicatorShader, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(m_indicatorShader, 512, nullptr, infoLog);
-        std::cerr << "Indicator Shader Linking Error:\n" << infoLog << std::endl;
-        return false;
-    }
+    glint3d::VertexAttribute posAttr;
+    posAttr.location = 0;
+    posAttr.binding = 0;
+    posAttr.format = glint3d::TextureFormat::RGB32F;
+    posAttr.offset = 0;
+    cubePipeDesc.vertexAttributes.push_back(posAttr);
 
-    // Clean up shaders (no longer needed once linked)
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    glint3d::VertexBinding binding;
+    binding.binding = 0;
+    binding.stride = sizeof(float) * 3;
+    binding.perInstance = false;
+    binding.buffer = m_indicatorVBO;
+    cubePipeDesc.vertexBindings.push_back(binding);
 
-    return true;
+    cubePipeDesc.depthTestEnable = true;
+    m_cubePipeline = m_rhi->createPipeline(cubePipeDesc);
+
+    // Create pipeline for lines (arrow + spot cone)
+    glint3d::PipelineDesc linePipeDesc{};
+    linePipeDesc.shader = m_indicatorShader;
+    linePipeDesc.topology = glint3d::PrimitiveTopology::Lines;
+    linePipeDesc.vertexAttributes.push_back(posAttr);
+
+    glint3d::VertexBinding lineBinding;
+    lineBinding.binding = 0;
+    lineBinding.stride = sizeof(float) * 3;
+    lineBinding.perInstance = false;
+    lineBinding.buffer = m_arrowVBO;  // Will be overridden in draw calls
+    linePipeDesc.vertexBindings.push_back(lineBinding);
+
+    linePipeDesc.depthTestEnable = true;
+    linePipeDesc.lineWidth = 3.0f;
+    m_linePipeline = m_rhi->createPipeline(linePipeDesc);
 }
 
-// Render visual indicators for each light using the indicator shader stored in the Light class
+
+// Render visual indicators for each light using RHI
 void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection, int selectedIndex) const
 {
-    if (m_indicatorShader == 0)
-        return; // Shader not initialized
+    if (!m_rhi || m_indicatorShader == glint3d::INVALID_HANDLE)
+        return; // Not initialized
 
-    glUseProgram(m_indicatorShader);
-
-    GLint viewLoc = glGetUniformLocation(m_indicatorShader, "view");
-    GLint projLoc = glGetUniformLocation(m_indicatorShader, "projection");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-    GLint modelLoc = glGetUniformLocation(m_indicatorShader, "model");
-    GLint colorLoc = glGetUniformLocation(m_indicatorShader, "indicatorColor");
+    // Set uniforms via RHI
+    m_rhi->setUniformMat4("view", view);
+    m_rhi->setUniformMat4("projection", projection);
 
     for (size_t i = 0; i < m_lights.size(); i++) {
         glm::mat4 model(1.0f);
-        
+
         if (m_lights[i].type == LightType::POINT) {
             // Render cube at light position
             model = glm::translate(model, m_lights[i].position);
-            glBindVertexArray(m_indicatorVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glUniform3fv(colorLoc, 1, glm::value_ptr(m_lights[i].color));
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        } 
+            m_rhi->setUniformMat4("model", model);
+            m_rhi->setUniformVec3("indicatorColor", m_lights[i].color);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = m_cubePipeline;
+            drawDesc.vertexBuffer = m_indicatorVBO;
+            drawDesc.vertexCount = 36;
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
+        }
         else if (m_lights[i].type == LightType::DIRECTIONAL) {
             // Calculate transformation to orient arrow in light direction
             glm::vec3 forward(0.0f, 0.0f, -1.0f); // Arrow points down -Z
             glm::vec3 lightDir = glm::normalize(m_lights[i].direction);
-            
+
             // Create rotation matrix to align arrow with light direction
             glm::vec3 axis = glm::cross(forward, lightDir);
             if (glm::length(axis) > 0.001f) {
@@ -399,15 +288,16 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection,
                 // 180 degree rotation needed
                 model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f));
             }
-            
-            // Position arrow at scene origin for directional lights (they're infinite)
-            // In the future, we could position them at the camera or scene bounds
-            
-            glBindVertexArray(m_arrowVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glUniform3fv(colorLoc, 1, glm::value_ptr(m_lights[i].color));
-            glLineWidth(3.0f);
-            glDrawArrays(GL_LINES, 0, 10); // 5 lines * 2 vertices = 10
+
+            m_rhi->setUniformMat4("model", model);
+            m_rhi->setUniformVec3("indicatorColor", m_lights[i].color);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = m_linePipeline;
+            drawDesc.vertexBuffer = m_arrowVBO;
+            drawDesc.vertexCount = 10; // 5 lines * 2 vertices = 10
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
         }
         else if (m_lights[i].type == LightType::SPOT) {
             // Translate to light position, orient cone along light direction
@@ -422,42 +312,67 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection,
             } else if (glm::dot(forward, lightDir) < 0) {
                 model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f));
             }
-            glBindVertexArray(m_spotVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glUniform3fv(colorLoc, 1, glm::value_ptr(m_lights[i].color));
-            glLineWidth(2.0f);
-            // Number of vertices: 2 (axis) + 2*N (circle) + 2*4 (spokes) where N=24 -> 2 + 48 + 8 = 58
-            glDrawArrays(GL_LINES, 0, 58);
+
+            m_rhi->setUniformMat4("model", model);
+            m_rhi->setUniformVec3("indicatorColor", m_lights[i].color);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = m_linePipeline;
+            drawDesc.vertexBuffer = m_spotVBO;
+            drawDesc.vertexCount = 58; // 2 (axis) + 48 (circle) + 8 (spokes)
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
         }
     }
-    
+
     // Draw selection highlight
     if (selectedIndex >= 0 && selectedIndex < (int)m_lights.size()) {
         glm::vec3 selColor(0.2f, 0.7f, 1.0f);
-        glUniform3fv(colorLoc, 1, glm::value_ptr(selColor));
-        
+        m_rhi->setUniformVec3("indicatorColor", selColor);
+
         if (m_lights[selectedIndex].type == LightType::POINT) {
-            glm::mat4 model = glm::translate(glm::mat4(1.0f), m_lights[selectedIndex].position) 
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), m_lights[selectedIndex].position)
                             * glm::scale(glm::mat4(1.0f), glm::vec3(1.3f));
-            glBindVertexArray(m_indicatorVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            
-#ifndef __EMSCRIPTEN__
-            GLint polyMode[2];
-            glGetIntegerv(GL_POLYGON_MODE, polyMode);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            glLineWidth(2.0f);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glPolygonMode(GL_FRONT_AND_BACK, polyMode[0]);
-#else
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-#endif
+            m_rhi->setUniformMat4("model", model);
+
+            // Create wireframe pipeline for selection highlight
+            glint3d::PipelineDesc wireDesc{};
+            wireDesc.shader = m_indicatorShader;
+            wireDesc.topology = glint3d::PrimitiveTopology::Triangles;
+            wireDesc.polygonMode = glint3d::PolygonMode::Line;
+            wireDesc.lineWidth = 2.0f;
+
+            glint3d::VertexAttribute posAttr;
+            posAttr.location = 0;
+            posAttr.binding = 0;
+            posAttr.format = glint3d::TextureFormat::RGB32F;
+            posAttr.offset = 0;
+            wireDesc.vertexAttributes.push_back(posAttr);
+
+            glint3d::VertexBinding binding;
+            binding.binding = 0;
+            binding.stride = sizeof(float) * 3;
+            binding.perInstance = false;
+            binding.buffer = m_indicatorVBO;
+            wireDesc.vertexBindings.push_back(binding);
+
+            wireDesc.depthTestEnable = true;
+            auto wirePipeline = m_rhi->createPipeline(wireDesc);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = wirePipeline;
+            drawDesc.vertexBuffer = m_indicatorVBO;
+            drawDesc.vertexCount = 36;
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
+
+            m_rhi->destroyPipeline(wirePipeline);
         } else if (m_lights[selectedIndex].type == LightType::DIRECTIONAL) {
             // Highlight directional light with thicker lines
             glm::mat4 model(1.0f);
             glm::vec3 forward(0.0f, 0.0f, -1.0f);
             glm::vec3 lightDir = glm::normalize(m_lights[selectedIndex].direction);
-            
+
             glm::vec3 axis = glm::cross(forward, lightDir);
             if (glm::length(axis) > 0.001f) {
                 axis = glm::normalize(axis);
@@ -466,11 +381,40 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection,
             } else if (glm::dot(forward, lightDir) < 0) {
                 model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f));
             }
-            
-            glBindVertexArray(m_arrowVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glLineWidth(5.0f);
-            glDrawArrays(GL_LINES, 0, 10);
+
+            m_rhi->setUniformMat4("model", model);
+
+            // Create thicker line pipeline for selection
+            glint3d::PipelineDesc thickDesc{};
+            thickDesc.shader = m_indicatorShader;
+            thickDesc.topology = glint3d::PrimitiveTopology::Lines;
+            thickDesc.lineWidth = 5.0f;
+
+            glint3d::VertexAttribute posAttr;
+            posAttr.location = 0;
+            posAttr.binding = 0;
+            posAttr.format = glint3d::TextureFormat::RGB32F;
+            posAttr.offset = 0;
+            thickDesc.vertexAttributes.push_back(posAttr);
+
+            glint3d::VertexBinding binding;
+            binding.binding = 0;
+            binding.stride = sizeof(float) * 3;
+            binding.perInstance = false;
+            binding.buffer = m_arrowVBO;
+            thickDesc.vertexBindings.push_back(binding);
+
+            thickDesc.depthTestEnable = true;
+            auto thickPipeline = m_rhi->createPipeline(thickDesc);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = thickPipeline;
+            drawDesc.vertexBuffer = m_arrowVBO;
+            drawDesc.vertexCount = 10;
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
+
+            m_rhi->destroyPipeline(thickPipeline);
         } else if (m_lights[selectedIndex].type == LightType::SPOT) {
             glm::mat4 model(1.0f);
             model = glm::translate(model, m_lights[selectedIndex].position);
@@ -484,14 +428,42 @@ void Light::renderIndicators(const glm::mat4& view, const glm::mat4& projection,
             } else if (glm::dot(forward, lightDir) < 0) {
                 model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f));
             }
-            glBindVertexArray(m_spotVAO);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            glLineWidth(4.0f);
-            glDrawArrays(GL_LINES, 0, 58);
+
+            m_rhi->setUniformMat4("model", model);
+
+            // Create thicker line pipeline for selection
+            glint3d::PipelineDesc thickDesc{};
+            thickDesc.shader = m_indicatorShader;
+            thickDesc.topology = glint3d::PrimitiveTopology::Lines;
+            thickDesc.lineWidth = 4.0f;
+
+            glint3d::VertexAttribute posAttr;
+            posAttr.location = 0;
+            posAttr.binding = 0;
+            posAttr.format = glint3d::TextureFormat::RGB32F;
+            posAttr.offset = 0;
+            thickDesc.vertexAttributes.push_back(posAttr);
+
+            glint3d::VertexBinding binding;
+            binding.binding = 0;
+            binding.stride = sizeof(float) * 3;
+            binding.perInstance = false;
+            binding.buffer = m_spotVBO;
+            thickDesc.vertexBindings.push_back(binding);
+
+            thickDesc.depthTestEnable = true;
+            auto thickPipeline = m_rhi->createPipeline(thickDesc);
+
+            glint3d::DrawDesc drawDesc{};
+            drawDesc.pipeline = thickPipeline;
+            drawDesc.vertexBuffer = m_spotVBO;
+            drawDesc.vertexCount = 58;
+            drawDesc.instanceCount = 1;
+            m_rhi->draw(drawDesc);
+
+            m_rhi->destroyPipeline(thickPipeline);
         }
     }
-    
-    glBindVertexArray(0);
 }
 
 const LightSource* Light::getFirstLight() const
@@ -506,4 +478,35 @@ bool Light::removeLightAt(size_t index)
     if (index >= m_lights.size()) return false;
     m_lights.erase(m_lights.begin() + index);
     return true;
+}
+
+void Light::cleanup()
+{
+    if (m_rhi) {
+        if (m_indicatorVBO != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyBuffer(m_indicatorVBO);
+            m_indicatorVBO = {};
+        }
+        if (m_arrowVBO != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyBuffer(m_arrowVBO);
+            m_arrowVBO = {};
+        }
+        if (m_spotVBO != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyBuffer(m_spotVBO);
+            m_spotVBO = {};
+        }
+        if (m_indicatorShader != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyShader(m_indicatorShader);
+            m_indicatorShader = {};
+        }
+        if (m_cubePipeline != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyPipeline(m_cubePipeline);
+            m_cubePipeline = {};
+        }
+        if (m_linePipeline != glint3d::INVALID_HANDLE) {
+            m_rhi->destroyPipeline(m_linePipeline);
+            m_linePipeline = {};
+        }
+        m_rhi = nullptr;
+    }
 }

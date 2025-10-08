@@ -1,17 +1,18 @@
 #ifndef AXIS_RENDERER_H
 #define AXIS_RENDERER_H
 
-#include "gl_platform.h"
 #include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <iostream>
+#include <glint3d/rhi_types.h>
 
 // Forward declaration
 namespace glint3d { class RHI; }
 
 class AxisRenderer {
 private:
-    GLuint VAO, VBO, shaderProgram;
+    glint3d::BufferHandle m_vertexBuffer;
+    glint3d::ShaderHandle m_shader;
+    glint3d::PipelineHandle m_pipeline;
+    glint3d::RHI* m_rhi;
 
     const char* vertexShaderSource = R"(
     #version 330 core
@@ -36,15 +37,9 @@ private:
 
 public:
     AxisRenderer();
-    void init();
+    void init(glint3d::RHI* rhi);
     void render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix);
     void cleanup();
-
-    // RHI bridge for transitional period
-    static void setRHI(glint3d::RHI* rhi);
-
-private:
-    static glint3d::RHI* s_rhi; // Static RHI reference for uniform bridging
 };
 
 #endif

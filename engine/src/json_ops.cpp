@@ -162,7 +162,6 @@ std::string JsonOpsExecutor::canonicalize(const std::string& json, std::string& 
     return buffer.GetString();
 }
 
-
 bool JsonOpsExecutor::apply(const std::string& json, std::string& error)
 {
     using namespace rapidjson;

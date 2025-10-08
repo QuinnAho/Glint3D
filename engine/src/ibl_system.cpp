@@ -5,6 +5,8 @@
 #include <iostream>
 #include <cmath>
 
+using namespace glint3d;
+
 namespace {
     // Cube vertices for environment mapping
     float cubeVertices[] = {
@@ -63,18 +65,24 @@ namespace {
 }
 
 IBLSystem::IBLSystem()
-    : m_environmentMap(0)
-    , m_irradianceMap(0)
-    , m_prefilterMap(0)
-    , m_brdfLUT(0)
-    , m_captureFramebuffer(0)
-    , m_captureRenderbuffer(0)
-    , m_equirectToCubemapShader(nullptr)
-    , m_irradianceShader(nullptr)
-    , m_prefilterShader(nullptr)
-    , m_brdfShader(nullptr)
-    , m_cubeVAO(0)
-    , m_quadVAO(0)
+    : m_rhi(nullptr)
+    , m_environmentMap(glint3d::INVALID_HANDLE)
+    , m_irradianceMap(glint3d::INVALID_HANDLE)
+    , m_prefilterMap(glint3d::INVALID_HANDLE)
+    , m_brdfLUT(glint3d::INVALID_HANDLE)
+    , m_captureFramebuffer(glint3d::INVALID_HANDLE)
+    , m_equirectToCubemapShader(glint3d::INVALID_HANDLE)
+    , m_irradianceShader(glint3d::INVALID_HANDLE)
+    , m_prefilterShader(glint3d::INVALID_HANDLE)
+    , m_brdfShader(glint3d::INVALID_HANDLE)
+    , m_equirectToCubemapShaderLegacy(nullptr)
+    , m_irradianceShaderLegacy(nullptr)
+    , m_prefilterShaderLegacy(nullptr)
+    , m_brdfShaderLegacy(nullptr)
+    , m_cubeBuffer(glint3d::INVALID_HANDLE)
+    , m_quadBuffer(glint3d::INVALID_HANDLE)
+    , m_cubePipeline(glint3d::INVALID_HANDLE)
+    , m_quadPipeline(glint3d::INVALID_HANDLE)
     , m_intensity(1.0f)
     , m_initialized(false)
 {
@@ -85,54 +93,47 @@ IBLSystem::~IBLSystem()
     cleanup();
 }
 
-bool IBLSystem::init()
+bool IBLSystem::init(glint3d::RHI* rhi)
 {
     if (m_initialized) return true;
+    if (!rhi) return false;
 
-    // Setup framebuffer for capturing cubemap faces
-    // TODO[FEAT-0253]: Legacy GL framebuffer setup
-    // These capture passes rely on raw GL FBO/RBO. Migrate to RHI render
-    // targets and draw passes, then remove direct GL framebuffer calls.
-    glGenFramebuffers(1, &m_captureFramebuffer);
-    glGenRenderbuffers(1, &m_captureRenderbuffer);
-    
-    // TODO[FEAT-0253]: Legacy GL FBO bind (migrate to RHI bindRenderTarget)
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_captureRenderbuffer);
+    m_rhi = rhi;
+
+    // Note: Legacy capture framebuffer removed - now using on-demand RenderTargets per cubemap face
+    // Each IBL generation method creates temporary render targets as needed
 
     // Create shaders
     createShaders();
-    
+
     // Setup geometry
     setupCube();
     setupQuad();
-    
-    // TODO[FEAT-0253]: Legacy GL default FBO bind
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
+
     m_initialized = true;
     return true;
 }
 
-void IBLSystem::createShaders() // Should we move the shaders into its own shaders folder?
+void IBLSystem::createShaders()
 {
+    using namespace glint3d;
+
+    // Create RHI shaders (for future use)
+    // Also create legacy Shader* for IBL generation (Phase 3 TODO)
+
     // Equirectangular to cubemap shader
-    m_equirectToCubemapShader = new Shader();
-    m_equirectToCubemapShader->loadFromStrings(
-        // Vertex shader
+    const char* equirectVertexShader =
         "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
         "out vec3 WorldPos;\n"
         "uniform mat4 projection;\n"
         "uniform mat4 view;\n"
         "void main() {\n"
-        "    WorldPos = aPos;\n"  
+        "    WorldPos = aPos;\n"
         "    gl_Position = projection * view * vec4(WorldPos, 1.0);\n"
-        "}\n",
-        
-        // Fragment shader
+        "}\n";
+
+    const char* equirectFragmentShader =
         "#version 330 core\n"
         "out vec4 FragColor;\n"
         "in vec3 WorldPos;\n"
@@ -144,17 +145,24 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "    uv += 0.5;\n"
         "    return uv;\n"
         "}\n"
-        "void main() {\n"		
+        "void main() {\n"
         "    vec2 uv = SampleSphericalMap(normalize(WorldPos));\n"
         "    vec3 color = texture(equirectangularMap, uv).rgb;\n"
         "    FragColor = vec4(color, 1.0);\n"
-        "}\n"
-    );
+        "}\n";
+
+    ShaderDesc equirectDesc{};
+    equirectDesc.vertexSource = equirectVertexShader;
+    equirectDesc.fragmentSource = equirectFragmentShader;
+    equirectDesc.debugName = "equirect_to_cubemap";
+    m_equirectToCubemapShader = m_rhi->createShader(equirectDesc);
+
+    // Legacy shader for IBL generation (TODO[Phase 3]: Remove)
+    m_equirectToCubemapShaderLegacy = new Shader();
+    m_equirectToCubemapShaderLegacy->loadFromStrings(equirectVertexShader, equirectFragmentShader);
 
     // Irradiance convolution shader
-    m_irradianceShader = new Shader();
-    m_irradianceShader->loadFromStrings(
-        // Vertex shader
+    const char* irradianceVertexShader =
         "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
         "out vec3 WorldPos;\n"
@@ -163,15 +171,15 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "void main() {\n"
         "    WorldPos = aPos;\n"
         "    gl_Position = projection * view * vec4(WorldPos, 1.0);\n"
-        "}\n",
-        
-        // Fragment shader
+        "}\n";
+
+    const char* irradianceFragmentShader =
         "#version 330 core\n"
         "out vec4 FragColor;\n"
         "in vec3 WorldPos;\n"
         "uniform samplerCube environmentMap;\n"
         "const float PI = 3.14159265359;\n"
-        "void main() {\n"		
+        "void main() {\n"
         "    vec3 N = normalize(WorldPos);\n"
         "    vec3 irradiance = vec3(0.0);\n"
         "    vec3 up    = vec3(0.0, 1.0, 0.0);\n"
@@ -182,20 +190,23 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "    for(float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta) {\n"
         "        for(float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta) {\n"
         "            vec3 tangentSample = vec3(sin(theta) * cos(phi),  sin(theta) * sin(phi), cos(theta));\n"
-        "            vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N;\n" 
+        "            vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N;\n"
         "            irradiance += texture(environmentMap, sampleVec).rgb * cos(theta) * sin(theta);\n"
         "            nrSamples++;\n"
         "        }\n"
         "    }\n"
         "    irradiance = PI * irradiance * (1.0 / float(nrSamples));\n"
         "    FragColor = vec4(irradiance, 1.0);\n"
-        "}\n"
-    );
+        "}\n";
+
+    ShaderDesc irradianceDesc{};
+    irradianceDesc.vertexSource = irradianceVertexShader;
+    irradianceDesc.fragmentSource = irradianceFragmentShader;
+    irradianceDesc.debugName = "irradiance_convolution";
+    m_irradianceShader = m_rhi->createShader(irradianceDesc);
 
     // Prefilter shader
-    m_prefilterShader = new Shader();
-    m_prefilterShader->loadFromStrings(
-        // Vertex shader
+    const char* prefilterVertexShader =
         "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
         "out vec3 WorldPos;\n"
@@ -204,9 +215,9 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "void main() {\n"
         "    WorldPos = aPos;\n"
         "    gl_Position = projection * view * vec4(WorldPos, 1.0);\n"
-        "}\n",
-        
-        // Fragment shader
+        "}\n";
+
+    const char* prefilterFragmentShader =
         "#version 330 core\n"
         "out vec4 FragColor;\n"
         "in vec3 WorldPos;\n"
@@ -249,7 +260,7 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "    vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;\n"
         "    return normalize(sampleVec);\n"
         "}\n"
-        "void main() {\n"		
+        "void main() {\n"
         "    vec3 N = normalize(WorldPos);\n"
         "    vec3 R = N;\n"
         "    vec3 V = R;\n"
@@ -276,13 +287,16 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "    }\n"
         "    prefilteredColor = prefilteredColor / totalWeight;\n"
         "    FragColor = vec4(prefilteredColor, 1.0);\n"
-        "}\n"
-    );
+        "}\n";
+
+    ShaderDesc prefilterDesc{};
+    prefilterDesc.vertexSource = prefilterVertexShader;
+    prefilterDesc.fragmentSource = prefilterFragmentShader;
+    prefilterDesc.debugName = "prefilter_envmap";
+    m_prefilterShader = m_rhi->createShader(prefilterDesc);
 
     // BRDF LUT shader
-    m_brdfShader = new Shader();
-    m_brdfShader->loadFromStrings(
-        // Vertex shader
+    const char* brdfVertexShader =
         "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
         "layout (location = 1) in vec2 aTexCoords;\n"
@@ -290,9 +304,9 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "void main() {\n"
         "    TexCoords = aTexCoords;\n"
         "    gl_Position = vec4(aPos, 1.0);\n"
-        "}\n",
-        
-        // Fragment shader
+        "}\n";
+
+    const char* brdfFragmentShader =
         "#version 330 core\n"
         "out vec2 FragColor;\n"
         "in vec2 TexCoords;\n"
@@ -368,76 +382,78 @@ void IBLSystem::createShaders() // Should we move the shaders into its own shade
         "void main() {\n"
         "    vec2 integratedBRDF = IntegrateBRDF(TexCoords.x, TexCoords.y);\n"
         "    FragColor = integratedBRDF;\n"
-        "}\n"
-    );
+        "}\n";
+
+    ShaderDesc brdfDesc{};
+    brdfDesc.vertexSource = brdfVertexShader;
+    brdfDesc.fragmentSource = brdfFragmentShader;
+    brdfDesc.debugName = "brdf_lut";
+    m_brdfShader = m_rhi->createShader(brdfDesc);
 }
 
-GLuint IBLSystem::loadHDRTexture(const std::string& path)
+glint3d::TextureHandle IBLSystem::loadHDRTexture(const std::string& path)
 {
+    using namespace glint3d;
+
     // Resolve path to handle different working directories
     std::string resolvedPath = PathUtils::resolveAssetPath(path);
     if (resolvedPath.empty()) {
         std::cerr << "Failed to resolve HDR/EXR path: " << path << std::endl;
-        return 0;
+        return INVALID_HANDLE;
     }
 
     ImageIO::ImageDataFloat img;
     if (!ImageIO::LoadImageFloat(resolvedPath, img, /*flipY=*/true)) {
         std::cerr << "Failed to load HDR/EXR image: " << resolvedPath << " (original: " << path << ")" << std::endl;
-        return 0;
+        return INVALID_HANDLE;
     }
 
-    GLuint hdrTexture;
-    glGenTextures(1, &hdrTexture);
-    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    // Create texture descriptor
+    TextureDesc desc{};
+    desc.type = TextureType::Texture2D;
+    desc.width = img.width;
+    desc.height = img.height;
+    desc.format = (img.channels == 3) ? TextureFormat::RGB16F : TextureFormat::RGBA16F;
+    desc.generateMips = false;
+    desc.initialData = img.pixels.data();
+    desc.initialDataSize = img.pixels.size() * sizeof(float);
 
-    if (img.channels == 3) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, img.width, img.height, 0, GL_RGB, GL_FLOAT, img.pixels.data());
-    } else {
-        // Default to RGBA for 4 or other channel counts (TinyEXR returns 4)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, img.width, img.height, 0, GL_RGBA, GL_FLOAT, img.pixels.data());
-    }
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
+    TextureHandle hdrTexture = m_rhi->createTexture(desc);
     return hdrTexture;
 }
 
 bool IBLSystem::loadHDREnvironment(const std::string& hdrPath)
 {
+    using namespace glint3d;
+
     if (!m_initialized) {
         std::cerr << "IBL System not initialized" << std::endl;
         return false;
     }
 
-    // Save current viewport
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    // Load HDR equirectangular map
-    GLuint hdrTexture = loadHDRTexture(hdrPath);
-    if (hdrTexture == 0) {
-        // Restore viewport before returning
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    // Load HDR equirectangular map via RHI
+    TextureHandle hdrTexture = loadHDRTexture(hdrPath);
+    if (hdrTexture == INVALID_HANDLE) {
         return false;
     }
 
-    // Create environment cubemap
-    glGenTextures(1, &m_environmentMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_environmentMap);
-    for (unsigned int i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Create environment cubemap via RHI
+    TextureDesc envCubemapDesc{};
+    envCubemapDesc.type = TextureType::TextureCube;
+    envCubemapDesc.width = 512;
+    envCubemapDesc.height = 512;
+    envCubemapDesc.format = TextureFormat::RGB16F;
+    envCubemapDesc.generateMips = true;  // Will generate after rendering
+    envCubemapDesc.mipLevels = 1 + static_cast<uint32_t>(std::floor(std::log2(std::max(512, 512))));
 
-    // Convert HDR equirectangular map to cubemap
+    m_environmentMap = m_rhi->createTexture(envCubemapDesc);
+    if (m_environmentMap == INVALID_HANDLE) {
+        std::cerr << "Failed to create environment cubemap texture" << std::endl;
+        m_rhi->destroyTexture(hdrTexture);
+        return false;
+    }
+
+    // Create render targets for each cubemap face
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] = {
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
@@ -448,70 +464,80 @@ bool IBLSystem::loadHDREnvironment(const std::string& hdrPath)
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
 
-    m_equirectToCubemapShader->use();
-    m_equirectToCubemapShader->setInt("equirectangularMap", 0);
-    m_equirectToCubemapShader->setMat4("projection", captureProjection);
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    // Render to each cubemap face
+    m_rhi->setViewport(0, 0, 512, 512);
 
-    glViewport(0, 0, 512, 512);
-    // TODO[FEAT-0253]: Legacy GL FBO bind in environment capture (migrate to RHI)
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
-    
-    for (unsigned int i = 0; i < 6; ++i) {
-        m_equirectToCubemapShader->setMat4("view", captureViews[i]);
-        // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_environmentMap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    for (unsigned int faceIndex = 0; faceIndex < 6; ++faceIndex) {
+        // Create render target for this cubemap face
+        RenderTargetDesc faceRTDesc{};
+        faceRTDesc.width = 512;
+        faceRTDesc.height = 512;
+
+        RenderTargetAttachment colorAttachment{};
+        colorAttachment.type = AttachmentType::Color0;
+        colorAttachment.texture = m_environmentMap;
+        colorAttachment.mipLevel = 0;
+        colorAttachment.arrayLayer = faceIndex;  // Cubemap face index
+        faceRTDesc.colorAttachments.push_back(colorAttachment);
+
+        RenderTargetHandle faceRT = m_rhi->createRenderTarget(faceRTDesc);
+        if (faceRT == INVALID_HANDLE) {
+            std::cerr << "Failed to create render target for cubemap face " << faceIndex << std::endl;
+            m_rhi->destroyTexture(m_environmentMap);
+            m_rhi->destroyTexture(hdrTexture);
+            m_environmentMap = INVALID_HANDLE;
+            return false;
+        }
+
+        // Bind render target
+        m_rhi->bindRenderTarget(faceRT);
+        m_rhi->clear(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0);
+
+        // Set uniforms via RHI
+        m_rhi->bindPipeline(m_cubePipeline);
+        m_rhi->bindTexture(hdrTexture, 0);
+        m_rhi->setUniformMat4("projection", captureProjection);
+        m_rhi->setUniformMat4("view", captureViews[faceIndex]);
+
+        // Draw cube
         renderCube();
-    }
-    // TODO[FEAT-0253]: Legacy GL default FBO bind
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Generate mipmaps for the environment map
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_environmentMap);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        // Cleanup face render target
+        m_rhi->destroyRenderTarget(faceRT);
+    }
+
+    // Unbind render target
+    m_rhi->bindRenderTarget(INVALID_HANDLE);
+
+    // Generate mipmaps via RHI
+    m_rhi->generateMipmaps(m_environmentMap);
 
     // Cleanup HDR texture
-    glDeleteTextures(1, &hdrTexture);
-    
-    // Restore original viewport
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-    
+    m_rhi->destroyTexture(hdrTexture);
+
     return true;
 }
 
 void IBLSystem::generateIrradianceMap()
 {
-    // Save current viewport
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-    
-    glGenTextures(1, &m_irradianceMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradianceMap);
-    for (unsigned int i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+    if (!m_rhi) {
+        std::cerr << "IBLSystem::generateIrradianceMap - RHI not initialized" << std::endl;
+        return;
     }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // TODO[FEAT-0253]: Legacy GL FBO bind for irradiance (migrate to RHI)
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+    // Create 32x32 RGB16F cubemap texture via RHI
+    TextureDesc irradianceDesc;
+    irradianceDesc.type = TextureType::TextureCube;
+    irradianceDesc.format = TextureFormat::RGB16F;
+    irradianceDesc.width = 32;
+    irradianceDesc.height = 32;
+    irradianceDesc.mipLevels = 1;
+    m_irradianceMap = m_rhi->createTexture(irradianceDesc);
 
-    m_irradianceShader->use();
-    m_irradianceShader->setInt("environmentMap", 0);
-    m_irradianceShader->setMat4("projection", glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f));
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_environmentMap);
+    // Projection matrix for cubemap rendering
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
-    glViewport(0, 0, 32, 32);
+    // View matrices for 6 cubemap faces
     glm::mat4 captureViews[] = {
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
@@ -520,220 +546,349 @@ void IBLSystem::generateIrradianceMap()
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
-    
-    for (unsigned int i = 0; i < 6; ++i) {
-        m_irradianceShader->setMat4("view", captureViews[i]);
-        // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_irradianceMap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Render to each cubemap face
+    for (unsigned int face = 0; face < 6; ++face) {
+        // Create render target for this face
+        RenderTargetDesc rtDesc;
+        rtDesc.width = 32;
+        rtDesc.height = 32;
+        RenderTargetAttachment colorAttachment;
+        colorAttachment.texture = m_irradianceMap;
+        colorAttachment.mipLevel = 0;
+        colorAttachment.arrayLayer = face;  // Face index 0-5
+        rtDesc.colorAttachments.push_back(colorAttachment);
+
+        RenderTargetHandle rt = m_rhi->createRenderTarget(rtDesc);
+
+        // Bind render target and setup viewport
+        m_rhi->bindRenderTarget(rt);
+        m_rhi->setViewport(0, 0, 32, 32);
+        m_rhi->clear(glm::vec4(0.0f), 1.0f, 0);
+
+        // Bind environment map texture
+        m_rhi->bindTexture(m_environmentMap, 0);
+
+        // Set shader uniforms
+        m_irradianceShaderLegacy->use();
+        m_irradianceShaderLegacy->setInt("environmentMap", 0);
+        m_irradianceShaderLegacy->setMat4("projection", captureProjection);
+        m_irradianceShaderLegacy->setMat4("view", captureViews[face]);
+
+        // Render cube
         renderCube();
+
+        // Clean up render target immediately (on-demand pattern)
+        m_rhi->destroyRenderTarget(rt);
     }
-    // TODO[FEAT-0253]: Legacy GL default FBO bind
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    // Restore original viewport
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+    // Restore default framebuffer
+    m_rhi->bindRenderTarget(INVALID_HANDLE);
 }
 
 void IBLSystem::generatePrefilterMap()
 {
-    // Save current viewport
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-    
-    glGenTextures(1, &m_prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilterMap);
-    for (unsigned int i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+    if (!m_rhi) {
+        std::cerr << "IBLSystem::generatePrefilterMap - RHI not initialized" << std::endl;
+        return;
     }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
-    m_prefilterShader->use();
-    m_prefilterShader->setInt("environmentMap", 0);
-    m_prefilterShader->setMat4("projection", glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f));
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_environmentMap);
+    // Create 128x128 RGB16F cubemap texture with mipmaps via RHI
+    TextureDesc prefilterDesc;
+    prefilterDesc.type = TextureType::TextureCube;
+    prefilterDesc.format = TextureFormat::RGB16F;
+    prefilterDesc.width = 128;
+    prefilterDesc.height = 128;
+    prefilterDesc.mipLevels = 5;
+    m_prefilterMap = m_rhi->createTexture(prefilterDesc);
 
-    // TODO[FEAT-0253]: Legacy GL FBO bind for prefilter (migrate to RHI)
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
+    // Generate mipmaps for the cubemap
+    m_rhi->generateMipmaps(m_prefilterMap);
+
+    // Projection matrix for cubemap rendering
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+
+    // View matrices for 6 cubemap faces
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+    };
+
+    // Render all mip levels (5 mips × 6 faces = 30 render passes)
     unsigned int maxMipLevels = 5;
     for (unsigned int mip = 0; mip < maxMipLevels; ++mip) {
         unsigned int mipWidth  = static_cast<unsigned int>(128 * std::pow(0.5, mip));
         unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
-        glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-        glViewport(0, 0, mipWidth, mipHeight);
-
         float roughness = (float)mip / (float)(maxMipLevels - 1);
-        m_prefilterShader->setFloat("roughness", roughness);
-        
-        glm::mat4 captureViews[] = {
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-        };
-        
-        for (unsigned int i = 0; i < 6; ++i) {
-            m_prefilterShader->setMat4("view", captureViews[i]);
-            // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilterMap, mip);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        for (unsigned int face = 0; face < 6; ++face) {
+            // Create render target for this mip level and face
+            RenderTargetDesc rtDesc;
+            rtDesc.width = mipWidth;
+            rtDesc.height = mipHeight;
+            RenderTargetAttachment colorAttachment;
+            colorAttachment.texture = m_prefilterMap;
+            colorAttachment.mipLevel = mip;
+            colorAttachment.arrayLayer = face;  // Face index 0-5
+            rtDesc.colorAttachments.push_back(colorAttachment);
+
+            RenderTargetHandle rt = m_rhi->createRenderTarget(rtDesc);
+
+            // Bind render target and setup viewport
+            m_rhi->bindRenderTarget(rt);
+            m_rhi->setViewport(0, 0, mipWidth, mipHeight);
+            m_rhi->clear(glm::vec4(0.0f), 1.0f, 0);
+
+            // Bind environment map texture
+            m_rhi->bindTexture(m_environmentMap, 0);
+
+            // Set shader uniforms
+            m_prefilterShaderLegacy->use();
+            m_prefilterShaderLegacy->setInt("environmentMap", 0);
+            m_prefilterShaderLegacy->setMat4("projection", captureProjection);
+            m_prefilterShaderLegacy->setMat4("view", captureViews[face]);
+            m_prefilterShaderLegacy->setFloat("roughness", roughness);
+
+            // Render cube
             renderCube();
+
+            // Clean up render target immediately (on-demand pattern)
+            m_rhi->destroyRenderTarget(rt);
         }
     }
-    // TODO[FEAT-0253]: Legacy GL default FBO bind
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    // Restore original viewport
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+    // Restore default framebuffer
+    m_rhi->bindRenderTarget(INVALID_HANDLE);
 }
 
 void IBLSystem::generateBRDFLUT()
 {
-    // Save current viewport
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-    
-    glGenTextures(1, &m_brdfLUT);
-    glBindTexture(GL_TEXTURE_2D, m_brdfLUT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (!m_rhi) {
+        std::cerr << "IBLSystem::generateBRDFLUT - RHI not initialized" << std::endl;
+        return;
+    }
 
-    // TODO[FEAT-0253]: Legacy GL FBO bind for BRDF LUT (migrate to RHI)
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFramebuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRenderbuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    // TODO[FEAT-0253]: Legacy GL attach (migrate to RHI RenderTargetDesc)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfLUT, 0);
+    // Create 512x512 RG16F 2D texture via RHI
+    TextureDesc brdfDesc;
+    brdfDesc.type = TextureType::Texture2D;
+    brdfDesc.format = TextureFormat::RG16F;
+    brdfDesc.width = 512;
+    brdfDesc.height = 512;
+    brdfDesc.mipLevels = 1;
+    m_brdfLUT = m_rhi->createTexture(brdfDesc);
 
-    glViewport(0, 0, 512, 512);
-    m_brdfShader->use();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Create render target for BRDF LUT
+    RenderTargetDesc rtDesc;
+    rtDesc.width = 512;
+    rtDesc.height = 512;
+    RenderTargetAttachment colorAttachment;
+    colorAttachment.texture = m_brdfLUT;
+    colorAttachment.mipLevel = 0;
+    rtDesc.colorAttachments.push_back(colorAttachment);
+
+    RenderTargetHandle rt = m_rhi->createRenderTarget(rtDesc);
+
+    // Bind render target and setup viewport
+    m_rhi->bindRenderTarget(rt);
+    m_rhi->setViewport(0, 0, 512, 512);
+    m_rhi->clear(glm::vec4(0.0f), 1.0f, 0);
+
+    // Set shader and render full-screen quad
+    m_brdfShaderLegacy->use();
     renderQuad();
 
-    // TODO[FEAT-0253]: Legacy GL default FBO bind
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    // Restore original viewport
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    // Clean up render target
+    m_rhi->destroyRenderTarget(rt);
+
+    // Restore default framebuffer
+    m_rhi->bindRenderTarget(INVALID_HANDLE);
 }
 
 void IBLSystem::bindIBLTextures() const
 {
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradianceMap);
-    
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilterMap);
-    
-    glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, m_brdfLUT);
+    // Bind IBL textures to standard slots
+    m_rhi->bindTexture(m_irradianceMap, 3);
+    m_rhi->bindTexture(m_prefilterMap, 4);
+    m_rhi->bindTexture(m_brdfLUT, 5);
 }
 
 void IBLSystem::setupCube()
 {
-    GLuint cubeVBO;
-    glGenVertexArrays(1, &m_cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    
-    glBindVertexArray(m_cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-    
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    
-    glBindVertexArray(0);
+    using namespace glint3d;
+
+    // Create vertex buffer for cube
+    BufferDesc bufferDesc{};
+    bufferDesc.type = BufferType::Vertex;
+    bufferDesc.usage = BufferUsage::Static;
+    bufferDesc.size = sizeof(cubeVertices);
+    bufferDesc.initialData = cubeVertices;
+    m_cubeBuffer = m_rhi->createBuffer(bufferDesc);
+
+    // Create pipeline for cube rendering (used for environment map conversion)
+    PipelineDesc pipelineDesc{};
+    pipelineDesc.shader = m_equirectToCubemapShader;
+    pipelineDesc.debugName = "IBL_CubePipeline";
+
+    // Vertex attribute: location 0, binding 0, RGB32F (3 floats), offset 0
+    VertexAttribute posAttr{};
+    posAttr.location = 0;
+    posAttr.binding = 0;
+    posAttr.format = TextureFormat::RGB32F;
+    posAttr.offset = 0;
+    pipelineDesc.vertexAttributes.push_back(posAttr);
+
+    // Vertex binding: binding 0, stride 3 floats, per-vertex
+    VertexBinding binding{};
+    binding.binding = 0;
+    binding.stride = 3 * sizeof(float);
+    binding.perInstance = false;
+    binding.buffer = m_cubeBuffer;
+    pipelineDesc.vertexBindings.push_back(binding);
+
+    pipelineDesc.topology = PrimitiveTopology::Triangles;
+    pipelineDesc.depthTestEnable = true;
+    pipelineDesc.depthWriteEnable = true;
+
+    m_cubePipeline = m_rhi->createPipeline(pipelineDesc);
 }
 
 void IBLSystem::setupQuad()
 {
-    GLuint quadVBO;
-    glGenVertexArrays(1, &m_quadVAO);
-    glGenBuffers(1, &quadVBO);
-    
-    glBindVertexArray(m_quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-    
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    
-    glBindVertexArray(0);
+    using namespace glint3d;
+
+    // Create vertex buffer for quad
+    BufferDesc bufferDesc{};
+    bufferDesc.type = BufferType::Vertex;
+    bufferDesc.usage = BufferUsage::Static;
+    bufferDesc.size = sizeof(quadVertices);
+    bufferDesc.initialData = quadVertices;
+    m_quadBuffer = m_rhi->createBuffer(bufferDesc);
+
+    // Create pipeline for quad rendering (BRDF LUT)
+    PipelineDesc pipelineDesc{};
+    pipelineDesc.shader = m_brdfShader;
+
+    // Vertex attribute 0: position (RGB32F - 3 floats)
+    VertexAttribute posAttr{};
+    posAttr.location = 0;
+    posAttr.binding = 0;
+    posAttr.format = TextureFormat::RGB32F;
+    posAttr.offset = 0;
+    pipelineDesc.vertexAttributes.push_back(posAttr);
+
+    // Vertex attribute 1: texcoord (RG32F - 2 floats)
+    VertexAttribute texAttr{};
+    texAttr.location = 1;
+    texAttr.binding = 0;
+    texAttr.format = TextureFormat::RG32F;
+    texAttr.offset = 3 * sizeof(float);
+    pipelineDesc.vertexAttributes.push_back(texAttr);
+
+    // Vertex binding: binding 0, stride 5 floats, per-vertex
+    VertexBinding binding{};
+    binding.binding = 0;
+    binding.stride = 5 * sizeof(float);
+    binding.perInstance = false;
+    pipelineDesc.vertexBindings.push_back(binding);
+
+    pipelineDesc.topology = PrimitiveTopology::TriangleStrip;
+    pipelineDesc.depthTestEnable = false;
+    pipelineDesc.depthWriteEnable = false;
+
+    m_quadPipeline = m_rhi->createPipeline(pipelineDesc);
 }
 
 void IBLSystem::renderCube()
 {
-    glBindVertexArray(m_cubeVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
+    using namespace glint3d;
+
+    DrawDesc drawDesc{};
+    drawDesc.pipeline = m_cubePipeline;
+    drawDesc.vertexBuffer = m_cubeBuffer;
+    drawDesc.vertexCount = 36;
+
+    m_rhi->draw(drawDesc);
 }
 
 void IBLSystem::renderQuad()
 {
-    glBindVertexArray(m_quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
+    using namespace glint3d;
+
+    DrawDesc drawDesc{};
+    drawDesc.pipeline = m_quadPipeline;
+    drawDesc.vertexBuffer = m_quadBuffer;
+    drawDesc.vertexCount = 4;
+
+    m_rhi->draw(drawDesc);
 }
 
 void IBLSystem::cleanup()
 {
-    if (m_environmentMap != 0) {
-        glDeleteTextures(1, &m_environmentMap);
-        m_environmentMap = 0;
+    using namespace glint3d;
+
+    if (!m_rhi) return;
+
+    // Destroy textures
+    if (m_environmentMap != INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_environmentMap);
+        m_environmentMap = INVALID_HANDLE;
     }
-    if (m_irradianceMap != 0) {
-        glDeleteTextures(1, &m_irradianceMap);
-        m_irradianceMap = 0;
+    if (m_irradianceMap != INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_irradianceMap);
+        m_irradianceMap = INVALID_HANDLE;
     }
-    if (m_prefilterMap != 0) {
-        glDeleteTextures(1, &m_prefilterMap);
-        m_prefilterMap = 0;
+    if (m_prefilterMap != INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_prefilterMap);
+        m_prefilterMap = INVALID_HANDLE;
     }
-    if (m_brdfLUT != 0) {
-        glDeleteTextures(1, &m_brdfLUT);
-        m_brdfLUT = 0;
+    if (m_brdfLUT != INVALID_HANDLE) {
+        m_rhi->destroyTexture(m_brdfLUT);
+        m_brdfLUT = INVALID_HANDLE;
     }
-    if (m_captureFramebuffer != 0) {
-        glDeleteFramebuffers(1, &m_captureFramebuffer);
-        m_captureFramebuffer = 0;
+
+    // Note: Legacy capture framebuffer removed - no longer needed with on-demand render targets
+
+    // Destroy buffers
+    if (m_cubeBuffer != INVALID_HANDLE) {
+        m_rhi->destroyBuffer(m_cubeBuffer);
+        m_cubeBuffer = INVALID_HANDLE;
     }
-    if (m_captureRenderbuffer != 0) {
-        glDeleteRenderbuffers(1, &m_captureRenderbuffer);
-        m_captureRenderbuffer = 0;
+    if (m_quadBuffer != INVALID_HANDLE) {
+        m_rhi->destroyBuffer(m_quadBuffer);
+        m_quadBuffer = INVALID_HANDLE;
     }
-    if (m_cubeVAO != 0) {
-        glDeleteVertexArrays(1, &m_cubeVAO);
-        m_cubeVAO = 0;
+
+    // Destroy pipelines
+    if (m_cubePipeline != INVALID_HANDLE) {
+        m_rhi->destroyPipeline(m_cubePipeline);
+        m_cubePipeline = INVALID_HANDLE;
     }
-    if (m_quadVAO != 0) {
-        glDeleteVertexArrays(1, &m_quadVAO);
-        m_quadVAO = 0;
+    if (m_quadPipeline != INVALID_HANDLE) {
+        m_rhi->destroyPipeline(m_quadPipeline);
+        m_quadPipeline = INVALID_HANDLE;
     }
-    
-    delete m_equirectToCubemapShader;
-    delete m_irradianceShader;
-    delete m_prefilterShader;
-    delete m_brdfShader;
-    
-    m_equirectToCubemapShader = nullptr;
-    m_irradianceShader = nullptr;
-    m_prefilterShader = nullptr;
-    m_brdfShader = nullptr;
-    
+
+    // Destroy shaders
+    if (m_equirectToCubemapShader != INVALID_HANDLE) {
+        m_rhi->destroyShader(m_equirectToCubemapShader);
+        m_equirectToCubemapShader = INVALID_HANDLE;
+    }
+    if (m_irradianceShader != INVALID_HANDLE) {
+        m_rhi->destroyShader(m_irradianceShader);
+        m_irradianceShader = INVALID_HANDLE;
+    }
+    if (m_prefilterShader != INVALID_HANDLE) {
+        m_rhi->destroyShader(m_prefilterShader);
+        m_prefilterShader = INVALID_HANDLE;
+    }
+    if (m_brdfShader != INVALID_HANDLE) {
+        m_rhi->destroyShader(m_brdfShader);
+        m_brdfShader = INVALID_HANDLE;
+    }
+
     m_initialized = false;
 }

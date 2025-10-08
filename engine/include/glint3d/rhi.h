@@ -185,6 +185,15 @@ public:
                               int x = 0, int y = 0, int mipLevel = 0) = 0;
 
     /**
+     * @brief Generate mipmaps for a texture
+     * @param texture Texture handle (must have been created with mipLevels > 1)
+     *
+     * Automatically generates mipmap chain from the base level (mip 0).
+     * Supports both 2D textures and cubemaps.
+     */
+    virtual void generateMipmaps(TextureHandle texture) = 0;
+
+    /**
      * @brief Bind a render target for subsequent draw commands
      * @param renderTarget Render target handle, or INVALID_HANDLE for default framebuffer
      */

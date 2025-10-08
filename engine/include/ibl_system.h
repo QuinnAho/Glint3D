@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gl_platform.h"
+#include "glint3d/rhi.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
@@ -11,8 +11,8 @@ class IBLSystem {
 public:
     IBLSystem();
     ~IBLSystem();
-    
-    bool init();
+
+    bool init(glint3d::RHI* rhi);
     bool loadHDREnvironment(const std::string& hdrPath);
     
     void generateIrradianceMap();
@@ -24,33 +24,45 @@ public:
     void setIntensity(float intensity) { m_intensity = intensity; }
     float getIntensity() const { return m_intensity; }
     
-    GLuint getEnvironmentMap() const { return m_environmentMap; }
-    GLuint getIrradianceMap() const { return m_irradianceMap; }
-    GLuint getPrefilterMap() const { return m_prefilterMap; }
-    GLuint getBRDFLUT() const { return m_brdfLUT; }
+    glint3d::TextureHandle getEnvironmentMap() const { return m_environmentMap; }
+    glint3d::TextureHandle getIrradianceMap() const { return m_irradianceMap; }
+    glint3d::TextureHandle getPrefilterMap() const { return m_prefilterMap; }
+    glint3d::TextureHandle getBRDFLUT() const { return m_brdfLUT; }
     
     void cleanup();
 
 private:
+    // RHI pointer
+    glint3d::RHI* m_rhi;
+
     // Textures
-    GLuint m_environmentMap;
-    GLuint m_irradianceMap;
-    GLuint m_prefilterMap;
-    GLuint m_brdfLUT;
-    
-    // Framebuffers and renderbuffers for convolution
-    GLuint m_captureFramebuffer;
-    GLuint m_captureRenderbuffer;
-    
-    // Shaders
-    Shader* m_equirectToCubemapShader;
-    Shader* m_irradianceShader;
-    Shader* m_prefilterShader;
-    Shader* m_brdfShader;
-    
-    // Cube for rendering
-    GLuint m_cubeVAO;
-    GLuint m_quadVAO;
+    glint3d::TextureHandle m_environmentMap;
+    glint3d::TextureHandle m_irradianceMap;
+    glint3d::TextureHandle m_prefilterMap;
+    glint3d::TextureHandle m_brdfLUT;
+
+    // Render target for convolution
+    glint3d::RenderTargetHandle m_captureFramebuffer;
+
+    // Shaders (RHI handles)
+    glint3d::ShaderHandle m_equirectToCubemapShader;
+    glint3d::ShaderHandle m_irradianceShader;
+    glint3d::ShaderHandle m_prefilterShader;
+    glint3d::ShaderHandle m_brdfShader;
+
+    // Legacy shader pointers (TODO[Phase 3]: Remove when IBL generation migrated)
+    Shader* m_equirectToCubemapShaderLegacy;
+    Shader* m_irradianceShaderLegacy;
+    Shader* m_prefilterShaderLegacy;
+    Shader* m_brdfShaderLegacy;
+
+    // Geometry buffers
+    glint3d::BufferHandle m_cubeBuffer;
+    glint3d::BufferHandle m_quadBuffer;
+
+    // Render pipelines
+    glint3d::PipelineHandle m_cubePipeline;
+    glint3d::PipelineHandle m_quadPipeline;
     
     float m_intensity;
     bool m_initialized;
@@ -58,7 +70,7 @@ private:
     void setupCube();
     void setupQuad();
     void createShaders();
-    GLuint loadHDRTexture(const std::string& path);
+    glint3d::TextureHandle loadHDRTexture(const std::string& path);
     void renderCube();
     void renderQuad();
 };

@@ -85,9 +85,8 @@ bool ApplicationCore::init(const std::string& windowTitle, int width, int height
     m_renderer->setGizmoLocalSpace(m_gizmoLocal);
     // Initialize light indicator visuals (shader + geometry)
     if (m_lights) {
-        m_lights->initIndicator();
-        if (!m_lights->initIndicatorShader()) {
-            std::cerr << "Failed to initialize light indicator shader\n";
+        if (auto* rhi = m_renderer->getRHI()) {
+            m_lights->initIndicator(rhi);
         }
     }
     
@@ -160,8 +159,11 @@ void ApplicationCore::frame()
         m_renderer->updateViewMatrix();
         m_renderer->updateProjectionMatrix(m_windowWidth, m_windowHeight);
         
-        // Clear and render scene
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Clear and render scene (RHI required - initialized in init())
+        auto* rhi = m_renderer->getRHI();
+        if (rhi) {
+            rhi->clear(glm::vec4(0.1f, 0.1f, 0.1f, 1.0f), 1.0f, 0);
+        }
         m_renderer->renderUnified(*m_scene, *m_lights);
         
         // Render UI
@@ -512,8 +514,13 @@ void ApplicationCore::handleFramebufferResize(int width, int height)
     
     m_windowWidth = width;
     m_windowHeight = height;
-    glViewport(0, 0, width, height);
-    
+
+    // Update viewport via RHI (initialized in init())
+    auto* rhi = m_renderer->getRHI();
+    if (rhi) {
+        rhi->setViewport(0, 0, width, height);
+    }
+
     m_renderer->updateProjectionMatrix(width, height);
     
     if (m_uiBridge) {

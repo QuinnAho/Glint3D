@@ -1,0 +1,66 @@
+{
+  "id": "rhi_cleanup",
+  "title": "RHI Architecture Cleanup and Manager-Centric Design",
+  "owner": "rhi_abstraction_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/src/rhi/rhi_gl.cpp (pipeline state management)",
+      "engine/include/rhi/rhi_gl.h",
+      "engine/src/managers/pipeline_manager.cpp",
+      "engine/src/render_system.cpp (manager integration)"
+    ],
+    "schema_version": "rhi_v1",
+    "prerequisite_tasks": ["opengl_migration"]
+  },
+  "outputs": {
+    "artifacts": [
+      "GLPipelineStateCache for redundant state elimination",
+      "GLPipelineManager module for VAO/state separation",
+      "GLUniformRing helper for uniform buffer allocation",
+      "Material-driven pipeline creation via PipelineManager",
+      "Manager-centric draw flow with command encoders"
+    ],
+    "events": [
+      "state_cache_implemented",
+      "pipeline_manager_extracted",
+      "uniform_ring_separated",
+      "material_pipeline_integration",
+      "manager_draw_flow_complete"
+    ]
+  },
+  "acceptance": [
+    "RhiGL::draw() only emits GL calls when pipeline state actually changes",
+    "PipelineManager creates material-aware pipelines with proper transparency/blending",
+    "Pipeline cache keys include material traits (transparent/opaque)",
+    "All uniform updates go through manager APIs, not direct RHI calls",
+    "Render passes use command encoder pattern for backend isolation",
+    "Legacy setUniform* helpers removed from RhiGL"
+  ],
+  "safety": {
+    "rate_limits": ["max_build_attempts_10_per_hour"],
+    "sandbox": false
+  },
+  "dependencies": ["opengl_migration"],
+  "seed_policy": "not_applicable",
+  "phases": [
+    {
+      "name": "rhi_internals",
+      "description": "Refactor RhiGL internals for state caching and modular helpers",
+      "estimated_loc": 500,
+      "deliverables": ["GLPipelineStateCache", "GLPipelineManager", "GLUniformRing"]
+    },
+    {
+      "name": "pipeline_consistency",
+      "description": "Unify pipeline creation with material-driven state",
+      "estimated_loc": 300,
+      "deliverables": ["Material-aware pipeline creation", "Cache key with material traits", "Pipeline invalidation API"]
+    },
+    {
+      "name": "manager_draw_flow",
+      "description": "Migrate to manager-centric uniform/texture binding",
+      "estimated_loc": 400,
+      "deliverables": ["Manager-based uniform writes", "TextureBinder helper", "Command encoder prototype"]
+    }
+  ]
+}

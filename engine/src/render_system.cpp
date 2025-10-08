@@ -69,6 +69,18 @@ void RenderSystem::ensureObjectPipeline(SceneObject& obj, bool usePbr)
     pd.shader = m_pbrShaderRhi; // Always use PBR shader
     pd.debugName = obj.name + ":pipeline_pbr";
 
+    // Configure blending for transparent/transmissive materials
+    float transmission = obj.materialCore.transmission;
+    bool needsBlending = (transmission > 0.01f || obj.materialCore.baseColor.a < 0.999f);
+    if (needsBlending) {
+        pd.blendEnable = true;
+        pd.srcColorBlendFactor = BlendFactor::SrcAlpha;
+        pd.dstColorBlendFactor = BlendFactor::OneMinusSrcAlpha;
+        pd.srcAlphaBlendFactor = BlendFactor::One;
+        pd.dstAlphaBlendFactor = BlendFactor::OneMinusSrcAlpha;
+        pd.depthWriteEnable = false; // Disable depth writes for transparency
+    }
+
     VertexBinding bPos{}; bPos.binding = 0; bPos.stride = 3 * sizeof(float); bPos.buffer = obj.rhiVboPositions; pd.vertexBindings.push_back(bPos);
     if (hasNormals) { VertexBinding bN{}; bN.binding = 1; bN.stride = 3 * sizeof(float); bN.buffer = obj.rhiVboNormals; pd.vertexBindings.push_back(bN); }
     if (hasUVs) { VertexBinding bUV{}; bUV.binding = 2; bUV.stride = 2 * sizeof(float); bUV.buffer = obj.rhiVboTexCoords; pd.vertexBindings.push_back(bUV); }
@@ -186,17 +198,13 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     if (m_rhi) {
         Texture::setRHI(m_rhi.get());
         Shader::setRHI(m_rhi.get()); // Route shader uniforms through RHI
-        Gizmo::setRHI(m_rhi.get()); // Route gizmo uniforms through RHI
-        AxisRenderer::setRHI(m_rhi.get()); // Route axis renderer uniforms through RHI
-        Grid::setRHI(m_rhi.get()); // Route grid uniforms through RHI
-        Skybox::setRHI(m_rhi.get()); // Route skybox uniforms through RHI
     }
 
     // Init helpers
-    if (m_grid) m_grid->init(m_gridShader.get(), 200, 1.0f);
-    if (m_axisRenderer) m_axisRenderer->init();
-    if (m_skybox) m_skybox->init();
-    if (m_iblSystem) m_iblSystem->init();
+    if (m_grid) m_grid->init(m_rhi.get(), m_gridShader.get(), 200, 1.0f);
+    if (m_axisRenderer) m_axisRenderer->init(m_rhi.get());
+    if (m_skybox) m_skybox->init(m_rhi.get());
+    if (m_iblSystem) m_iblSystem->init(m_rhi.get());
     
     // Create shaders via RHI and minimal pipelines for fallback
     if (m_rhi) {
@@ -225,7 +233,7 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
         initScreenQuad();
         initRaytraceTexture();
     }
-    if (m_gizmo) m_gizmo->init();
+    if (m_gizmo) m_gizmo->init(m_rhi.get());
 
     // Create a 1x1 depth texture as a dummy shadow map to satisfy shaders
     float depthOne = 1.0f;
@@ -316,8 +324,7 @@ void RenderSystem::render(const SceneManager& scene, const Light& lights)
 void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
 {
     if (!m_rhi || !m_pipelineSelector) {
-        // Fallback to legacy if render graphs not initialized
-        renderLegacy(scene, lights);
+        std::cerr << "[RenderSystem] ERROR: RHI or pipeline selector not initialized. Cannot render." << std::endl;
         return;
     }
 
@@ -344,8 +351,7 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
     // Get the active render graph
     RenderGraph* graph = getActiveGraph(mode);
     if (!graph) {
-        std::cerr << "[RenderSystem] No render graph available for mode " << (int)mode << std::endl;
-        renderLegacy(scene, lights);
+        std::cerr << "[RenderSystem] ERROR: No render graph available for mode " << (int)mode << std::endl;
         return;
     }
 
@@ -365,16 +371,9 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
     // Camera and viewport
     ctx.viewMatrix = m_cameraManager.viewMatrix();
     ctx.projMatrix = m_cameraManager.projectionMatrix();
-    if (m_rhi) {
-        // Use tracked framebuffer dimensions when RHI available
-        ctx.viewportWidth = m_fbWidth;
-        ctx.viewportHeight = m_fbHeight;
-    } else {
-        GLint vp[4];
-        glGetIntegerv(GL_VIEWPORT, vp);
-        ctx.viewportWidth = vp[2];
-        ctx.viewportHeight = vp[3];
-    }
+    // Use tracked framebuffer dimensions (RHI is required for renderUnified)
+    ctx.viewportWidth = m_fbWidth;
+    ctx.viewportHeight = m_fbHeight;
 
     // Frame state
     ctx.frameIndex = ++m_frameCounter;
@@ -386,8 +385,7 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
 
     // Setup render graph if needed
     if (!graph->setup(ctx)) {
-        std::cerr << "[RenderSystem] Failed to setup render graph" << std::endl;
-        renderLegacy(scene, lights);
+        std::cerr << "[RenderSystem] ERROR: Failed to setup render graph" << std::endl;
         return;
     }
 
@@ -397,219 +395,15 @@ void RenderSystem::renderUnified(const SceneManager& scene, const Light& lights)
     m_rhi->endFrame();
 }
 
-void RenderSystem::renderLegacy(const SceneManager& scene, const Light& lights)
-{
-    // Reset per-frame stats counters
-    m_stats = {};
-
-    // Update uniform blocks using managers (FEAT-0249)
-    m_transformManager.updateTransforms(glm::mat4(1.0f), m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
-    m_lightingManager.updateLighting(lights, m_cameraManager.camera().position);
-    // Material updates are per-object, handled in rendering loops
-    m_renderingManager.updateRenderingState(m_exposure, m_gamma, m_tonemap, m_shadingMode, m_iblSystem.get());
-
-    // Bind uniform blocks to their binding points (FEAT-0249)
-    bindUniformBlocks();
-
-    // Optimize clear operations - only set GL clear color if RHI unavailable
-    if (!m_rhi) {
-        static glm::vec3 lastBgColor{-1.0f};
-        if (lastBgColor != m_backgroundColor) {
-            glClearColor(m_backgroundColor.r, m_backgroundColor.g, m_backgroundColor.b, 1.0f);
-            lastBgColor = m_backgroundColor;
-        }
-    }
-    // Recreate MSAA targets if viewport changed or flagged
-    GLint vp[4] = {0,0,0,0};
-    glGetIntegerv(GL_VIEWPORT, vp);
-    if (vp[2] != m_fbWidth || vp[3] != m_fbHeight) {
-        m_fbWidth = vp[2];
-        m_fbHeight = vp[3];
-        m_recreateTargets = true;
-    }
-    if (m_recreateTargets) {
-        createOrResizeTargets(m_fbWidth, m_fbHeight);
-        if (m_rhi) m_rhi->setViewport(0, 0, m_fbWidth, m_fbHeight);
-        m_recreateTargets = false;
-    }
-    // Begin RHI frame
-    if (m_rhi) m_rhi->beginFrame();
-
-    // Bind target for rendering
-    if (m_samples > 1 && m_rhi && m_msaaRenderTarget != INVALID_HANDLE) {
-        m_rhi->bindRenderTarget(m_msaaRenderTarget);
-    } else {
-        // Bind default framebuffer (RHI handles null render target as default)
-        if (m_rhi) m_rhi->bindRenderTarget(INVALID_HANDLE);
-        else glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-    // Use RHI for clearing (RHI should always be initialized at this point)
-    if (m_rhi) {
-        m_rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
-    } else {
-        // Fallback for edge cases where RHI failed to initialize
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-
-    // If using gradient background and no skybox, draw full-screen gradient
-    if (m_bgMode == BackgroundMode::Gradient && !m_showSkybox && m_gradientShader) {
-        if (!m_screenQuadVAO) {
-            initScreenQuad();
-        }
-        glDisable(GL_DEPTH_TEST);
-        m_gradientShader->use();
-        m_gradientShader->setVec3("topColor", m_bgTop);
-        m_gradientShader->setVec3("bottomColor", m_bgBottom);
-        glBindVertexArray(m_screenQuadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-        glEnable(GL_DEPTH_TEST);
-        // counts as one draw call
-        m_stats.drawCalls += 1;
-    }
-    
-    // If using HDR background mode, render environment map as skybox background
-    if (m_bgMode == BackgroundMode::HDR && !m_showSkybox && m_iblSystem) {
-        GLuint envMap = m_iblSystem->getEnvironmentMap();
-        if (envMap != 0 && m_skybox) {
-            // Use the IBL environment map as the skybox texture
-            m_skybox->setEnvironmentMap(envMap);
-            m_skybox->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
-            // counts as one draw call
-            m_stats.drawCalls += 1;
-        }
-    }
-    
-    // Choose render path based on mode
-    switch (m_renderMode) {
-        case RenderMode::Raytrace:
-            renderRaytraced(scene, lights);
-            break;
-        default:
-            renderRasterized(scene, lights);
-            break;
-    }
-    
-    // Batch debug element rendering for fewer state changes
-    renderDebugElements(scene, lights);
-
-    // Selection outline for currently selected object (wireframe overlay)
-    {
-        int selObj = scene.getSelectedObjectIndex();
-        const auto& objs = scene.getObjects();
-        if (selObj >= 0 && selObj < (int)objs.size() && m_pbrShader) {
-            const auto& obj = objs[selObj];
-            if (obj.rhiVboPositions != INVALID_HANDLE) {
-                Shader* s = m_pbrShader.get(); // Always use PBR shader
-                if (m_rhi) {
-                    ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
-                    // FEAT-0249: Use UBO system for structured data
-
-                    // Update transform UBO with object-specific data
-                    // Update transform for this object
-                    m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
-
-                    // TODO: Add special overlay lighting/material mode to managers
-                    // For now, selection overlay lighting will use current scene lighting
-
-                    // Non-UBO uniforms: only texture bindings
-                    if (m_rhi) {
-                        // Texture binding
-                        if (s_dummyShadowTexRhi != 0) {
-                            m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-                            m_rhi->setUniformInt("shadowMap", 7);
-                        }
-                    }
-                }
-
-                // Draw as wireframe overlay with slight depth bias to reduce z-fighting
-#ifndef __EMSCRIPTEN__
-                GLint prevPolyMode[2];
-                glGetIntegerv(GL_POLYGON_MODE, prevPolyMode);
-                glEnable(GL_POLYGON_OFFSET_LINE);
-                glPolygonOffset(-1.0f, -1.0f);
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                glLineWidth(1.5f);
-#endif
-                if (m_rhi && ((obj.rhiPipelineBasic != INVALID_HANDLE) || m_basicPipeline != INVALID_HANDLE)) {
-                    DrawDesc dd{};
-                    dd.pipeline = (obj.rhiPipelineBasic != INVALID_HANDLE) ? obj.rhiPipelineBasic : m_basicPipeline;
-                    bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
-                    if (hasIndex) {
-                        dd.indexBuffer = obj.rhiEbo;
-                        dd.indexCount = obj.objLoader.getIndexCount();
-                    } else {
-                        dd.vertexCount = obj.objLoader.getVertCount();
-                    }
-                    m_rhi->draw(dd);
-                } else {
-                    // TODO: Bind RHI vertex buffers and pipeline instead of legacy VAO
-                    if (obj.rhiEbo != INVALID_HANDLE) {
-                        glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
-                    } else {
-                        glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
-                    }
-                    glBindVertexArray(0);
-                }
-                // Selection overlay adds an extra draw call
-                m_stats.drawCalls += 1;
-#ifndef __EMSCRIPTEN__
-                glPolygonMode(GL_FRONT_AND_BACK, prevPolyMode[0]);
-                glDisable(GL_POLYGON_OFFSET_LINE);
-#endif
-            }
-        }
-    }
-
-    // Draw gizmo at selected object's or light's center
-    if (m_gizmo) {
-        int selObj = -1;
-        const auto& objs = scene.getObjects();
-        // Use SceneManager selection if available
-        selObj = scene.getSelectedObjectIndex();
-        bool haveObj = (selObj >= 0 && selObj < (int)objs.size());
-        bool haveLight = (m_selectedLightIndex >= 0 && m_selectedLightIndex < (int)lights.m_lights.size());
-        if (haveObj || haveLight) {
-            glm::vec3 center(0.0f);
-            glm::mat3 R(1.0f);
-            if (haveObj) {
-                const auto& obj = objs[selObj];
-                center = glm::vec3(obj.modelMatrix[3]);
-                if (m_gizmoLocal) {
-                    glm::mat3 M3(obj.modelMatrix);
-                    R[0] = glm::normalize(glm::vec3(M3[0]));
-                    R[1] = glm::normalize(glm::vec3(M3[1]));
-                    R[2] = glm::normalize(glm::vec3(M3[2]));
-                }
-            } else {
-                center = lights.m_lights[(size_t)m_selectedLightIndex].position;
-                R = glm::mat3(1.0f); // lights are treated as world-aligned
-            }
-            float dist = glm::length(m_cameraManager.camera().position - center);
-            float gscale = glm::clamp(dist * 0.15f, 0.5f, 10.0f);
-            m_gizmo->render(m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix(), center, R, gscale, m_gizmoAxis, m_gizmoMode);
-            // Approximate draw call for gizmo
-            m_stats.drawCalls += 1;
-        }
-    }
-    
-    updateRenderStats(scene);
-
-    // Resolve MSAA render to default framebuffer if enabled
-    if (m_samples > 1 && m_rhi && m_msaaRenderTarget != INVALID_HANDLE) {
-        m_rhi->resolveToDefaultFramebuffer(m_msaaRenderTarget);
-    }
-
-    // End RHI frame
-    if (m_rhi) m_rhi->endFrame();
-}
+// renderLegacy() removed - all rendering now uses renderUnified() with RenderGraph
+// Legacy GL-based rendering path no longer supported (opengl_migration task completion)
 
 bool RenderSystem::loadSkybox(const std::string& path)
 {
     // Minimal implementation: ensure skybox is initialized and enable it.
     // If needed, future enhancement can parse `path` for cubemap faces.
     if (!m_skybox) return false;
-    if (!m_skybox->init()) return false;
+    if (!m_skybox->init(m_rhi.get())) return false;
     setShowSkybox(true);
     return true;
 }
@@ -649,235 +443,9 @@ void RenderSystem::setIBLIntensity(float intensity)
     }
 }
 
-bool RenderSystem::renderToTexture(const SceneManager& scene, const Light& lights,
-                                  GLuint textureId, int width, int height)
-{
-    // TODO[FEAT-0253]: Legacy GL FBO path
-    // This function renders to a provided GL texture via direct FBO operations.
-    // It predates the RHI offscreen API and remains as a compatibility layer
-    // for call sites that provide a raw GLuint texture. Once call sites migrate
-    // to RHI textures + RenderTarget, replace this implementation with an RHI
-    // render path and delete the GL framebuffer code below.
-    std::cerr << "[RenderSystem] renderToTexture called with textureId=" << textureId << ", width=" << width << ", height=" << height << std::endl;
-    if (textureId == 0 || width <= 0 || height <= 0) {
-        std::cerr << "[RenderSystem] renderToTexture: invalid parameters" << std::endl;
-        return false;
-    }
-
-    // Preserve current framebuffer and viewport
-    GLint prevFBO = 0;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
-    GLint prevViewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    // Use offscreen aspect ratio; restore later
-    glm::mat4 prevProj = m_cameraManager.projectionMatrix();
-    updateProjectionMatrix(width, height);
-
-    std::cerr << "[RenderSystem] m_samples=" << m_samples << std::endl;
-    if (m_samples > 1) {
-        std::cerr << "[RenderSystem] Using MSAA path" << std::endl;
-        // TODO[FEAT-0253]: Legacy GL MSAA resolve path
-        // MSAA path: render into multisampled RBOs and resolve into provided texture.
-        // This will be replaced by RHI RenderTarget + resolve once call sites
-        // provide RHI texture handles instead of raw GL texture IDs.
-        GLuint fboMSAA = 0, rboColorMSAA = 0, rboDepthMSAA = 0;
-        GLuint fboResolve = 0;
-
-        glGenFramebuffers(1, &fboMSAA);
-        glBindFramebuffer(GL_FRAMEBUFFER, fboMSAA);
-
-        glGenRenderbuffers(1, &rboColorMSAA);
-        glBindRenderbuffer(GL_RENDERBUFFER, rboColorMSAA);
-        glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_RGBA8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rboColorMSAA);
-
-        glGenRenderbuffers(1, &rboDepthMSAA);
-        glBindRenderbuffer(GL_RENDERBUFFER, rboDepthMSAA);
-#ifndef __EMSCRIPTEN__
-        glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboDepthMSAA);
-#else
-        glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_samples, GL_DEPTH_COMPONENT16, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepthMSAA);
-#endif
-
-        GLenum fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        if (fboStatus != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "[RenderSystem] MSAA framebuffer not complete: 0x" << std::hex << fboStatus << std::dec << std::endl;
-            glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-            if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
-            if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
-            if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
-            m_cameraManager.setProjectionMatrix(prevProj);
-            // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-            return false;
-        }
-
-        // Render to MSAA framebuffer - use RHI for viewport and clear
-        if (m_rhi) {
-            m_rhi->setViewport(0, 0, width, height);
-            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
-        } else {
-            glViewport(0, 0, width, height);
-            glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        }
-
-        if (m_renderMode == RenderMode::Raytrace) {
-            renderRaytraced(scene, lights);
-        } else {
-            renderRasterized(scene, lights);
-        }
-
-        // Create resolve framebuffer with provided texture
-        glGenFramebuffers(1, &fboResolve);
-        glBindFramebuffer(GL_FRAMEBUFFER, fboResolve);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-#ifndef __EMSCRIPTEN__
-        const GLenum drawBufsR[1] = { GL_COLOR_ATTACHMENT0 };
-        glDrawBuffers(1, drawBufsR);
-#endif
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-            if (fboResolve) glDeleteFramebuffers(1, &fboResolve);
-            if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
-            if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
-            if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
-            m_cameraManager.setProjectionMatrix(prevProj);
-            // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-            return false;
-        }
-
-        // Resolve
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, fboMSAA);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboResolve);
-        glBlitFramebuffer(0, 0, width, height,
-                          0, 0, width, height,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-        // Cleanup and restore
-        glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-        if (fboResolve) glDeleteFramebuffers(1, &fboResolve);
-        if (rboColorMSAA) glDeleteRenderbuffers(1, &rboColorMSAA);
-        if (rboDepthMSAA) glDeleteRenderbuffers(1, &rboDepthMSAA);
-        if (fboMSAA) glDeleteFramebuffers(1, &fboMSAA);
-
-        m_cameraManager.setProjectionMatrix(prevProj);
-        // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-        return true;
-    } else {
-        std::cerr << "[RenderSystem] Using non-MSAA path" << std::endl;
-        // TODO[FEAT-0253]: Legacy GL single-sample path (previous behavior)
-        // Replace with RHI RenderTarget when callers migrate off raw GL texture IDs.
-        // Create FBO
-        GLuint fbo = 0;
-        glGenFramebuffers(1, &fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-        // Attach provided color texture
-        std::cerr << "[RenderSystem] Attaching color texture " << textureId << " to FBO" << std::endl;
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-#ifndef __EMSCRIPTEN__
-        const GLenum drawBufs[1] = { GL_COLOR_ATTACHMENT0 };
-        glDrawBuffers(1, drawBufs);
-#endif
-
-        // Create and attach depth (and stencil if available) renderbuffer
-        GLuint rboDepth = 0;
-        glGenRenderbuffers(1, &rboDepth);
-        glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-        // Try different depth formats for maximum compatibility
-        bool depthAttached = false;
-        
-        // Try GL_DEPTH_COMPONENT24 first (desktop preferred)
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
-            depthAttached = true;
-        }
-        
-        // Fallback to GL_DEPTH_COMPONENT16 if 24-bit failed
-        if (!depthAttached) {
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
-                depthAttached = true;
-            }
-        }
-        
-        // Final fallback: try without depth buffer
-        if (!depthAttached) {
-            std::cerr << "[RenderSystem] Warning: Unable to attach depth buffer, proceeding without depth testing" << std::endl;
-            glDeleteRenderbuffers(1, &rboDepth);
-            rboDepth = 0;
-        }
-
-        // Validate
-        GLenum fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        if (fboStatus != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "[RenderSystem] Non-MSAA framebuffer not complete: 0x" << std::hex << fboStatus << std::dec << std::endl;
-            glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-            if (rboDepth != 0) glDeleteRenderbuffers(1, &rboDepth);
-            if (fbo != 0) glDeleteFramebuffers(1, &fbo);
-            m_cameraManager.setProjectionMatrix(prevProj);
-            // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-            return false;
-        }
-
-        // Set viewport and clear - use RHI when available
-        if (m_rhi) {
-            m_rhi->setViewport(0, 0, width, height);
-            m_rhi->clear(glm::vec4(0.10f, 0.11f, 0.12f, 1.0f), 1.0f, 0);
-        } else {
-            glViewport(0, 0, width, height);
-            glClearColor(0.10f, 0.11f, 0.12f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        }
-
-        // Render scene using current mode
-        if (m_renderMode == RenderMode::Raytrace) {
-            renderRaytraced(scene, lights);
-        } else {
-            renderRasterized(scene, lights);
-        }
-
-        // Restore projection, framebuffer and viewport
-        m_cameraManager.setProjectionMatrix(prevProj);
-        glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
-        // Restore viewport via RHI
-            if (m_rhi) {
-                m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            } else {
-                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-            }
-
-        // Cleanup
-        glDeleteRenderbuffers(1, &rboDepth);
-        glDeleteFramebuffers(1, &fbo);
-        return true;
-    }
-}
+// renderToTexture() REMOVED (FEAT-0253 completion - opengl_migration task)
+// Legacy GL FBO-based rendering path with 69 GL calls eliminated
+// Use renderToTextureRHI() instead for all offscreen rendering
 
 bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
                                const std::string& path, int width, int height)
@@ -889,16 +457,14 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
 #else
     if (width <= 0 || height <= 0) return false;
 
-    // Save current viewport for restoration (use RHI for this since it's offscreen)
-    // Note: renderToPNG is an offscreen operation and shouldn't affect main framebuffer
-    GLint prevViewport[4] = {0, 0, 0, 0};
+    // RHI is required for offscreen rendering
     if (!m_rhi) {
-        // Only query GL viewport if no RHI available
-        glGetIntegerv(GL_VIEWPORT, prevViewport);
+        std::cerr << "[RenderSystem] renderToPNG requires RHI initialization\n";
+        return false;
     }
 
-    // RHI-first path: render using the new RHI overload, then readback
-    if (m_rhi) {
+    // RHI path: render using renderToTextureRHI, then readback
+    {
         TextureHandle colorTexHandle = INVALID_HANDLE;
         TextureDesc td{};
         td.type = TextureType::Texture2D;
@@ -987,13 +553,6 @@ bool RenderSystem::renderToPNG(const SceneManager& scene, const Light& lights,
     }
 
     int writeOK = stbi_write_png(path.c_str(), width, height, comp, flipped.data(), rowStride);
-
-    // Restore viewport via RHI
-    if (m_rhi) {
-        m_rhi->setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-    } else {
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-    }
 
     // Cleanup RHI texture
     m_rhi->destroyTexture(colorTexHandle);
@@ -1373,26 +932,17 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
         }
     }
 
-    // Upload raytraced image to texture
+    // Upload raytraced image to texture (RHI required)
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
-        // Use RHI to update texture data
         m_rhi->updateTexture(m_raytraceTextureRhi, raytraceBuffer.data(),
                            m_raytraceWidth, m_raytraceHeight, TextureFormat::RGB32F);
-    } else {
-        // GL fallback path
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
-                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
-        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // Clear the screen
+    // Clear the screen (RHI required)
     if (m_rhi) {
         m_rhi->clear(glm::vec4(m_backgroundColor, 1.0f), 1.0f, 0);
-    } else {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
-    glDisable(GL_DEPTH_TEST); // Disable depth testing for screen quad
+    // Note: Depth testing state managed by pipeline
     
     // Render the raytraced result using screen quad
     m_screenQuadShader->use();
@@ -1402,17 +952,12 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     m_screenQuadShader->setFloat("gamma", m_gamma);
     m_screenQuadShader->setInt("toneMappingMode", static_cast<int>(m_tonemap));
     
-    // Bind the raytraced texture
+    // Bind the raytraced texture (RHI required)
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
         m_rhi->bindTexture(m_raytraceTextureRhi, 0);
-    } else {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-    }
-    m_screenQuadShader->setInt("rayTex", 0);
-    
-    // Draw the screen quad - use RHI when available
-    if (m_rhi) {
+        m_screenQuadShader->setInt("rayTex", 0);
+
+        // Draw the screen quad using RHI
         BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
         if (screenQuadBuffer != INVALID_HANDLE) {
             DrawDesc drawDesc{};
@@ -1420,21 +965,10 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
             drawDesc.vertexCount = 6;
             drawDesc.instanceCount = 1;
             m_rhi->draw(drawDesc);
-        } else {
-            // Fallback to GL if RHI screen quad not available
-            glBindVertexArray(m_screenQuadVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            glBindVertexArray(0);
+            m_stats.drawCalls += 1;
         }
-    } else {
-        glBindVertexArray(m_screenQuadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
     }
-    // One draw call for the screen quad
-    m_stats.drawCalls += 1;
-    
-    glEnable(GL_DEPTH_TEST); // Re-enable depth testing
+    // Note: Depth testing state managed by pipeline
     
     std::cout << "[RenderSystem] Raytracing complete\n";
 }
@@ -1491,39 +1025,33 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         // Note: Post-processing uniforms now in RenderingBlock UBO
         
         int unit = 0;
-        if (obj.baseColorTex) {
+        if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
             // RHI-only texture binding
             m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
             m_rhi->setUniformInt("baseColorTex", unit);
             unit++;
         }
-        if (obj.normalTex) {
+        if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
             // RHI-only texture binding
             m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
             m_rhi->setUniformInt("normalTex", unit);
             unit++;
         }
-        if (obj.mrTex) {
+        if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
             // RHI-only texture binding
             m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
             m_rhi->setUniformInt("mrTex", unit);
         }
     }
 
-    // Lights (sets globalAmbient, lights[], numLights) - RHI only
-    // Use currently bound program (bound via ensureObjectPipeline)
-    // When using RHI, prefer UBO-based lighting over legacy uniform approach
-    if (m_rhi) {
-        // UBO-based lighting is handled by LightingManager - no GL program query needed
-        // Note: Legacy lights.applyLights() bypassed when using RHI + UBOs
-    } else {
-        GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-        if (prog) lights.applyLights(static_cast<GLuint>(prog));
-    }
+    // Lights - UBO-based lighting is handled by LightingManager
+    // No GL program query needed with RHI
 
     // Bind dummy shadow map and identity lightSpaceMatrix to avoid undefined sampling - RHI only
-    m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-    m_rhi->setUniformInt("shadowMap", 7);
+    if (s_dummyShadowTexRhi != INVALID_HANDLE) {
+        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
+        m_rhi->setUniformInt("shadowMap", 7);
+    }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
 
     if (s == m_basicShader.get()) {
@@ -1542,65 +1070,22 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
         // Material UBO now handled by MaterialManager
     }
 
-    // TODO: Replace with RHI vertex buffer binding and pipeline
+    // Polygon mode and blending handled by pipeline state in RHI
 
-    // Optimized render mode handling - cache state
-    static RenderMode lastRenderMode = static_cast<RenderMode>(-1);
-    if (m_renderMode != lastRenderMode) {
-        switch (m_renderMode) {
-            case RenderMode::Points:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-                break;
-            case RenderMode::Wireframe:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                break;
-            default:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                break;
-        }
-        lastRenderMode = m_renderMode;
-    }
-    
-    // Enable blending for transmissive materials (approx; SSR pending)
-    bool blendingEnabled = false;
-    if (s == m_pbrShader.get()) {
-        // Decide using unified MaterialCore transmission and alpha
-        float transmission = obj.materialCore.transmission;
-        if (transmission > 0.01f || obj.materialCore.baseColor.a < 0.999f) {
-            glEnable(GL_BLEND);
-            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            glDepthMask(GL_FALSE);
-            blendingEnabled = true;
-        }
-    }
-
-    // Optimized draw call
-    if (m_rhi) {
-        ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
-        DrawDesc dd{};
-        dd.pipeline = (s == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
-                                               : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
-        // Use indexed draw if either legacy GL EBO exists or RHI index buffer was created
-        bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
-        if (hasIndex) {
-            dd.indexBuffer = obj.rhiEbo;
-            dd.indexCount = obj.objLoader.getIndexCount();
-        } else {
-            dd.vertexCount = obj.objLoader.getVertCount();
-        }
-        m_rhi->draw(dd);
+    // Draw call using RHI
+    ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
+    DrawDesc dd{};
+    dd.pipeline = (s == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
+                                           : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
+    // Use indexed draw if RHI index buffer was created
+    bool hasIndex = (obj.rhiEbo != INVALID_HANDLE);
+    if (hasIndex) {
+        dd.indexBuffer = obj.rhiEbo;
+        dd.indexCount = obj.objLoader.getIndexCount();
     } else {
-        if (obj.rhiEbo != INVALID_HANDLE) {
-            glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
-        } else {
-            glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
-        }
+        dd.vertexCount = obj.objLoader.getVertCount();
     }
-
-    if (blendingEnabled) {
-        glDepthMask(GL_TRUE);
-        glDisable(GL_BLEND);
-    }
+    m_rhi->draw(dd);
 
     // Count one draw call for this object
     m_stats.drawCalls += 1;
@@ -1779,8 +1264,10 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
             // Set material useTexture flag
             // Material UBO now handled by MaterialManager
             // Force bright ambient and no direct lights
-            m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-            m_rhi->setUniformInt("shadowMap", 7);
+            if (s_dummyShadowTexRhi != INVALID_HANDLE) {
+                m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
+                m_rhi->setUniformInt("shadowMap", 7);
+            }
             // Note: lightSpaceMatrix now in TransformBlock UBO
             // Note: numLights, globalAmbient now in LightingBlock UBO
             // TODO: Add selection overlay lighting mode to LightingManager
@@ -1788,28 +1275,50 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
 
             // Note: Legacy Material uniform struct eliminated - using MaterialBlock UBO only
 
-            // Draw as wireframe overlay with slight depth bias to reduce z-fighting
-#ifndef __EMSCRIPTEN__
-            GLint prevPolyMode[2];
-            glGetIntegerv(GL_POLYGON_MODE, prevPolyMode);
-            glEnable(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-1.0f, -1.0f);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            glLineWidth(1.5f);
-#endif
-            // TODO: Replace with RHI vertex buffer binding and pipeline
-            if (obj.rhiEbo != INVALID_HANDLE) {
-                glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
-            } else {
-                glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
+            // Draw as wireframe overlay
+            if (m_rhi) {
+                // Create wireframe selection pipeline if needed
+                PipelineHandle wireframePipeline = INVALID_HANDLE;
+                auto it = m_wireframePipelines.find(&obj);
+                if (it != m_wireframePipelines.end()) {
+                    wireframePipeline = it->second;
+                } else {
+                    PipelineDesc pd{};
+                    pd.topology = PrimitiveTopology::Triangles;
+                    pd.shader = m_pbrShaderRhi;
+                    pd.debugName = obj.name + ":pipeline_wireframe";
+                    pd.polygonMode = PolygonMode::Line;
+                    pd.lineWidth = 1.5f;
+                    pd.polygonOffsetEnable = true;
+                    pd.polygonOffsetFactor = -1.0f;
+                    pd.polygonOffsetUnits = -1.0f;
+
+                    bool hasNormals = (obj.rhiVboNormals != INVALID_HANDLE);
+                    bool hasUVs = (obj.rhiVboTexCoords != INVALID_HANDLE);
+                    VertexBinding bPos{}; bPos.binding = 0; bPos.stride = 3 * sizeof(float); bPos.buffer = obj.rhiVboPositions; pd.vertexBindings.push_back(bPos);
+                    if (hasNormals) { VertexBinding bN{}; bN.binding = 1; bN.stride = 3 * sizeof(float); bN.buffer = obj.rhiVboNormals; pd.vertexBindings.push_back(bN); }
+                    if (hasUVs) { VertexBinding bUV{}; bUV.binding = 2; bUV.stride = 2 * sizeof(float); bUV.buffer = obj.rhiVboTexCoords; pd.vertexBindings.push_back(bUV); }
+
+                    VertexAttribute aPos{}; aPos.location = 0; aPos.binding = 0; aPos.format = TextureFormat::RGB32F; aPos.offset = 0; pd.vertexAttributes.push_back(aPos);
+                    if (hasNormals) { VertexAttribute aN{}; aN.location = 1; aN.binding = 1; aN.format = TextureFormat::RGB32F; aN.offset = 0; pd.vertexAttributes.push_back(aN); }
+                    if (hasUVs) { VertexAttribute aUV{}; aUV.location = 2; aUV.binding = 2; aUV.format = TextureFormat::RG32F; aUV.offset = 0; pd.vertexAttributes.push_back(aUV); }
+
+                    pd.indexBuffer = obj.rhiEbo;
+                    wireframePipeline = m_rhi->createPipeline(pd);
+                    m_wireframePipelines[&obj] = wireframePipeline;
+                }
+
+                DrawDesc dd{};
+                dd.pipeline = wireframePipeline;
+                if (obj.rhiEbo != INVALID_HANDLE) {
+                    dd.indexBuffer = obj.rhiEbo;
+                    dd.indexCount = obj.objLoader.getIndexCount();
+                } else {
+                    dd.vertexCount = obj.objLoader.getVertCount();
+                }
+                m_rhi->draw(dd);
+                m_stats.drawCalls += 1;
             }
-            glBindVertexArray(0);
-            // Selection overlay adds an extra draw call
-            m_stats.drawCalls += 1;
-#ifndef __EMSCRIPTEN__
-            glPolygonMode(GL_FRONT_AND_BACK, prevPolyMode[0]);
-            glDisable(GL_POLYGON_OFFSET_LINE);
-#endif
         }
     }
 }
@@ -1865,15 +1374,18 @@ void RenderSystem::renderObjectsBatched(const SceneManager& scene, const Light& 
     if (!pbrShaderObjects.empty() && m_pbrShader) {
         m_pbrShader->use();
         setupCommonUniforms(m_pbrShader.get());
-        // Apply lighting for this shader
-        lights.applyLights(m_pbrShader->getID());
+        // Apply lighting via LightingManager UBO (no direct GL uniforms)
+        if (m_rhi) {
+            m_lightingManager.updateLighting(lights, m_cameraManager.camera().position);
+            m_lightingManager.bindLightingUniforms();
+        }
         for (const auto* obj : pbrShaderObjects) {
             renderObjectFast(*obj, lights, m_pbrShader.get());
         }
     }
-    
-    // Reset VAO binding once at the end
-    glBindVertexArray(0);
+
+    // Reset VAO binding once at the end (RHI handles binding cleanup automatically)
+    // TODO[FEAT-0248]: Remove when all draw calls use RHI::draw() (no legacy VAO binding)
 }
 
 void RenderSystem::setupCommonUniforms(Shader* shader)
@@ -1890,8 +1402,10 @@ void RenderSystem::setupCommonUniforms(Shader* shader)
     }
     
     // Bind dummy shadow map - RHI only
-    m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-    m_rhi->setUniformInt("shadowMap", 7);
+    if (s_dummyShadowTexRhi != INVALID_HANDLE) {
+        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
+        m_rhi->setUniformInt("shadowMap", 7);
+    }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
     
     // Bind IBL textures if available - RHI only
@@ -1918,59 +1432,34 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights,
     // Note: Texture flags now in MaterialBlock UBO (set by updateMaterialUniformsForObject)
 
     int unit = 0;
-    if (obj.baseColorTex) {
+    if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
         m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
         m_rhi->setUniformInt("baseColorTex", unit);
         unit++;
     }
-    if (obj.normalTex) {
+    if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
         m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
         m_rhi->setUniformInt("normalTex", unit);
         unit++;
     }
-    if (obj.mrTex) {
+    if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
         m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
         m_rhi->setUniformInt("mrTex", unit);
     }
-    // Simple blending for transmissive materials (approx; SSR pending)
-    bool blendingEnabled = false;
-    float transmission = obj.materialCore.transmission;
-    if (transmission > 0.01f || obj.materialCore.baseColor.a < 0.999f) {
-        glEnable(GL_BLEND);
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
-        blendingEnabled = true;
-    }
-
-    // Draw call
-    if (m_rhi) {
-        DrawDesc dd{};
-        dd.pipeline = obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline; // Always use PBR pipeline
-        bool hasIndex = (obj.rhiEbo != INVALID_HANDLE) || (obj.rhiEbo != INVALID_HANDLE);
-        if (hasIndex) {
-            dd.indexBuffer = obj.rhiEbo;
-            dd.indexCount = obj.objLoader.getIndexCount();
-        } else {
-            dd.vertexCount = obj.objLoader.getVertCount();
-        }
-        m_rhi->draw(dd);
+    // Draw call using RHI
+    DrawDesc dd{};
+    dd.pipeline = obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline; // Always use PBR pipeline
+    bool hasIndex = (obj.rhiEbo != INVALID_HANDLE);
+    if (hasIndex) {
+        dd.indexBuffer = obj.rhiEbo;
+        dd.indexCount = obj.objLoader.getIndexCount();
     } else {
-        // TODO: Replace with RHI vertex buffer binding and pipeline
-        if (obj.rhiEbo != INVALID_HANDLE) {
-            glDrawElements(GL_TRIANGLES, obj.objLoader.getIndexCount(), GL_UNSIGNED_INT, 0);
-        } else {
-            glDrawArrays(GL_TRIANGLES, 0, obj.objLoader.getVertCount());
-        }
-        glBindVertexArray(0);
+        dd.vertexCount = obj.objLoader.getVertCount();
     }
-    
-    if (blendingEnabled) {
-        glDepthMask(GL_TRUE);
-        glDisable(GL_BLEND);
-    }
+    m_rhi->draw(dd);
 
     m_stats.drawCalls += 1;
 }
@@ -1995,11 +1484,6 @@ void RenderSystem::destroyTargets()
         m_rhi->destroyRenderTarget(m_msaaRenderTarget);
         m_msaaRenderTarget = INVALID_HANDLE;
     }
-
-    // Legacy GL cleanup (TODO: Remove after full migration)
-    if (m_msaaColorRBO) { glDeleteRenderbuffers(1, &m_msaaColorRBO); m_msaaColorRBO = 0; }
-    if (m_msaaDepthRBO) { glDeleteRenderbuffers(1, &m_msaaDepthRBO); m_msaaDepthRBO = 0; }
-    if (m_msaaFBO) { glDeleteFramebuffers(1, &m_msaaFBO); m_msaaFBO = 0; }
 }
 
 void RenderSystem::createOrResizeTargets(int width, int height)
@@ -2047,8 +1531,6 @@ void RenderSystem::createOrResizeTargets(int width, int height)
     std::cout << "[RenderSystem] Created RHI MSAA render target (" << width << "x" << height
               << ", " << m_samples << "x samples): " << m_msaaRenderTarget << std::endl;
 }
-
-
 
 void RenderSystem::initRenderGraphs()
 {
@@ -2215,34 +1697,24 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
         }
     }
 
-    // Upload raytraced image to texture
+    // Upload raytraced image to RHI texture
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
-        // Use RHI to update texture data
         m_rhi->updateTexture(m_raytraceTextureRhi, raytraceBuffer.data(),
                            m_raytraceWidth, m_raytraceHeight, TextureFormat::RGB32F);
-    } else {
-        glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_raytraceWidth, m_raytraceHeight,
-                        GL_RGB, GL_FLOAT, raytraceBuffer.data());
-        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // Render full-screen quad with raytraced texture
-    if (m_screenQuadVAO && m_screenQuadShader) {
+    // Render full-screen quad with raytraced texture using RHI
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE && m_screenQuadShader) {
         m_screenQuadShader->use();
         m_screenQuadShader->setInt("screenTexture", 0);
+        m_rhi->bindTexture(m_raytraceTextureRhi, 0);
 
-        // Bind raytraced texture
-        if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
-            m_rhi->bindTexture(m_raytraceTextureRhi, 0);
-        } else {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, m_raytraceTexture);
-        }
-
-        glBindVertexArray(m_screenQuadVAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        // Use RHI screen quad buffer
+        BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
+        DrawDesc dd{};
+        dd.vertexCount = 6;
+        // Note: Screen quad buffer doesn't have a dedicated pipeline; uses current shader
+        m_rhi->draw(dd);
 
         m_stats.drawCalls += 1;
     }
@@ -2471,33 +1943,38 @@ void RenderSystem::passDeferredLighting(const PassContext& ctx, RenderTargetHand
         textureUnit++;
     }
 
-    // TODO: Bind IBL textures if available (temporarily disabled due to type issues)
-    // This needs to be fixed once IBL system RHI integration is completed
-    /*
+    // Bind IBL textures if available and loaded (now that IBL system is RHI-based)
+    // Note: IBL textures are only created after loadHDREnvironment() is called
     if (m_iblSystem) {
         auto irradianceMap = m_iblSystem->getIrradianceMap();
         auto prefilterMap = m_iblSystem->getPrefilterMap();
         auto brdfLUT = m_iblSystem->getBRDFLUT();
 
-        if (irradianceMap && irradianceMap->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(irradianceMap->rhiHandle(), textureUnit);
+        // Only bind if textures are actually loaded (not just initialized to INVALID_HANDLE)
+        if (irradianceMap != INVALID_HANDLE) {
+            m_rhi->bindTexture(irradianceMap, textureUnit);
             m_rhi->setUniformInt("irradianceMap", textureUnit);
+            m_rhi->setUniformInt("useIBL", 1);  // Enable IBL in shader
             textureUnit++;
+        } else {
+            m_rhi->setUniformInt("useIBL", 0);  // Disable IBL in shader if not loaded
         }
 
-        if (prefilterMap && prefilterMap->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(prefilterMap->rhiHandle(), textureUnit);
+        if (prefilterMap != INVALID_HANDLE) {
+            m_rhi->bindTexture(prefilterMap, textureUnit);
             m_rhi->setUniformInt("prefilterMap", textureUnit);
             textureUnit++;
         }
 
-        if (brdfLUT && brdfLUT->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(brdfLUT->rhiHandle(), textureUnit);
+        if (brdfLUT != INVALID_HANDLE) {
+            m_rhi->bindTexture(brdfLUT, textureUnit);
             m_rhi->setUniformInt("brdfLUT", textureUnit);
             textureUnit++;
         }
+    } else {
+        // No IBL system available
+        m_rhi->setUniformInt("useIBL", 0);
     }
-    */
 
     // Draw screen quad (6 vertices, no index buffer)
     DrawDesc drawDesc{};
@@ -2804,11 +2281,3 @@ void RenderSystem::renderObjectsBatchedWithManagers(const SceneManager& scene, c
         m_stats.totalTriangles += obj.objLoader.getIndexCount() / 3;  // Convert indices to triangles
     }
 }
-
-
-
-
-
-
-
-

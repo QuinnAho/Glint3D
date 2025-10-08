@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
-#include "gl_platform.h"
+#include <glint3d/rhi_types.h>
 
 // Forward declaration
 namespace glint3d { class RHI; }
@@ -40,18 +40,12 @@ public:
                       const glm::vec3& color, float intensity,
                       float innerConeDeg, float outerConeDeg);
 
-    // Legacy GL-based method (deprecated, use applyLightsRHI instead)
-    void applyLights(GLuint shaderProgram) const;
-
-    // RHI-based light uniform application
-    void applyLightsRHI(glint3d::RHI* rhi) const;
-
     size_t getLightCount() const;
 
     // New functions for indicator visualization
-    void initIndicator();         // Create geometry (cube for point lights, arrow for directional)
-    bool initIndicatorShader();   // Compile and link the indicator shader
+    void initIndicator(glint3d::RHI* rhi);  // Create geometry (cube for point lights, arrow for directional)
     void renderIndicators(const glm::mat4& view, const glm::mat4& projection, int selectedIndex) const;
+    void cleanup();  // Cleanup RHI resources
 
     glm::vec4 m_globalAmbient = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
     std::vector<LightSource> m_lights;
@@ -60,19 +54,19 @@ public:
     bool removeLightAt(size_t index);
 
 private:
+    glint3d::RHI* m_rhi = nullptr;
 
     // Indicator geometry for point lights (cube)
-    GLuint m_indicatorVAO = 0;
-    GLuint m_indicatorVBO = 0;
+    glint3d::BufferHandle m_indicatorVBO;
 
     // Indicator geometry for directional lights (arrow)
-    GLuint m_arrowVAO = 0;
-    GLuint m_arrowVBO = 0;
+    glint3d::BufferHandle m_arrowVBO;
 
     // Indicator geometry for spot lights (cone outline)
-    GLuint m_spotVAO = 0;
-    GLuint m_spotVBO = 0;
+    glint3d::BufferHandle m_spotVBO;
 
-    // Indicator shader program stored in the Light class
-    GLuint m_indicatorShader = 0;
+    // Indicator shader and pipelines
+    glint3d::ShaderHandle m_indicatorShader;
+    glint3d::PipelineHandle m_cubePipeline;
+    glint3d::PipelineHandle m_linePipeline;
 };

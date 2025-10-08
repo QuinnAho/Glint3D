@@ -1,0 +1,1 @@
+{"ts": "2025-01-15T18:55:00Z", "task_id": "rhi_cleanup", "event": "task_created", "phase": "planning", "status": "pending", "description": "RHI architecture cleanup task created following opengl_migration completion", "prerequisite": "opengl_migration_complete_146_to_0_gl_calls", "estimated_loc": 1200, "phases": ["rhi_internals", "pipeline_consistency", "manager_draw_flow"]}
