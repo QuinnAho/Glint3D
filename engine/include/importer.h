@@ -2,7 +2,7 @@
 #include <string>
 #include <memory>
 #include "mesh_loader.h"   // MeshData
-#include "pbr_material.h"
+#include "pbr_material.h" // todo use material core
 
 struct ImporterOptions {
     bool flipUV = true; // flip V coordinate on load

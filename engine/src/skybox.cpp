@@ -129,11 +129,9 @@ bool Skybox::init(glint3d::RHI* rhi)
     glint3d::ShaderDesc shaderDesc;
     shaderDesc.vertexSource = kVS;
     shaderDesc.fragmentSource = kFS;
-    m_shader = m_rhi->createShader(shaderDesc);
 
     // Create pipeline with vertex attributes
     glint3d::PipelineDesc desc{};
-    desc.shader = m_shader;
     desc.topology = glint3d::PrimitiveTopology::Triangles;
 
     // Position attribute (location 0)
@@ -288,6 +286,7 @@ void Skybox::cleanup()
             m_rhi->destroyTexture(m_cubemapTexture);
             m_cubemapTexture = {};
         }
+        // legacy block?
         if (m_shader != glint3d::INVALID_HANDLE) {
             m_rhi->destroyShader(m_shader);
             m_shader = {};

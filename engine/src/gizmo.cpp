@@ -52,11 +52,9 @@ void Gizmo::init(glint3d::RHI* rhi){
     glint3d::ShaderDesc shaderDesc;
     shaderDesc.vertexSource = kVS;
     shaderDesc.fragmentSource = kFS;
-    m_shader = m_rhi->createShader(shaderDesc);
 
     // Create pipeline with vertex attributes
     glint3d::PipelineDesc desc{};
-    desc.shader = m_shader;
     desc.topology = glint3d::PrimitiveTopology::Lines;
 
     // Position attribute (location 0)
@@ -91,7 +89,6 @@ void Gizmo::init(glint3d::RHI* rhi){
 void Gizmo::cleanup(){
     if (m_rhi) {
         m_rhi->destroyBuffer(m_vertexBuffer);
-        m_rhi->destroyShader(m_shader);
         m_rhi->destroyPipeline(m_pipeline);
         m_rhi = nullptr;
     }
@@ -130,7 +127,6 @@ void Gizmo::render(const glm::mat4& view,
     if (active != GizmoAxis::None) {
         // Create thicker line pipeline for active axis
         glint3d::PipelineDesc thickDesc{};
-        thickDesc.shader = m_shader;
         thickDesc.topology = glint3d::PrimitiveTopology::Lines;
 
         // Position attribute

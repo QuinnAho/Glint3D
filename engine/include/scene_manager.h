@@ -7,7 +7,6 @@
 #include "light.h"
 #include "objloader.h"
 #include "texture.h"
-#include "shader.h"
 #include <glint3d/rhi.h>
 #include <glint3d/rhi_types.h>
 #include "material_core.h"

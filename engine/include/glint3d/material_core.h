@@ -12,6 +12,8 @@ namespace glint3d {
  * This single struct is used by BOTH rasterization and raytracing pipelines,
  * eliminating the need for dual material storage and conversion between systems.
  * 
+ * May change for the raster and ray unfication process
+ * 
  * Design Goals:
  * - Single source of truth for all material properties
  * - Compatible with both real-time raster and offline ray pipelines  

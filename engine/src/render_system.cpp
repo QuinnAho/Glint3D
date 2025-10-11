@@ -8,7 +8,6 @@
 #include "skybox.h"
 #include "ibl_system.h"
 #include "raytracer.h"
-#include "shader.h"
 #include "texture.h"
 #include "material_core.h"
 #include "render_mode_selector.h"

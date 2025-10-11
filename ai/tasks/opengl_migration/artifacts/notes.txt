@@ -1,0 +1,1 @@
+removed legacy mshaders, conditionals marked with legacy comments asssumed to be replaced, take a look

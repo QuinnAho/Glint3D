@@ -10,7 +10,7 @@ namespace glint3d { class RHI; }
 class AxisRenderer {
 private:
     glint3d::BufferHandle m_vertexBuffer;
-    glint3d::ShaderHandle m_shader;
+    glint3d::ShaderHandle m_shader; //to-do remove
     glint3d::PipelineHandle m_pipeline;
     glint3d::RHI* m_rhi;
 

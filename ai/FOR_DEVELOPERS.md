@@ -1,30 +1,33 @@
 # Task Module System - Developer Guide
 
+**This is the workflow we use to develop Glint3D.** It helps humans and AI work together on tasks in a clear, organized way. The system keeps AI agents controlled and context-aware, so they know exactly what to do and contribute clean, quality code without getting lost or over-engineering.
+
 ## What is a Task Module?
 
-A **task module** is a structured directory containing all the information needed to plan, execute, track, and validate a specific engineering task. Task modules are designed to facilitate collaboration between human developers and AI assistants by providing a shared, machine-readable representation of work to be done.
+A **task module** is a structured folder that holds everything needed to plan, do, track, and check a specific engineering task. 
+It gives both humans and AI a clear, shared way to understand and work on the same task.
 
-Think of a task module as a "work capsule" that contains:
-- **Specification**: What needs to be done and why
-- **Execution plan**: Step-by-step instructions
-- **Progress tracking**: Real-time status updates
-- **Validation criteria**: How to know when it's done
-- **Artifacts**: Generated outputs and documentation
+Think of a task module as a **“work capsule”** that includes:  
+- **Specification**: What needs to be done and why  
+- **Execution plan**: Clear steps to follow  
+- **Progress tracking**: Real-time updates on what’s finished  
+- **Validation criteria**: How to confirm the task is complete  
+- **Artifacts**: The outputs and documentation created along the way  
 
 ## Why Use Task Modules?
 
 ### Benefits for Developers
-- **Clear scope**: Every task has explicit inputs, outputs, and acceptance criteria
-- **Progress visibility**: Real-time tracking via NDJSON event logs
-- **Context preservation**: All task-related information in one place
-- **Handoff ready**: Easy to pause, resume, or transfer work between team members or AI assistants
-- **Audit trail**: Complete history of what was done and when
+- **Clear scope**: Each task has defined inputs, outputs, and success criteria  
+- **Progress visibility**: You can track updates in real time  
+- **Context preservation**: All task information stays in one place  
+- **Easy handoff**: Anyone can pick up where the last person left off  
+- **Audit trail**: A full history of what was done and when  
 
 ### Benefits for AI Collaboration
-- **Deterministic execution**: AI assistants know exactly what to do and in what order
-- **Quality gates**: Explicit acceptance criteria prevent incomplete work
-- **Context loading**: AI can pick up where previous work left off
-- **Minimal hallucination**: Structured format reduces ambiguity
+- **Predictable execution**: AI knows exactly what steps to take  
+- **Quality checks**: Acceptance criteria prevent unfinished work  
+- **Context loading**: AI can resume work without losing track  
+- **Fewer errors**: A clear structure reduces guesswork and confusion
 
 ## Directory Structure
 
@@ -48,7 +51,15 @@ ai/tasks/{task_name}/
 
 ### 1. task.json - Task Specification
 
-The `task.json` file is the single source of truth for what needs to be accomplished.
+The `task.json` file is the single source of truth for what needs to be accomplished.  
+It contains all the essential information about a task in a clean, structured, and machine-readable format.
+
+We use **JSON** because:  
+- It’s easy for both humans and AI to read and update.  
+- It provides a clear, standardized structure for storing task details.  
+- AI systems can quickly parse and act on the information without guesswork.  
+- It ensures consistent formatting across all tasks, reducing context loss.  
+- It allows automation, making it simple to link tasks, track progress, and enforce requirements.
 
 **Schema:**
 ```json
@@ -79,17 +90,18 @@ The `task.json` file is the single source of truth for what needs to be accompli
 }
 ```
 
-**Key Fields:**
-- **id**: Unique identifier matching the directory name
-- **status**: Current state (pending, in_progress, completed, blocked)
-- **inputs.files**: Specific files and line ranges that will be modified
-- **outputs.artifacts**: Expected deliverables
-- **acceptance**: Criteria that must be met for the task to be considered complete
-- **dependencies**: Other tasks that must be completed first
+**Key Fields:**  
+- **id**: A unique name that matches the task’s folder.  
+- **status**: Shows where the task is right now (pending, in progress, completed, or blocked).  
+- **inputs.files**: The files and line ranges that will be changed.  
+- **outputs.artifacts**: The expected results or deliverables.  
+- **acceptance**: The rules or checks that must be met for the task to be finished.  
+- **dependencies**: Other tasks that need to be done first.
 
 ### 2. checklist.md - Execution Plan
 
-The checklist breaks down the task into atomic, actionable steps. Each step should be small enough to complete in one sitting (15-60 minutes).
+The checklist is a simple list of clear steps that break the task into small, easy-to-finish actions.  
+Each step should be small enough to finish in one work session (around 15–60 minutes).
 
 **Format:**
 ```markdown
@@ -120,7 +132,15 @@ The checklist breaks down the task into atomic, actionable steps. Each step shou
 
 ### 3. progress.ndjson - Event Log
 
-The progress file is a **newline-delimited JSON** log that tracks every significant event during task execution. Each line is a complete JSON object.
+The `progress.ndjson` file is a simple event log that records everything that happens during a task.  
+It uses **newline-delimited JSON**, which means each line is one complete JSON object.  
+This makes it easy for both humans and AI to read, write, and process events in order, without needing a big or complex file format.
+
+We use this format because:  
+- It’s easy to append new events as they happen.  
+- AI can quickly read and understand the task’s history without extra parsing.  
+- It keeps a clean, ordered timeline of what was done.  
+- It makes resuming, auditing, and debugging tasks much simpler.
 
 **Format:**
 ```json
@@ -172,158 +192,100 @@ The artifacts directory contains all deliverables produced during task execution
 ### Starting a New Task
 
 ```
-I want to work on the "pass_bridging" task. Please:
-1. Read ai/tasks/current_index.json to confirm it's the active task
-2. Read all files in ai/tasks/pass_bridging/
-3. Execute the checklist step by step
-4. Update progress.ndjson after each step
-5. Generate artifacts in the artifacts/ directory
+I want to work on the "pass_bridging" task.
+Please follow and read thorugh the ai/FOR_MACHINES.md protocol.
 ```
+
+The FOR_MACHINES.md document is the universal AI execution protocol. It will:
+1. Read ai/tasks/current_index.json to confirm the active task
+2. Load all task context files
+3. Execute checklist steps sequentially
+4. Update progress.ndjson after each step
+5. Generate all required artifacts
+6. Validate acceptance criteria before completion
 
 ### Resuming Work on an Existing Task
 
 ```
-Continue working on the current task. Please:
-1. Read ai/tasks/current_index.json to see what's active
-2. Check progress.ndjson to see what's been completed
-3. Review checklist.md to see what's left
-4. Continue from the next incomplete step
+Continue working on the current task.
+Please follow the ai/FOR_MACHINES.md protocol.
 ```
+
+The protocol will automatically determine where you left off by reading progress.ndjson and continue from the next incomplete step.
 
 ### Checking Task Status
 
 ```
-What's the status of the render system tasks?
-Please read ai/tasks/current_index.json and summarize:
-- What task is currently active
-- What phase we're in
-- What's blocking progress (if anything)
-- What's next on the critical path
+What's the status of the current task?
+Please read ai/tasks/current_index.json and progress.ndjson to summarize current state.
 ```
 
 ### Switching Tasks
 
 ```
-I need to switch to a different task because of a blocker.
-Please:
-1. Update ai/tasks/current_index.json with the blocker details
-2. Log the blocker event to the current task's progress.ndjson
-3. Switch active_task to "new_task_name"
-4. Begin the new task following the standard protocol
+I need to switch to "new_task_name" because of a blocker.
+Please follow the ai/FOR_MACHINES.md blocker handling protocol.
 ```
+
+The FOR_MACHINES.md protocol includes proper blocker handling:
+- Logs blocker_encountered event
+- Updates current_index.json with blocker details
+- Switches to the new task if instructed
+- Maintains proper event history
 
 ## How to Create a New Task Module
 
-### Step 1: Create Directory Structure
+### Using the Task Creation Prompt (Recommended)
 
-```bash
-cd ai/tasks
-mkdir my_new_task
-cd my_new_task
-mkdir -p artifacts/{code,tests,documentation,validation}
+The easiest way to create a new task is to describe what you want and let AI format it properly.
+
+**Step 1:** Describe your task in plain language to any AI (like ChatGPT):
+```
+I need to add a bloom post-processing effect to the renderer.
+It should modify the lighting shader and add a new blur pass.
 ```
 
-### Step 2: Create task.json
-
-```json
-{
-  "id": "my_new_task",
-  "title": "Implement Feature X",
-  "owner": "your_team",
-  "status": "pending",
-  "inputs": {
-    "files": ["engine/src/feature.cpp", "engine/include/feature.h"],
-    "schema_version": "v1"
-  },
-  "outputs": {
-    "artifacts": ["artifacts/code/feature_impl.cpp", "artifacts/tests/feature_test.cpp"],
-    "events": ["feature_integrated", "tests_passed"]
-  },
-  "acceptance": [
-    "Feature compiles without warnings",
-    "All unit tests pass",
-    "Performance meets budget (<5ms per operation)",
-    "Documentation updated in header file"
-  ],
-  "safety": {
-    "rate_limits": ["max_memory_usage_500mb"],
-    "sandbox": false
-  },
-  "dependencies": ["prerequisite_task"],
-  "seed_policy": "deterministic"
-}
+**Step 2:** Ask the AI to format it for the task creation prompt:
+```
+Format this task for the Glint3D task creation system with proper inputs, outputs, and acceptance criteria.
 ```
 
-### Step 3: Create checklist.md
-
-Break down the task into phases and atomic steps:
-
-```markdown
-# My New Task Checklist
-
-## Phase 1: Research & Design
-- [ ] **Review existing code** - Read engine/src/feature.cpp
-- [ ] **Identify dependencies** - List affected systems
-- [ ] **Design API** - Sketch function signatures
-
-## Phase 2: Implementation
-- [ ] **Implement core logic** - Write Feature::doWork()
-- [ ] **Add error handling** - Handle edge cases
-- [ ] **Write unit tests** - Cover all code paths
-
-## Phase 3: Integration & Validation
-- [ ] **Build verification** - cmake --build builds/desktop/cmake
-- [ ] **Run tests** - ctest --test-dir builds/desktop/cmake
-- [ ] **Update documentation** - Add API docs to header
+**Step 3:** Use the formatted details with the task creation prompt:
+```
+Create a new task module using ai/prompts/TASK_MODULE_CREATION_PROMPT.md with:
+- ID: add_bloom_effect
+- Title: Add Bloom Post-Processing Effect
+- Owner: rendering_team
+- Inputs: ["engine/src/lighting.cpp", "engine/shaders/post_process.glsl"]
+- Outputs: ["artifacts/code/bloom_pass.cpp", "artifacts/tests/bloom_test.cpp"]
+- Acceptance criteria:
+  * Bloom effect renders correctly
+  * Performance impact under 2ms
+  * All tests pass
+  * Documentation updated
+- Dependencies: ["lighting_system"]
 ```
 
-### Step 4: Initialize progress.ndjson
+The task creation prompt will automatically:
+1. Create the full folder structure (ai/tasks/add_bloom_effect/)
+2. Generate task.json with all the details
+3. Create checklist.md with clear steps
+4. Set up progress.ndjson for tracking
+5. Create artifacts/README.md
+6. Register the task in current_index.json
+7. Validate everything is correct
 
-Create an empty file or add the initial event:
+### Manual Creation (Advanced)
 
-```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","task_id":"my_new_task","event":"task_created","status":"pending","agent":"human"}' > progress.ndjson
-```
+If you prefer to create a task module manually, follow the canonical structure:
 
-### Step 5: Create artifacts/README.md
+1. **Create directory**: `ai/tasks/{task_id}/`
+2. **Create required files**: task.json, checklist.md, progress.ndjson
+3. **Create artifacts structure**: `artifacts/{code,tests,documentation,validation}/`
+4. **Create artifacts/README.md**: Document expected outputs
+5. **Register in current_index.json**: Add to task_status section
 
-```markdown
-# My New Task Artifacts
-
-## Expected Outputs
-
-### Code
-- `code/feature_impl.cpp` - Core implementation
-- `code/feature.h` - Public API header
-
-### Tests
-- `tests/feature_test.cpp` - Unit tests
-- `tests/test_results.txt` - Test execution log
-
-### Documentation
-- `documentation/api_reference.md` - API documentation
-- `documentation/migration_guide.md` - How to use the new feature
-
-### Validation
-- `validation/performance_report.txt` - Benchmark results
-- `validation/coverage_report.txt` - Test coverage metrics
-```
-
-### Step 6: Register in current_index.json
-
-Add your task to the task_status section:
-
-```json
-{
-  "task_status": {
-    "my_new_task": {
-      "status": "pending",
-      "blocked_by": ["prerequisite_task"],
-      "ready_when": "prerequisite_task completes"
-    }
-  }
-}
-```
+See the file format specifications in ai/FOR_MACHINES.md for exact schemas.
 
 ## How Task Modules Work
 
@@ -366,303 +328,93 @@ Example:
 }
 ```
 
-## How to Read Task Modules
+### CI/CD Integration (Future)
 
-### Quick Status Check
+Eventually, we can use **Codex for GitHub Actions** to automate task validation. If you don't know what that is, you should look into it—it's a game changer for structured workflows like this.
 
-```bash
-# See what's currently active
-cat ai/tasks/current_index.json | jq '.current_focus'
+Because our task modules are deterministic and machine-readable, AI agents can run in CI to:
+- Validate `task.json` has required fields and proper format
+- Check `checklist.md` has all steps completed before merge
+- Verify `progress.ndjson` has proper event sequence (task_started → step_completed → task_completed)
+- Confirm all `outputs.artifacts` files exist
+- Run acceptance criteria checks automatically
+- Execute QA passes using `ai/prompts/QA_PASS_PROMPT.md`
+- Generate findings and reports in `ai/qa/`
 
-# Check task completion percentage
-cat ai/tasks/opengl_migration/task.json | jq '.status'
+This means every PR can be automatically validated against the task specification, ensuring no incomplete work gets merged.
 
-# View recent progress events
-tail -5 ai/tasks/pass_bridging/progress.ndjson | jq '.'
+## AI Prompts and QA Resources
+
+### Prompts Directory (`ai/prompts/`)
+
+The prompts directory contains specialized AI prompts for task management and quality assurance:
+
+#### QA_PASS_PROMPT.md
+A structured prompt for conducting architecture quality assurance passes. Use this to have AI agents:
+- Analyze system architecture and organization
+- Identify modularity, navigability, and controllability issues
+- Generate structured QA reports in `ai/qa/`
+- Create prioritized findings with remediation recommendations
+- Ensure alignment with architecture vision
+
+**Usage:**
+```
+Please perform a QA pass following the ai/prompts/QA_PASS_PROMPT.md specification.
+Focus on [specific subsystem or concern].
 ```
 
-### Deep Dive into a Task
+#### TASK_MODULE_CREATION_PROMPT.md
+A deterministic protocol for creating new task modules. Use this to have AI agents:
+- Generate complete task module structure
+- Create all required files (task.json, checklist.md, progress.ndjson)
+- Register tasks in current_index.json
+- Set up artifact directories
 
-1. **Start with task.json** - Understand the goal and acceptance criteria
-2. **Review checklist.md** - See what steps are planned
-3. **Read progress.ndjson** - See what's been done and current status
-4. **Check artifacts/** - Review generated outputs
-5. **Read optional files** - coverage.md, mapping.md, implementation plans
-
-### Understanding Progress
-
-The progress.ndjson file is the real-time log. To find specific information:
-
-```bash
-# Find all build failures
-grep 'build_failed' ai/tasks/my_task/progress.ndjson | jq '.'
-
-# Find when a specific step was completed
-grep 'Migrate function X' ai/tasks/my_task/progress.ndjson | jq '.'
-
-# Count completed steps
-grep 'step_completed' ai/tasks/my_task/progress.ndjson | wc -l
-
-# See latest status
-tail -1 ai/tasks/my_task/progress.ndjson | jq '.'
+**Usage:**
+```
+Create a new task module using ai/prompts/TASK_MODULE_CREATION_PROMPT.md with:
+- ID: my_new_task
+- Title: Implement Feature X
+- Inputs: [list of files]
+- Outputs: [expected artifacts]
+- Acceptance criteria: [list]
 ```
 
-## Best Practices
+### QA Directory (`ai/qa/`)
 
-### For Developers
+The QA directory stores quality assurance findings and reports generated during QA passes:
 
-1. **Keep checklists atomic**: Each step should be completable in 15-60 minutes
-2. **Be specific**: "Fix bug" is bad; "Fix null pointer in RHI::clear()" is good
-3. **Update progress frequently**: Log after every significant action
-4. **Document blockers immediately**: Don't wait until standup to report issues
-5. **Review acceptance criteria regularly**: Make sure you're on track
-6. **Generate artifacts continuously**: Don't wait until the end to create outputs
-
-### For AI Assistants
-
-1. **Always read current_index.json first**: Know what's active before starting work
-2. **Follow checklist order**: Don't skip ahead unless explicitly told to
-3. **Log every step**: Update progress.ndjson after each action
-4. **Check acceptance criteria**: Validate work against requirements
-5. **Generate artifacts**: Create all expected outputs in artifacts/ directory
-6. **Don't mark tasks complete prematurely**: All criteria must be met
-
-### For Teams
-
-1. **One task active at a time**: Focus reduces context switching
-2. **Regular index updates**: Keep current_index.json synchronized
-3. **Consistent event naming**: Use standard event types across tasks
-4. **Artifact validation**: Review generated outputs before marking complete
-5. **Dependency management**: Update blocked_by relationships promptly
-
-## Common Patterns
-
-### Pattern: Phase-Based Execution
-
-Break large tasks into phases with clear milestones:
-
-```markdown
-## Phase 1: Research (No code changes)
-- [ ] Read documentation
-- [ ] Analyze existing code
-- [ ] Design approach
-
-## Phase 2: Implementation (Write code)
-- [ ] Implement feature X
-- [ ] Implement feature Y
-
-## Phase 3: Validation (Verify quality)
-- [ ] Run tests
-- [ ] Check performance
-- [ ] Update docs
+**Structure:**
+```
+ai/qa/
+├── progress.ndjson              # QA event history
+├── findings/
+│   ├── open/                    # Active issues
+│   │   ├── QA_001_issue.json    # Individual issue files
+│   │   └── QA_002_issue.json
+│   └── resolved/                # Fixed issues
+├── reports/
+│   ├── index.json               # Report registry
+│   ├── QA_2024-12-28_qa_pass.json          # Structured report
+│   └── QA_2024-12-28_qa_summary.md         # Human-readable summary
 ```
 
-### Pattern: Incremental Migration
+**QA Findings Format:**
+Each finding includes:
+- Unique ID
+- Priority (High, Medium, Low)
+- Impact assessment
+- Affected component
+- Description of the issue
+- Recommended remediation
+- Links to related task modules (if applicable)
 
-For large refactors, migrate system by system:
-
-```json
-{
-  "outputs": {
-    "artifacts": [
-      "artifacts/migration/system_a_migrated.cpp",
-      "artifacts/migration/system_b_migrated.cpp",
-      "artifacts/migration/system_c_migrated.cpp"
-    ]
-  }
-}
+**Usage:**
+```
+Please perform a QA pass following the ai/prompts/QA_PASS_PROMPT.md specification.
 ```
 
-### Pattern: Test-Driven Development
+## Next Steps
 
-Write tests before implementation:
-
-```markdown
-- [ ] **Write test for feature X** - Define expected behavior
-- [ ] **Implement feature X** - Make the test pass
-- [ ] **Refactor** - Improve code quality
-```
-
-### Pattern: Blocked Task Handling
-
-When a task is blocked:
-
-```json
-{
-  "ts": "2024-12-28T10:00:00Z",
-  "task_id": "my_task",
-  "event": "blocker_encountered",
-  "blocker": "Missing RHI API for cubemap generation",
-  "blocked_by": "opengl_migration",
-  "action": "Switch to preparatory work",
-  "agent": "claude"
-}
-```
-
-Update current_index.json:
-```json
-{
-  "task_status": {
-    "my_task": {
-      "status": "blocked",
-      "blocked_by": ["opengl_migration"],
-      "preparation_work": ["design_api", "write_tests"]
-    }
-  }
-}
-```
-
-## Troubleshooting
-
-### Problem: AI isn't following the checklist
-
-**Solution**: Be explicit in your prompt:
-```
-Please follow the checklist in ai/tasks/my_task/checklist.md exactly.
-Work through each item in order and update progress.ndjson after each step.
-```
-
-### Problem: Progress isn't being logged
-
-**Solution**: Check that progress.ndjson is being updated:
-```bash
-# Watch progress in real-time
-tail -f ai/tasks/my_task/progress.ndjson
-```
-
-Remind the AI:
-```
-After completing each step, append an event to progress.ndjson with:
-- Current timestamp
-- task_id: "my_task"
-- event: "step_completed"
-- step: Name of the checklist item
-```
-
-### Problem: Task marked complete but acceptance criteria not met
-
-**Solution**: Review acceptance criteria explicitly:
-```
-Before marking this task complete, verify that all acceptance criteria
-from task.json are met:
-1. [Check criterion 1]
-2. [Check criterion 2]
-3. [Check criterion 3]
-```
-
-### Problem: Dependencies not clear
-
-**Solution**: Update current_index.json with clear dependency information:
-```json
-{
-  "task_status": {
-    "task_b": {
-      "status": "blocked",
-      "blocked_by": ["task_a"],
-      "ready_when": "task_a provides RHI API extensions"
-    }
-  }
-}
-```
-
-## Advanced Topics
-
-### Custom Task Types
-
-You can extend the base task module structure for specific needs:
-
-**Performance Optimization Task:**
-```
-ai/tasks/optimize_raytracer/
-├── task.json
-├── checklist.md
-├── progress.ndjson
-├── artifacts/
-│   ├── profiling/          # Profiler outputs
-│   ├── benchmarks/         # Before/after metrics
-│   └── optimization_log.md # What was changed and why
-└── baseline_metrics.json   # Performance before optimization
-```
-
-**Bug Fix Task:**
-```
-ai/tasks/fix_memory_leak/
-├── task.json
-├── checklist.md
-├── progress.ndjson
-├── artifacts/
-│   ├── valgrind_before.txt
-│   ├── valgrind_after.txt
-│   └── root_cause_analysis.md
-└── reproduction_steps.md
-```
-
-### Integration with CI/CD
-
-Task modules can integrate with continuous integration:
-
-**In .github/workflows/task-validation.yml:**
-```yaml
-name: Task Validation
-
-on:
-  push:
-    paths:
-      - 'ai/tasks/*/progress.ndjson'
-
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check acceptance criteria
-        run: |
-          python scripts/validate_task_completion.py
-```
-
-### Telemetry and Analytics
-
-Analyze progress.ndjson files to gain insights:
-
-```python
-import json
-import pandas as pd
-
-# Load all events
-events = []
-with open('progress.ndjson', 'r') as f:
-    for line in f:
-        events.append(json.loads(line))
-
-df = pd.DataFrame(events)
-
-# Calculate task duration
-start = df[df['event'] == 'task_started']['ts'].iloc[0]
-end = df[df['event'] == 'task_completed']['ts'].iloc[0]
-duration = pd.to_datetime(end) - pd.to_datetime(start)
-print(f"Task took: {duration}")
-
-# Count step completions per day
-df['date'] = pd.to_datetime(df['ts']).dt.date
-daily_progress = df[df['event'] == 'step_completed'].groupby('date').size()
-print(daily_progress)
-```
-
-## Summary
-
-Task modules provide a structured, machine-readable way to plan, execute, and track engineering work. By following the conventions in this guide, you can:
-
-- Collaborate effectively with AI assistants
-- Maintain clear progress visibility
-- Ensure work is completed to specification
-- Create a detailed audit trail
-- Reduce context switching and ambiguity
-
-The key to success is **consistency**: use the same structure, follow the same patterns, and maintain the same level of detail across all tasks.
-
----
-
-**Next Steps:**
-- Read `ai/FOR_MACHINES.md` for the machine-readable specification
+- Read `ai/FOR_MACHINES.md` for the AI execution protocol
 - Review existing task modules in `ai/tasks/` for examples
-- Create your first task module using the templates in this guide
-- Start using task modules in your daily workflow

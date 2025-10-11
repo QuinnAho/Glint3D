@@ -9,7 +9,6 @@ Grid::Grid()
     , m_vertexBuffer(glint3d::INVALID_HANDLE)
     , m_shaderHandle(glint3d::INVALID_HANDLE)
     , m_pipeline(glint3d::INVALID_HANDLE)
-    , m_shader(nullptr)
     , m_lineCount(200)
     , m_spacing(1.0f)
 {}
@@ -18,10 +17,9 @@ Grid::~Grid() {
     cleanup();
 }
 
-bool Grid::init(glint3d::RHI* rhi, Shader* shader, int lineCount, float spacing)
+bool Grid::init(glint3d::RHI* rhi, int lineCount, float spacing)
 {
     m_rhi = rhi;
-    m_shader = shader;  // Keep for compatibility, but won't be used for rendering
     m_lineCount = lineCount;
     m_spacing = spacing;
 
@@ -76,7 +74,6 @@ bool Grid::init(glint3d::RHI* rhi, Shader* shader, int lineCount, float spacing)
     glint3d::ShaderDesc shaderDesc;
     shaderDesc.vertexSource = vertexShaderSource;
     shaderDesc.fragmentSource = fragmentShaderSource;
-    m_shaderHandle = m_rhi->createShader(shaderDesc);
 
     // Create pipeline
     glint3d::PipelineDesc pipelineDesc;
@@ -106,7 +103,7 @@ bool Grid::init(glint3d::RHI* rhi, Shader* shader, int lineCount, float spacing)
 
 void Grid::render(const glm::mat4& view, const glm::mat4& projection)
 {
-    if (!m_rhi || !m_shader) return;
+    if (!m_rhi) return;
 
     // Bind pipeline
     m_rhi->bindPipeline(m_pipeline);

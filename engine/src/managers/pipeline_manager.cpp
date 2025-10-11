@@ -1,6 +1,5 @@
 #include "managers/pipeline_manager.h"
 #include "scene_manager.h"
-#include "shader.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>

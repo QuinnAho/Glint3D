@@ -5,8 +5,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
 
-class Shader;
-
 class IBLSystem {
 public:
     IBLSystem();
@@ -49,12 +47,6 @@ private:
     glint3d::ShaderHandle m_irradianceShader;
     glint3d::ShaderHandle m_prefilterShader;
     glint3d::ShaderHandle m_brdfShader;
-
-    // Legacy shader pointers (TODO[Phase 3]: Remove when IBL generation migrated)
-    Shader* m_equirectToCubemapShaderLegacy;
-    Shader* m_irradianceShaderLegacy;
-    Shader* m_prefilterShaderLegacy;
-    Shader* m_brdfShaderLegacy;
 
     // Geometry buffers
     glint3d::BufferHandle m_cubeBuffer;

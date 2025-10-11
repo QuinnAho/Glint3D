@@ -4,7 +4,7 @@ Welcome to the Glint3D documentation! This index will guide you to the right res
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### New Developer? Start Here:
 1. **[ONBOARDING.md](ONBOARDING.md)** - Comprehensive guide for developers with C++/game dev background

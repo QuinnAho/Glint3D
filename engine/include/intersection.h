@@ -13,6 +13,7 @@ struct HitRecord
     const Triangle* tri = nullptr;
 
     // Material snapshot (PBR)
+    // Use material core
     glm::vec3 baseColor{1.0f};
     float roughness = 0.5f;
     float metallic = 0.0f;

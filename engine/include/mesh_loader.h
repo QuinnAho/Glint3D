@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
-#include "pbr_material.h"
+#include "pbr_material.h" // use material core
 
 struct MeshData {
     std::vector<glm::vec3> positions;

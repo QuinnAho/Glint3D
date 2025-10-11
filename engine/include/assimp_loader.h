@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
-#include "pbr_material.h"
+#include "pbr_material.h" // todo - use material core
 
 // Import a triangulated mesh and basic PBR material via Assimp.
 // - positions/normals always filled (normals auto-generated if missing)

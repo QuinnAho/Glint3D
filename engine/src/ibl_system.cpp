@@ -1,5 +1,4 @@
 #include "ibl_system.h"
-#include "shader.h"
 #include "image_io.h"
 #include "path_utils.h"
 #include <iostream>
@@ -75,10 +74,6 @@ IBLSystem::IBLSystem()
     , m_irradianceShader(glint3d::INVALID_HANDLE)
     , m_prefilterShader(glint3d::INVALID_HANDLE)
     , m_brdfShader(glint3d::INVALID_HANDLE)
-    , m_equirectToCubemapShaderLegacy(nullptr)
-    , m_irradianceShaderLegacy(nullptr)
-    , m_prefilterShaderLegacy(nullptr)
-    , m_brdfShaderLegacy(nullptr)
     , m_cubeBuffer(glint3d::INVALID_HANDLE)
     , m_quadBuffer(glint3d::INVALID_HANDLE)
     , m_cubePipeline(glint3d::INVALID_HANDLE)
@@ -156,10 +151,6 @@ void IBLSystem::createShaders()
     equirectDesc.fragmentSource = equirectFragmentShader;
     equirectDesc.debugName = "equirect_to_cubemap";
     m_equirectToCubemapShader = m_rhi->createShader(equirectDesc);
-
-    // Legacy shader for IBL generation (TODO[Phase 3]: Remove)
-    m_equirectToCubemapShaderLegacy = new Shader();
-    m_equirectToCubemapShaderLegacy->loadFromStrings(equirectVertexShader, equirectFragmentShader);
 
     // Irradiance convolution shader
     const char* irradianceVertexShader =
@@ -569,14 +560,46 @@ void IBLSystem::generateIrradianceMap()
         // Bind environment map texture
         m_rhi->bindTexture(m_environmentMap, 0);
 
-        // Set shader uniforms
-        m_irradianceShaderLegacy->use();
-        m_irradianceShaderLegacy->setInt("environmentMap", 0);
-        m_irradianceShaderLegacy->setMat4("projection", captureProjection);
-        m_irradianceShaderLegacy->setMat4("view", captureViews[face]);
+        // Set shader uniforms via RHI
+        // Create temporary pipeline for irradiance generation
+        PipelineDesc irradPipelineDesc{};
+        irradPipelineDesc.shader = m_irradianceShader;
+        irradPipelineDesc.debugName = "IBL_IrradiancePipeline";
+
+        VertexAttribute posAttr{};
+        posAttr.location = 0;
+        posAttr.binding = 0;
+        posAttr.format = TextureFormat::RGB32F;
+        posAttr.offset = 0;
+        irradPipelineDesc.vertexAttributes.push_back(posAttr);
+
+        VertexBinding binding{};
+        binding.binding = 0;
+        binding.stride = 3 * sizeof(float);
+        binding.perInstance = false;
+        binding.buffer = m_cubeBuffer;
+        irradPipelineDesc.vertexBindings.push_back(binding);
+
+        irradPipelineDesc.topology = PrimitiveTopology::Triangles;
+        irradPipelineDesc.depthTestEnable = true;
+        irradPipelineDesc.depthWriteEnable = true;
+
+        PipelineHandle irradPipeline = m_rhi->createPipeline(irradPipelineDesc);
+
+        m_rhi->bindPipeline(irradPipeline);
+        m_rhi->setUniformInt("environmentMap", 0);
+        m_rhi->setUniformMat4("projection", captureProjection);
+        m_rhi->setUniformMat4("view", captureViews[face]);
 
         // Render cube
-        renderCube();
+        DrawDesc drawDesc{};
+        drawDesc.pipeline = irradPipeline;
+        drawDesc.vertexBuffer = m_cubeBuffer;
+        drawDesc.vertexCount = 36;
+        m_rhi->draw(drawDesc);
+
+        // Clean up temporary pipeline
+        m_rhi->destroyPipeline(irradPipeline);
 
         // Clean up render target immediately (on-demand pattern)
         m_rhi->destroyRenderTarget(rt);
@@ -646,15 +669,47 @@ void IBLSystem::generatePrefilterMap()
             // Bind environment map texture
             m_rhi->bindTexture(m_environmentMap, 0);
 
-            // Set shader uniforms
-            m_prefilterShaderLegacy->use();
-            m_prefilterShaderLegacy->setInt("environmentMap", 0);
-            m_prefilterShaderLegacy->setMat4("projection", captureProjection);
-            m_prefilterShaderLegacy->setMat4("view", captureViews[face]);
-            m_prefilterShaderLegacy->setFloat("roughness", roughness);
+            // Set shader uniforms via RHI
+            // Create temporary pipeline for prefilter generation
+            PipelineDesc prefilterPipelineDesc{};
+            prefilterPipelineDesc.shader = m_prefilterShader;
+            prefilterPipelineDesc.debugName = "IBL_PrefilterPipeline";
+
+            VertexAttribute posAttr{};
+            posAttr.location = 0;
+            posAttr.binding = 0;
+            posAttr.format = TextureFormat::RGB32F;
+            posAttr.offset = 0;
+            prefilterPipelineDesc.vertexAttributes.push_back(posAttr);
+
+            VertexBinding binding{};
+            binding.binding = 0;
+            binding.stride = 3 * sizeof(float);
+            binding.perInstance = false;
+            binding.buffer = m_cubeBuffer;
+            prefilterPipelineDesc.vertexBindings.push_back(binding);
+
+            prefilterPipelineDesc.topology = PrimitiveTopology::Triangles;
+            prefilterPipelineDesc.depthTestEnable = true;
+            prefilterPipelineDesc.depthWriteEnable = true;
+
+            PipelineHandle prefilterPipeline = m_rhi->createPipeline(prefilterPipelineDesc);
+
+            m_rhi->bindPipeline(prefilterPipeline);
+            m_rhi->setUniformInt("environmentMap", 0);
+            m_rhi->setUniformMat4("projection", captureProjection);
+            m_rhi->setUniformMat4("view", captureViews[face]);
+            m_rhi->setUniformFloat("roughness", roughness);
 
             // Render cube
-            renderCube();
+            DrawDesc drawDesc{};
+            drawDesc.pipeline = prefilterPipeline;
+            drawDesc.vertexBuffer = m_cubeBuffer;
+            drawDesc.vertexCount = 36;
+            m_rhi->draw(drawDesc);
+
+            // Clean up temporary pipeline
+            m_rhi->destroyPipeline(prefilterPipeline);
 
             // Clean up render target immediately (on-demand pattern)
             m_rhi->destroyRenderTarget(rt);
@@ -697,8 +752,8 @@ void IBLSystem::generateBRDFLUT()
     m_rhi->setViewport(0, 0, 512, 512);
     m_rhi->clear(glm::vec4(0.0f), 1.0f, 0);
 
-    // Set shader and render full-screen quad
-    m_brdfShaderLegacy->use();
+    // Set shader and render full-screen quad via RHI
+    m_rhi->bindPipeline(m_quadPipeline);
     renderQuad();
 
     // Clean up render target

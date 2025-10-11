@@ -44,6 +44,5 @@ public:
 private:
     glint3d::RHI* m_rhi = nullptr;
     glint3d::BufferHandle m_vertexBuffer;
-    glint3d::ShaderHandle m_shader;
     glint3d::PipelineHandle m_pipeline;
 };

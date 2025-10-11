@@ -162,7 +162,6 @@ private:
     // Resource storage
     std::unordered_map<TextureHandle, GLTexture> m_textures;
     std::unordered_map<BufferHandle, GLBuffer> m_buffers;
-    std::unordered_map<ShaderHandle, GLShader> m_shaders;
     std::unordered_map<PipelineHandle, GLPipeline> m_pipelines;
     std::unordered_map<RenderTargetHandle, GLRenderTarget> m_renderTargets;
     struct GLBindGroupLayout { BindGroupLayoutDesc desc; };
@@ -220,7 +219,7 @@ private:
     UniformRingBuffer m_uniformRing;
     std::unordered_map<UniformAllocationHandle, GLUniformAllocation> m_uniformAllocations;
     uint32_t m_nextUniformHandle = 1;
-    std::unordered_map<ShaderHandle, ShaderReflection> m_shaderReflections;
+    std::unordered_map<ShaderHandle, ShaderReflection> m_shaderReflections; //legacy?
 
     // UBO helper methods
     bool initializeUniformRing();

@@ -43,7 +43,6 @@ private:
     glint3d::RHI* m_rhi = nullptr;
     glint3d::BufferHandle m_vertexBuffer;
     glint3d::TextureHandle m_cubemapTexture;
-    glint3d::ShaderHandle m_shader;
     glint3d::PipelineHandle m_pipeline;
 
     bool m_enabled;

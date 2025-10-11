@@ -3,7 +3,6 @@
 
 AxisRenderer::AxisRenderer()
     : m_vertexBuffer(glint3d::INVALID_HANDLE)
-    , m_shader(glint3d::INVALID_HANDLE)
     , m_pipeline(glint3d::INVALID_HANDLE)
     , m_rhi(nullptr)
 {}
@@ -35,11 +34,9 @@ void AxisRenderer::init(glint3d::RHI* rhi) {
     glint3d::ShaderDesc shaderDesc;
     shaderDesc.vertexSource = vertexShaderSource;
     shaderDesc.fragmentSource = fragmentShaderSource;
-    m_shader = m_rhi->createShader(shaderDesc);
 
     // Create pipeline with vertex layout
     glint3d::PipelineDesc pipelineDesc;
-    pipelineDesc.shader = m_shader;
     pipelineDesc.topology = glint3d::PrimitiveTopology::Lines;
 
     // Position attribute (location 0)
@@ -97,6 +94,7 @@ void AxisRenderer::cleanup() {
         m_rhi->destroyPipeline(m_pipeline);
         m_pipeline = glint3d::INVALID_HANDLE;
     }
+    // legacy?
     if (m_shader != glint3d::INVALID_HANDLE) {
         m_rhi->destroyShader(m_shader);
         m_shader = glint3d::INVALID_HANDLE;
