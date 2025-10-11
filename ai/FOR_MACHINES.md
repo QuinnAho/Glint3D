@@ -1,9 +1,7 @@
-# ==========================================================
 # AI EXECUTION CONTRACT — GLINT3D TASK MODULE SYSTEM
-# ==========================================================
+
 # This file defines the deterministic protocol an AI agent must follow
 # during any task execution in the Glint3D project.
-# ==========================================================
 
 ## 0. BEHAVIORAL CONTRACT
 
