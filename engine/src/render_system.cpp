@@ -171,27 +171,12 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
         // Note: glClearColor is now handled in render loop via m_rhi->clear()
     }
 
-    // Load shaders - unified PBR pipeline only (standard shader eliminated)
-    m_pbrShader = std::make_unique<Shader>();
-    m_pbrShader->load("engine/shaders/pbr.vert", "engine/shaders/pbr.frag");
-
-    // For backward compatibility, point basicShader to PBR shader
-    m_basicShader.reset(); // Clear the unique_ptr
-    // Note: m_basicShader calls will use m_pbrShader instead
-
-    m_gridShader = std::make_unique<Shader>();
-    if (!m_gridShader->load("engine/shaders/grid.vert", "engine/shaders/grid.frag"))
-        std::cerr << "[RenderSystem] Failed to load grid shader.\n";
-
-    // Gradient background shader (for background mode = Gradient)
-    m_gradientShader = std::make_unique<Shader>();
-    if (!m_gradientShader->load("engine/shaders/gradient.vert", "engine/shaders/gradient.frag"))
-        std::cerr << "[RenderSystem] Failed to load gradient shader.\n";
-
-    // Load raytracing screen quad shader
-    m_screenQuadShader = std::make_unique<Shader>();
-    if (!m_screenQuadShader->load("engine/shaders/rayscreen.vert", "engine/shaders/rayscreen.frag"))
-        std::cerr << "[RenderSystem] Failed to load rayscreen shader.\n";
+    // Legacy Shader wrappers removed - using RHI shaders and pipelines exclusively
+    // m_pbrShader removed - now using m_pbrShaderRhi with m_pbrPipeline
+    // m_basicShader removed - legacy comparison logic eliminated
+    // m_gridShader removed - Grid class now self-contained with RHI shader
+    // m_gradientShader removed - never used, gradient background should use RHI directly
+    // m_screenQuadShader removed - now using m_screenQuadShaderRhi with m_screenQuadPipeline
 
     // Register RHI with Texture so cache can create matching RHI textures
     if (m_rhi) {
@@ -200,7 +185,7 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     }
 
     // Init helpers
-    if (m_grid) m_grid->init(m_rhi.get(), m_gridShader.get(), 200, 1.0f);
+    if (m_grid) m_grid->init(m_rhi.get(), 200, 1.0f);
     if (m_axisRenderer) m_axisRenderer->init(m_rhi.get());
     if (m_skybox) m_skybox->init(m_rhi.get());
     if (m_iblSystem) m_iblSystem->init(m_rhi.get());
@@ -225,6 +210,45 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
 
         // For backward compatibility, point basicPipeline to PBR pipeline
         m_basicPipeline = m_pbrPipeline;
+
+        // Create rayscreen shader and pipeline for screen quad display
+        ShaderDesc sdRayscreen{};
+        sdRayscreen.vertexSource = loadTextFileRhi("engine/shaders/rayscreen.vert");
+        sdRayscreen.fragmentSource = loadTextFileRhi("engine/shaders/rayscreen.frag");
+        sdRayscreen.debugName = "rayscreen";
+        m_screenQuadShaderRhi = m_rhi->createShader(sdRayscreen);
+
+        PipelineDesc pdRayscreen{};
+        pdRayscreen.shader = m_screenQuadShaderRhi;
+        pdRayscreen.topology = PrimitiveTopology::Triangles;
+        pdRayscreen.debugName = "rayscreen_pipeline";
+
+        // Vertex attributes matching screen quad buffer format (vec2 pos + vec2 uv)
+        VertexAttribute posAttr{};
+        posAttr.location = 0;
+        posAttr.binding = 0;
+        posAttr.format = TextureFormat::RG32F;  // vec2 position
+        posAttr.offset = 0;
+        pdRayscreen.vertexAttributes.push_back(posAttr);
+
+        VertexAttribute uvAttr{};
+        uvAttr.location = 1;
+        uvAttr.binding = 0;
+        uvAttr.format = TextureFormat::RG32F;  // vec2 UV
+        uvAttr.offset = sizeof(float) * 2;
+        pdRayscreen.vertexAttributes.push_back(uvAttr);
+
+        VertexBinding binding{};
+        binding.binding = 0;
+        binding.stride = sizeof(float) * 4;  // 2 floats pos + 2 floats UV
+        binding.perInstance = false;
+        binding.buffer = m_rhi->getScreenQuadBuffer();
+        pdRayscreen.vertexBindings.push_back(binding);
+
+        pdRayscreen.depthTestEnable = false;  // Screen quad doesn't need depth test
+        pdRayscreen.depthWriteEnable = false;
+
+        m_screenQuadPipeline = m_rhi->createPipeline(pdRayscreen);
     }
 
     // Initialize raytracing resources only when needed
@@ -294,9 +318,8 @@ void RenderSystem::shutdown()
     if (m_grid) { m_grid->cleanup(); }
     if (m_gizmo) { m_gizmo->cleanup(); }
     m_raytracer.reset();
-    m_basicShader.reset();
-    m_pbrShader.reset();
-    m_gridShader.reset();
+    // Legacy Shader wrappers removed - RHI shaders cleaned up by RHI::shutdown()
+    // m_basicShader, m_pbrShader, m_gridShader removed - using RHI shaders exclusively
     // Note: m_dummyShadowTexRhi cleanup handled by RHI shutdown
 
     // Shutdown managers (will handle UBO cleanup)
@@ -866,8 +889,8 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
         return;
     }
 
-    if (!m_screenQuadShader) {
-        std::cerr << "[RenderSystem] Screen quad shader not loaded\n";
+    if (m_screenQuadPipeline == INVALID_HANDLE) {
+        std::cerr << "[RenderSystem] Screen quad pipeline not created\n";
         return;
     }
 
@@ -943,23 +966,24 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     }
     // Note: Depth testing state managed by pipeline
     
-    // Render the raytraced result using screen quad
-    m_screenQuadShader->use();
-    
-    // Set post-processing uniforms
-    m_screenQuadShader->setFloat("exposure", m_exposure);
-    m_screenQuadShader->setFloat("gamma", m_gamma);
-    m_screenQuadShader->setInt("toneMappingMode", static_cast<int>(m_tonemap));
-    
+    // Render the raytraced result using screen quad with RHI pipeline
+    // Set post-processing uniforms via RHI
+    if (m_rhi) {
+        m_rhi->setUniformFloat("exposure", m_exposure);
+        m_rhi->setUniformFloat("gamma", m_gamma);
+        m_rhi->setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
+    }
+
     // Bind the raytraced texture (RHI required)
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
         m_rhi->bindTexture(m_raytraceTextureRhi, 0);
-        m_screenQuadShader->setInt("rayTex", 0);
+        m_rhi->setUniformInt("rayTex", 0);
 
-        // Draw the screen quad using RHI
+        // Draw the screen quad using RHI with rayscreen pipeline
         BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
         if (screenQuadBuffer != INVALID_HANDLE) {
             DrawDesc drawDesc{};
+            drawDesc.pipeline = m_screenQuadPipeline;  // Use RHI pipeline instead of legacy shader
             drawDesc.vertexBuffer = screenQuadBuffer;
             drawDesc.vertexCount = 6;
             drawDesc.instanceCount = 1;
@@ -974,108 +998,54 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
 
 void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
 {
-    // Basic object rendering - optimized for minimal state changes
+    // RHI-only object rendering with PBR pipeline
     if (obj.rhiVboPositions == INVALID_HANDLE) return;
+    if (!m_rhi) return;
 
-    // Always use PBR shader (standard shader eliminated)
-    Shader* s = m_pbrShader.get();
-    if (!s) return;
-    
-    // Ensure pipeline is bound before setting uniforms in RHI path
-    if (m_rhi) {
-        ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
-    } else {
-        // Cache shader state to avoid redundant use() calls
-        static Shader* lastShader = nullptr;
-        if (s != lastShader) { s->use(); lastShader = s; }
+    // Ensure PBR pipeline is bound before setting uniforms
+    ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
+
+    // Set common uniforms (texture binding only)
+    setupCommonUniforms();
+
+    // FEAT-0249: Update UBOs for this object via managers
+    // Update transform UBO with object-specific model matrix
+    m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
+
+    // Update material UBO for this object
+    m_materialManager.updateMaterialForObject(obj);
+
+    // Lighting UBO is now handled by LightingManager via bindUniformBlocks()
+    // Note: shadingMode now in RenderingBlock UBO
+
+    // Bind PBR textures - RHI texture binding
+    int unit = 0;
+    if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
+        m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
+        m_rhi->setUniformInt("baseColorTex", unit);
+        unit++;
     }
-    // Set common uniforms
-    setupCommonUniforms(s);
-
-    // FEAT-0249: Update UBOs for this object instead of individual uniforms
-    if (m_rhi) {
-        // Update transform UBO with object-specific model matrix
-        // Update transform UBO using manager
-        m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
-
-        // Update material UBO for this object
-        m_materialManager.updateMaterialForObject(obj);
-
-        // Lighting UBO is now handled by LightingManager via bindUniformBlocks()
-
-        // Note: shadingMode now in RenderingBlock UBO
+    if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
+        m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
+        m_rhi->setUniformInt("normalTex", unit);
+        unit++;
     }
-
-    if (s == m_basicShader.get()) {
-        // Note: Post-processing uniforms now in RenderingBlock UBO
-        // Standard shader uniforms using unified MaterialCore - RHI only
-        // FEAT-0249: Material data now uses MaterialBlock UBO instead of individual uniforms
-        // Material data is set via updateMaterialUniformsForObject() -> MaterialBlock UBO
-    } else {
-        // Use unified MaterialCore (eliminates dual storage) - RHI only
-        const auto& mc = obj.materialCore;
-
-        // Use MaterialManager for unified material handling
-        m_materialManager.updateMaterialForObject(obj);
-        // FEAT-0249: PBR material data now uses MaterialBlock UBO instead of individual uniforms
-        // Material data is set via updateMaterialUniformsForObject() -> MaterialBlock UBO
-        // Note: Texture flags now in MaterialBlock UBO (set by updateMaterialUniformsForObject)
-        
-        // Note: Post-processing uniforms now in RenderingBlock UBO
-        
-        int unit = 0;
-        if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
-            // RHI-only texture binding
-            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
-            m_rhi->setUniformInt("baseColorTex", unit);
-            unit++;
-        }
-        if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
-            // RHI-only texture binding
-            m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
-            m_rhi->setUniformInt("normalTex", unit);
-            unit++;
-        }
-        if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
-            // RHI-only texture binding
-            m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
-            m_rhi->setUniformInt("mrTex", unit);
-        }
+    if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
+        m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
+        m_rhi->setUniformInt("mrTex", unit);
     }
 
-    // Lights - UBO-based lighting is handled by LightingManager
-    // No GL program query needed with RHI
-
-    // Bind dummy shadow map and identity lightSpaceMatrix to avoid undefined sampling - RHI only
+    // Bind dummy shadow map - RHI texture binding
     if (s_dummyShadowTexRhi != INVALID_HANDLE) {
         m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
         m_rhi->setUniformInt("shadowMap", 7);
     }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
 
-    if (s == m_basicShader.get()) {
-        // Texturing or solid color - RHI only
-        if (obj.texture) {
-            obj.texture->bind(0);
-            m_rhi->setUniformInt("cowTexture", 0);
-            // Set useTexture in MaterialBlock UBO
-            // Material texture flags now handled by MaterialManager
-        } else {
-            // Material texture flags now handled by MaterialManager
-            // Set object color in RenderingBlock UBO
-            // Update object color in rendering manager
-            m_renderingManager.setObjectColor(obj.color);
-        }
-        // Material UBO now handled by MaterialManager
-    }
-
-    // Polygon mode and blending handled by pipeline state in RHI
-
-    // Draw call using RHI
-    ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
+    // Draw call using RHI with PBR pipeline
     DrawDesc dd{};
-    dd.pipeline = (s == m_pbrShader.get()) ? (obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline)
-                                           : (obj.rhiPipelineBasic != INVALID_HANDLE ? obj.rhiPipelineBasic : m_basicPipeline);
+    dd.pipeline = obj.rhiPipelinePbr != INVALID_HANDLE ? obj.rhiPipelinePbr : m_pbrPipeline;
+
     // Use indexed draw if RHI index buffer was created
     bool hasIndex = (obj.rhiEbo != INVALID_HANDLE);
     if (hasIndex) {
@@ -1086,7 +1056,6 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     }
     m_rhi->draw(dd);
 
-    // Count one draw call for this object
     m_stats.drawCalls += 1;
 }
 
@@ -1247,11 +1216,9 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
 {
     int selObj = scene.getSelectedObjectIndex();
     const auto& objs = scene.getObjects();
-    if (selObj >= 0 && selObj < (int)objs.size() && m_basicShader) {
+    if (selObj >= 0 && selObj < (int)objs.size()) {
         const auto& obj = objs[selObj];
-        if (obj.rhiVboPositions != INVALID_HANDLE) {
-            Shader* s = m_basicShader.get();
-            s->use();
+        if (obj.rhiVboPositions != INVALID_HANDLE && m_rhi) {
             // Post-processing uniforms for standard shader (selection overlay respects gamma/exposure) - RHI only
             // Update per-object data in UBOs
             // Update transform and rendering state using managers
@@ -1369,17 +1336,16 @@ void RenderSystem::renderObjectsBatched(const SceneManager& scene, const Light& 
         pbrShaderObjects.push_back(&obj);
     }
     
-    // Render all objects with PBR shader
-    if (!pbrShaderObjects.empty() && m_pbrShader) {
-        m_pbrShader->use();
-        setupCommonUniforms(m_pbrShader.get());
+    // Render all objects with PBR shader via RHI pipeline
+    if (!pbrShaderObjects.empty()) {
+        setupCommonUniforms(); // RHI texture binding only
         // Apply lighting via LightingManager UBO (no direct GL uniforms)
         if (m_rhi) {
             m_lightingManager.updateLighting(lights, m_cameraManager.camera().position);
             m_lightingManager.bindLightingUniforms();
         }
         for (const auto* obj : pbrShaderObjects) {
-            renderObjectFast(*obj, lights, m_pbrShader.get());
+            renderObjectFast(*obj, lights);
         }
     }
 
@@ -1387,27 +1353,23 @@ void RenderSystem::renderObjectsBatched(const SceneManager& scene, const Light& 
     // TODO[FEAT-0248]: Remove when all draw calls use RHI::draw() (no legacy VAO binding)
 }
 
-void RenderSystem::setupCommonUniforms(Shader* shader)
+void RenderSystem::setupCommonUniforms()
 {
-    // Prefer RHI-bound current program; fall back to shader wrapper
-    if (m_rhi) {
-        // FEAT-0249: Use manager-based UBO system
-        // Note: Transform UBO is now handled by TransformManager, updated per-object
-        // This method is legacy and should be phased out in favor of manager calls
+    // FEAT-0249: Use manager-based UBO system
+    // Transform UBO handled by TransformManager, updated per-object
+    // Lighting UBO handled by LightingManager
+    // Rendering params (shadingMode, exposure, gamma, toneMappingMode) in RenderingBlock UBO
 
-        // Lighting UBO now handled by LightingManager
+    if (!m_rhi) return;
 
-        // Note: shadingMode, exposure, gamma, toneMappingMode now in RenderingBlock UBO
-    }
-    
-    // Bind dummy shadow map - RHI only
+    // Bind dummy shadow map - RHI texture binding
     if (s_dummyShadowTexRhi != INVALID_HANDLE) {
         m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
         m_rhi->setUniformInt("shadowMap", 7);
     }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
-    
-    // Bind IBL textures if available - RHI only
+
+    // Bind IBL textures if available - RHI texture binding
     if (m_iblSystem) {
         m_iblSystem->bindIBLTextures();
         m_rhi->setUniformInt("irradianceMap", 3);
@@ -1417,18 +1379,17 @@ void RenderSystem::setupCommonUniforms(Shader* shader)
     }
 }
 
-void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights, Shader* shader)
+void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights)
 {
-    // Fast object rendering with minimal per-object state changes
+    // Fast object rendering with minimal per-object state changes via RHI pipelines
     if (m_rhi) {
         ensureObjectPipeline(const_cast<SceneObject&>(obj), true); // Always use PBR
         // FEAT-0249: model matrix now part of TransformBlock UBO, updated per-object
     }
-    
-    // Always use PBR shader (standard shader eliminated)
-    // FEAT-0249: PBR material data now uses MaterialBlock UBO instead of individual uniforms
-    // Material data is set via updateMaterialUniformsForObject() -> MaterialBlock UBO
-    // Note: Texture flags now in MaterialBlock UBO (set by updateMaterialUniformsForObject)
+
+    // FEAT-0249: PBR material data uses MaterialBlock UBO instead of individual uniforms
+    // Material data set via updateMaterialUniformsForObject() -> MaterialBlock UBO
+    // Texture flags in MaterialBlock UBO (set by updateMaterialUniformsForObject)
 
     int unit = 0;
     if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
@@ -1627,8 +1588,8 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
         return;
     }
 
-    if (!m_screenQuadShader) {
-        std::cerr << "[RenderSystem] Screen quad shader not loaded\n";
+    if (m_screenQuadPipeline == INVALID_HANDLE) {
+        std::cerr << "[RenderSystem] Screen quad pipeline not created\n";
         return;
     }
 
@@ -1702,17 +1663,18 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
                            m_raytraceWidth, m_raytraceHeight, TextureFormat::RGB32F);
     }
 
-    // Render full-screen quad with raytraced texture using RHI
-    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE && m_screenQuadShader) {
-        m_screenQuadShader->use();
-        m_screenQuadShader->setInt("screenTexture", 0);
+    // Render full-screen quad with raytraced texture using RHI pipeline
+    if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE && m_screenQuadPipeline != INVALID_HANDLE) {
+        m_rhi->setUniformInt("screenTexture", 0);
         m_rhi->bindTexture(m_raytraceTextureRhi, 0);
 
-        // Use RHI screen quad buffer
+        // Use RHI screen quad buffer with rayscreen pipeline
         BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
         DrawDesc dd{};
+        dd.pipeline = m_screenQuadPipeline;  // Use RHI pipeline instead of legacy shader
+        dd.vertexBuffer = screenQuadBuffer;
         dd.vertexCount = 6;
-        // Note: Screen quad buffer doesn't have a dedicated pipeline; uses current shader
+        dd.instanceCount = 1;
         m_rhi->draw(dd);
 
         m_stats.drawCalls += 1;

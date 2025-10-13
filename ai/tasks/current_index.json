@@ -1,12 +1,12 @@
 {
   "current_focus": {
-    "active_task": "pass_bridging",
-    "phase": "ready_to_start",
-    "sub_issue": "render_graph_implementation",
+    "active_task": "opengl_migration",
+    "phase": "phase_6_integration_fixes",
+    "sub_issue": "legacy_shader_removal_and_rhi_pipeline_integration",
     "assigned_agent": null,
-    "started_at": "2025-10-07T00:00:00Z",
-    "estimated_completion": "2025-10-10T00:00:00Z",
-    "notes": "opengl_migration functionally complete (94%), ready to proceed with critical path"
+    "started_at": "2025-10-11T00:00:00Z",
+    "estimated_completion": "2025-10-12T00:00:00Z",
+    "notes": "Phase 1-5 complete (94%) but critical integration issues block RHIGL runtime: Grid shader handle not created, RenderSystem depends on legacy Shader, uniform bridge still calls GL"
   },
   "task_status": {
     "core_decomposition": {
@@ -15,19 +15,19 @@
       "next_dependent": "opengl_migration"
     },
     "opengl_migration": {
-      "status": "functionally_complete",
+      "status": "in_progress",
       "completion_percentage": 94,
-      "completion_date": "2025-10-07",
+      "last_updated": "2025-10-11",
       "phase_render_system_completed": "2025-01-15",
       "phase_helper_systems_completed": "2025-10-02",
       "phase_texture_system_completed": "2025-10-02",
       "phase_application_loop_completed": "2025-10-03",
       "phase_ibl_cubemap_generation_completed": "2025-10-05",
       "documentation_sync_completed": "2025-10-07",
-      "current_phase": "deferred_optional_cleanup",
-      "blocking": [],
-      "priority": "low",
-      "estimated_effort": "2-4 hours (Phase 6 only, if desired)",
+      "current_phase": "phase_6_integration_fixes",
+      "blocking": ["pass_bridging"],
+      "priority": "critical",
+      "estimated_effort": "4-8 hours",
       "phases_completed": [
         "Phase 1: RenderSystem migration (146 GL calls eliminated)",
         "Phase 2: Helper systems (AxisRenderer 26, Grid 10, Light 76, Gizmo/Skybox already RHI)",
@@ -36,24 +36,36 @@
         "Phase 5: IBL cubemap generation (92 GL calls eliminated)",
         "Documentation sync (2025-10-07): README, checklist, audit updated with accurate state"
       ],
-      "phases_deferred": [
-        "Phase 6 (optional): Legacy Shader class removal (24 GL calls in shader.cpp)",
-        "Phase 6 (separate task): setUniform* bridge removal (60+ call sites, major refactor)"
+      "critical_issues_discovered": [
+        "Grid shader handle never created before pipeline build (engine/src/grid.cpp:55-101)",
+        "RenderSystem::init passes obsolete Shader* to Grid (engine/src/render_system.cpp:213)",
+        "RenderSystem still instantiates legacy Shader wrappers (engine/src/render_system.cpp:175-199, 1374-1407)",
+        "RHIGL uniform helpers call glGetUniformLocation/glUniform* (engine/src/rhi/rhi_gl.cpp:1143-1166)",
+        "Uniforms set via legacy path may target wrong program after RHI pipeline bind"
       ],
-      "reality": "All core rendering systems RHI-only (zero GL calls). Only legacy Shader class retains 24 GL calls. Backend swap blocked by Shader dependency but not required for rendering functionality.",
+      "phase_6_now_required": [
+        "Replace remaining Shader usage with RHI equivalents (PBR, grid, gradient, gizmo, screen-quad)",
+        "Move uniform/state updates to RHI path exclusively (manager APIs or bind groups)",
+        "Fix Grid shader handle creation and init signature mismatch",
+        "Remove setUniform* bridge from RHIGL (60+ call sites to convert)",
+        "Delete shader.{h,cpp} once everything compiles (24 GL calls)"
+      ],
+      "reality": "Phase 1-5 eliminated 426 GL calls but integration incomplete. Legacy Shader still instantiated causing uniform routing conflicts. Grid shader handle missing. RHIGL won't run cleanly until Phase 6 complete.",
       "acceptance_criteria": {
-        "core_systems_rhi": "PASSED - RenderSystem, helpers, IBL, textures, app loop all zero GL",
-        "rendering_functional": "PASSED - raster/ray pipelines working via RHI",
-        "performance_maintained": "PASSED - no regressions observed",
-        "repo_wide_zero_gl": "DEFERRED - 24 calls in Shader class, 3 false positives",
-        "backend_swap_capability": "DEFERRED - blocked by Shader class"
+        "core_systems_rhi": "PARTIAL - zero GL calls but still using legacy Shader wrappers",
+        "rendering_functional": "PARTIAL - works but uses mixed legacy/RHI paths",
+        "grid_pipeline_valid": "FAILED - shader handle not created",
+        "uniform_routing_correct": "FAILED - legacy Shader may conflict with RHI pipelines",
+        "repo_wide_zero_gl": "FAILED - 24 calls in Shader class, uniform bridge calls GL",
+        "backend_swap_capability": "BLOCKED - Shader dependency"
       },
-      "recommendation": "Proceed to pass_bridging - migration functionally complete for rendering"
+      "recommendation": "Complete Phase 6 integration fixes BEFORE pass_bridging - current state won't run cleanly with RHIGL"
     },
     "pass_bridging": {
-      "status": "ready",
-      "blocked_by": [],
-      "ready_when": "rhi_screen_quad_utility_available ✅",
+      "status": "blocked",
+      "blocked_by": ["opengl_migration"],
+      "reason": "RHIGL won't run cleanly until Phase 6 integration fixes complete",
+      "ready_when": "opengl_migration Phase 6 complete",
       "prerequisites_met": "2024-12-29"
     },
     "state_accessibility": {
@@ -92,11 +104,11 @@
     "json_ops_runner"
   ],
   "blockers": {
-    "immediate": [],
-    "upcoming": []
+    "immediate": ["Grid shader handle not created", "RenderSystem uses legacy Shader wrappers", "Uniform bridge calls GL"],
+    "upcoming": ["setUniform* bridge removal across 60+ call sites"]
   },
-  "last_updated": "2025-10-07T00:00:00Z",
+  "last_updated": "2025-10-11T00:00:00Z",
   "updated_by": "claude_code_assistant",
-  "notes": "OpenGL migration FUNCTIONALLY COMPLETE (94%). All core rendering systems now RHI-only: RenderSystem (146 calls), AxisRenderer (26), Grid (10), Light (76), IBLSystem generation (92), Texture (18), ApplicationCore (2) = 426 GL calls eliminated. Documentation synchronized 2025-10-07: README.md, checklist.md, remaining_gl_calls_audit.md all updated with accurate current state. Remaining: 24 GL calls in legacy Shader class (shader.cpp lines 18-181), used only by IBLSystem for uniform setting. 3 false positives (glTF string literals, comments). Phase 6 optional: Remove Shader class (2-4 hours) for 100% GL-free + backend swap. Recommendation: Proceed to pass_bridging task - migration meets all functional requirements for rendering architecture."
+  "notes": "OpenGL migration 94% complete (426/454 GL calls eliminated) BUT critical integration issues discovered. Phase 1-5 work complete but Grid shader handle never created before pipeline build (engine/src/grid.cpp:55-101), RenderSystem still instantiates legacy Shader wrappers (engine/src/render_system.cpp:175-199, 1374-1407), and RHIGL uniform helpers still call glGetUniformLocation/glUniform* (engine/src/rhi/rhi_gl.cpp:1143-1166). Current state won't run cleanly with RHIGL. Phase 6 NOW REQUIRED: 1) Replace Shader usage with RHI equivalents, 2) Move uniform updates to RHI path exclusively (manager APIs or bind groups), 3) Fix Grid shader handle creation, 4) Remove setUniform* bridge (60+ call sites), 5) Delete shader.{h,cpp} (24 GL calls). Priority elevated to CRITICAL - must complete before pass_bridging can proceed."
 }
 }

@@ -3,7 +3,7 @@
   "title": "Complete OpenGL to RHI Migration",
   "owner": "rhi_abstraction_team",
   "status": "in_progress",
-  "completion_percentage": 95,
+  "completion_percentage": 94,
   "inputs": {
     "files": [
       "engine/src/render_system.cpp (146 OpenGL calls - COMPLETED)",
@@ -110,8 +110,23 @@
     },
     {
       "name": "final_cleanup",
-      "status": "pending",
-      "tasks": ["Remove setUniform* helpers (60+ call sites)", "Remove legacy Shader class (22 GL calls)", "Backend swap validation"]
+      "status": "in_progress",
+      "priority": "critical",
+      "reason": "Integration issues discovered - RHIGL won't run cleanly until complete",
+      "critical_blockers": [
+        "Grid shader handle never created before pipeline build (grid.cpp:55-101)",
+        "RenderSystem::init passes obsolete Shader* argument (render_system.cpp:213)",
+        "RenderSystem still instantiates legacy Shader wrappers (render_system.cpp:175-199, 1374-1407)",
+        "RHIGL uniform helpers call glGetUniformLocation/glUniform* (rhi_gl.cpp:1143-1166)"
+      ],
+      "tasks": [
+        "Fix Grid shader handle creation and init signature",
+        "Replace Shader instantiation with RHI shader/pipeline handles",
+        "Move uniform updates to manager APIs or bind groups",
+        "Remove setUniform* helpers (60+ call sites)",
+        "Remove legacy Shader class (24 GL calls)",
+        "Backend swap validation"
+      ]
     }
   ],
   "safety": {

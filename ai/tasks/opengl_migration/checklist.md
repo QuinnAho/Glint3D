@@ -1,7 +1,9 @@
 # OpenGL Migration Checklist
 
-**Last Updated**: 2025-10-07
-**Status**: 94% Complete (426/454 GL calls eliminated)
+**Last Updated**: 2025-10-11
+**Status**: 94% Complete (426/454 GL calls eliminated) - Phase 6 CRITICAL integration fixes IN PROGRESS
+
+**Reality Check**: While RenderSystem no longer instantiates legacy Shader wrappers, the Shader class itself (24 GL calls) and PipelineManager's legacy Shader instantiation remain. RHI uniform bridge still calls GL. Repo-wide zero-GL not yet achieved.
 
 ---
 
@@ -165,24 +167,42 @@
 
 ---
 
-## Phase 6: Final Cleanup ⏸️ DEFERRED (Optional)
+## Phase 6: Final Cleanup 🔴 CRITICAL (IN PROGRESS - 2025-10-11)
 
-### Remove Legacy Shader Class (NOT STARTED)
+**Priority Elevated**: Integration audit discovered RHIGL won't run cleanly with current mixed legacy/RHI state.
+
+### Critical Issue: Grid Shader Handle Not Created
+- [x] **Create Grid RHI shader** - Call m_rhi->createShader() before pipeline creation (grid.cpp:77) ✅
+- [x] **Store shader handle** - RhiShaderHandle m_shaderHandle member already exists (grid.h:27) ✅
+- [x] **Fix init() signature** - Signature already correct, only takes RHI* parameter (grid.h:16) ✅
+- [x] **Update RenderSystem call** - Removed m_gridShader.get() argument (render_system.cpp:203) ✅
+- [x] **Test** - Build successful with Grid RHI shader handle (Release build clean) ✅
+
+### Critical Issue: RenderSystem Legacy Shader Wrappers
+- [x] **Audit Shader instantiation** - Comprehensive audit completed, documented in artifacts/shader_instantiation_audit.md ✅
+- [x] **Remove unused shaders** - Deleted m_gridShader and m_gradientShader from RenderSystem (Phase 1) ✅
+- [x] **Replace m_screenQuadShader** - Migrated to m_screenQuadShaderRhi + m_screenQuadPipeline in RenderSystem (Phase 2) ✅
+- [x] **Replace m_pbrShader** - Removed from RenderSystem, primary rendering uses RHI pipelines (Phase 3) ✅
+- [x] **Replace m_basicShader** - Removed from RenderSystem, comparison logic eliminated (Phase 3) ✅
+- [ ] **Migrate PipelineManager** - Still instantiates legacy Shader at pipeline_manager.cpp:80
+- [ ] **Remove Shader::setRHI** - Still called at render_system.cpp:184
+- [ ] **Remove Shader class** - Still exists with 24 GL calls in shader.cpp
+
+### Critical Issue: RHIGL Uniform Bridge Calls GL
+- [ ] **Audit setUniform* calls** - Find all RHI::setUniform* call sites (60+ locations)
+- [ ] **Design manager API** - Define TransformManager/MaterialManager/LightingManager interfaces
+- [ ] **Implement UBO-backed managers** - Replace direct uniform setting with manager updates
+- [ ] **Migrate call sites** - Convert all setUniform* calls to manager API (render_system, helpers)
+- [ ] **Remove GL bridge** - Delete RhiGL::setUniform* methods (rhi_gl.cpp:1143-1166)
+- [ ] **Test** - Verify uniforms update correctly via managers
+
+### Remove Legacy Shader Class
 - [ ] **Migrate IBLSystem uniforms** - Replace Shader::use()/setInt/setMat4 with RHI approach
-- [ ] **Verify Grid Shader usage** - Check if m_shader member is actually used
+- [ ] **Remove Grid Shader member** - Delete unused Shader* m_shader from Grid class
 - [ ] **Delete shader.h** - Remove header file
 - [ ] **Delete shader.cpp** - Remove implementation (24 GL calls)
-- [ ] **Update includes** - Remove #include "shader.h" from IBLSystem, Grid, others
+- [ ] **Update includes** - Remove #include "shader.h" from IBLSystem, Grid, RenderSystem
 - [ ] **Test** - Build successful, zero GL calls outside rhi_gl.cpp
-
-### Remove setUniform* Bridge (DEFERRED TO SEPARATE TASK)
-- [ ] **Audit setUniform* usage** - Find all RHI::setUniform* calls (60+ sites)
-- [ ] **Design manager API** - TransformManager, MaterialManager, LightingManager approach
-- [ ] **Migrate call sites** - Replace RHI::setUniform* with manager APIs
-- [ ] **Remove bridge methods** - Delete RhiGL::setUniform* (lines ~1064-1089)
-- [ ] **Test** - Verify all uniform updates work via managers
-
-**Deferral Reason**: setUniform* migration requires major refactor across entire codebase (60+ call sites). Not blocking for RHI architecture goals or critical path tasks. Can be completed as separate polish task.
 
 ### Backend Swap Validation (BLOCKED)
 - [ ] **Create RhiNull stub** - Minimal no-op backend for testing
@@ -230,23 +250,46 @@
 6. ✅ Rendering works correctly via RHI (visual validation)
 7. ✅ Performance maintained (no regressions)
 
-### Deferred (6% - 24 GL calls in Shader class) ⏸️
-1. ⏸️ Legacy Shader class removal (24 GL calls in shader.cpp)
-2. ⏸️ Backend swap validation (blocked by Shader dependency)
-3. ⏸️ setUniform* bridge removal (60+ call sites, separate task)
+### Critical Integration Issues Discovered (2025-10-11) 🔴
+1. ✅ Grid shader handle never created before pipeline build - FIXED (2025-10-11)
+2. 🟡 RenderSystem instantiated legacy Shader wrappers - PARTIALLY FIXED (removed from RenderSystem, but PipelineManager still uses)
+3. 🔴 PipelineManager still instantiates legacy Shader objects - pipeline_manager.cpp:80
+4. 🔴 RHIGL uniform helpers call glGetUniformLocation/glUniform* - rhi_gl.cpp:1146+
+5. 🔴 Mixed legacy/RHI uniform paths cause routing conflicts
+6. 🔴 Legacy Shader class removal (24 GL calls in shader.cpp)
+7. ⏸️ Backend swap validation (blocked by Shader dependency and uniform bridge)
 
 ---
 
 ## Recommendation
 
-**OpenGL migration is functionally complete** for all core rendering systems. The remaining 24 GL calls are isolated in the legacy Shader class and don't block RHI architecture goals or downstream tasks.
+**UPDATED 2025-10-11**: Phase 6 integration fixes IN PROGRESS
 
-**Next Steps**:
-- **Recommended**: Proceed to `pass_bridging` task on critical path
-- **Alternative**: Complete Phase 6 Shader cleanup (2-4 hours) for 100% achievement
+**Completed Work (2025-10-11)**:
+- ✅ Grid shader handle creation (grid.cpp:77)
+- ✅ Skybox shader handle creation (skybox.cpp:132)
+- ✅ RHIGL m_shaders map declaration (rhi_gl.h:165)
+- ✅ RenderSystem Shader wrapper removal (m_pbrShader, m_basicShader, m_screenQuadShader)
+- ✅ setupCommonUniforms() no longer takes Shader* parameter
+- ✅ renderObjectFast() no longer takes Shader* parameter
 
-**Decision**: Recommend proceeding to critical path. Phase 6 can be completed as optional polish work if/when backend swap becomes a priority.
+**Remaining Critical Work**:
+1. 🔴 **PipelineManager migration** - Still instantiates legacy Shader at pipeline_manager.cpp:80
+   - Remove loadShaders() method
+   - Remove m_pbrShader/m_basicShader unique_ptr members
+   - Use m_pbrShaderRhi/m_basicShaderRhi exclusively
+2. 🔴 **Remove Shader::setRHI call** - render_system.cpp:184 still calls this
+3. 🔴 **Delete Shader class** - shader.cpp still exists with 24 GL calls
+4. 🔴 **Migrate setUniform* bridge** - 60+ call sites still use RHI::setUniform*, which calls GL
+   - Move to manager APIs or bind groups
+   - Remove setUniform* methods from RhiGL (rhi_gl.cpp:1146+)
+5. 🔴 **Remove forward declaration** - render_system.h:40 still has `class Shader;`
+
+**Priority**: CRITICAL - Must complete before pass_bridging
+
+**Estimated Remaining**: 3-5 hours for full Phase 6 completion
 
 ---
 
 *Last verification: 2025-10-07 via `grep -rn "gl[A-Z]" engine/src/*.cpp`*
+*Integration audit: 2025-10-11 - Critical issues discovered requiring Phase 6 completion*

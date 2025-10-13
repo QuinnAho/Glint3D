@@ -74,6 +74,7 @@ bool Grid::init(glint3d::RHI* rhi, int lineCount, float spacing)
     glint3d::ShaderDesc shaderDesc;
     shaderDesc.vertexSource = vertexShaderSource;
     shaderDesc.fragmentSource = fragmentShaderSource;
+    m_shaderHandle = m_rhi->createShader(shaderDesc);
 
     // Create pipeline
     glint3d::PipelineDesc pipelineDesc;

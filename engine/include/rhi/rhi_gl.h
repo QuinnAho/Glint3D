@@ -162,6 +162,7 @@ private:
     // Resource storage
     std::unordered_map<TextureHandle, GLTexture> m_textures;
     std::unordered_map<BufferHandle, GLBuffer> m_buffers;
+    std::unordered_map<ShaderHandle, GLShader> m_shaders;
     std::unordered_map<PipelineHandle, GLPipeline> m_pipelines;
     std::unordered_map<RenderTargetHandle, GLRenderTarget> m_renderTargets;
     struct GLBindGroupLayout { BindGroupLayoutDesc desc; };

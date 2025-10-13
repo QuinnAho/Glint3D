@@ -259,15 +259,17 @@ private:
     GLuint m_screenQuadVBO = 0;
     GLuint m_raytraceTexture = 0;
     TextureHandle m_raytraceTextureRhi = INVALID_HANDLE;
-    std::unique_ptr<Shader> m_screenQuadShader;
+    // m_screenQuadShader removed - now using m_screenQuadShaderRhi with m_screenQuadPipeline
     int m_raytraceWidth = 512;
     int m_raytraceHeight = 512;
 
-    // RHI pipelines (shader binding handled by legacy Shader for now)
+    // RHI pipelines (shader binding handled exclusively through RHI::bindPipeline)
     PipelineHandle m_basicPipeline = INVALID_HANDLE;
     PipelineHandle m_pbrPipeline = INVALID_HANDLE;
     ShaderHandle m_basicShaderRhi = INVALID_HANDLE;
     ShaderHandle m_pbrShaderRhi = INVALID_HANDLE;
+    ShaderHandle m_screenQuadShaderRhi = INVALID_HANDLE;
+    PipelineHandle m_screenQuadPipeline = INVALID_HANDLE;
     std::unordered_map<const SceneObject*, PipelineHandle> m_wireframePipelines; // Cache for selection wireframes
 
     // Helpers
@@ -283,11 +285,12 @@ private:
     // UBO binding - delegates entirely to managers
     void bindUniformBlocks(); // Delegates to all managers
 
-    // Shaders
-    std::unique_ptr<Shader> m_basicShader;
-    std::unique_ptr<Shader> m_pbrShader;
-    std::unique_ptr<Shader> m_gridShader;
-    std::unique_ptr<Shader> m_gradientShader;
+    // Legacy Shader wrappers removed - using RHI shaders and pipelines exclusively
+    // m_basicShader removed - legacy comparison logic eliminated
+    // m_pbrShader removed - now using m_pbrShaderRhi with m_pbrPipeline
+    // m_gridShader removed - Grid class now self-contained with RHI
+    // m_gradientShader removed - never used, gradient background should use RHI directly
+    // m_screenQuadShader removed - now using m_screenQuadShaderRhi with m_screenQuadPipeline
     
     // Fallback shadow map to satisfy shaders that sample shadowMap
     GLuint m_dummyShadowTex = 0;
@@ -309,8 +312,8 @@ private:
     void renderGizmo(const SceneManager& scene, const Light& lights);
     void renderObjectsBatched(const SceneManager& scene, const Light& lights);
     void renderObjectsBatchedWithManagers(const SceneManager& scene, const Light& lights);  // New manager-based method
-    void setupCommonUniforms(Shader* shader);
-    void renderObjectFast(const SceneObject& obj, const Light& lights, Shader* shader);
+    void setupCommonUniforms();
+    void renderObjectFast(const SceneObject& obj, const Light& lights);
     
     // Raytracing support methods
     void initScreenQuad();

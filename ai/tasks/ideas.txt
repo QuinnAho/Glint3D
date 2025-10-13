@@ -1,0 +1,19 @@
+Converting 3D models into Gaussian Splatting (3DGS) makes Glint3D faster, simpler, and much more flexible for AI to use. Splats are lightweight, so scenes load and render quickly — even on lower-end hardware or in the browser. They don’t need UVs, complex materials, or baking, which removes a lot of setup work. Lighting and shading can be changed easily with a few parameters, making it perfect for fast AI-driven feedback loops. Splats also make LOD (level of detail) and streaming easier, so big scenes can run smoothly. Because splats are parametric and predictable, AI can directly control them, automate renders, and experiment freely. This turns Glint from a traditional renderer into a fast, flexible sandbox where AI can explore lighting, materials, and style in real time.
+
+
+Internal Ai when living renderer come into fruition
+
+Glint’s “living renderer” idea is built around two main parts that work together: outside AI and users, and an internal learning system.
+
+The outside part is simple — users or external AI tools use machine-readable files like presets, playbooks, and tuning settings to control how scenes are rendered. They don’t touch the engine itself, they just give it clean instructions.
+
+While they do that, Glint is quietly watching and learning. It looks at which settings people use the most, what lighting gives the best results, and what setups are fastest. Over time, this info becomes really valuable.
+
+The internal learning system then takes what it sees from real use and runs its own safe experiments in a sandbox — trying different settings, testing what works best, and updating its presets and best practices.
+
+Instead of rewriting code or changing how the engine works, Glint updates its own “knowledge” about what works best. The more people use it, the smarter it gets. External AI handles the creative part, users give it real signals, and Glint quietly improves in the background.
+
+When testing brand-new rendering techniques like a new lighting model or equation, Glint would use a separate sandbox layer just for experiments. New methods can run side-by-side with the current pipeline using the same scene data, letting Glint compare quality, speed, and performance without touching production. If the new approach proves better through real tests and user feedback, it can then be safely promoted into the main system.
+
+sperate json ops into two, one for internal rendering settings, ect
+
