@@ -1,13 +1,23 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/managers/pipeline_manager.h","purpose":"Creates and caches GPU pipeline objects for render passes","exports":["PipelineManager"],"depends_on":["glint3d::RHI","ShaderHandle"],"notes":["Provides reuse of shader/pipeline combos","Handles rebuilds on shader or config changes"]}
 #pragma once
+
+/**
+ * @file pipeline_manager.h
+ * @brief Factory/cache for render pipelines built through the RHI.
+ */
+
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 #include <memory>
 #include <unordered_map>
 #include <string>
 
-using namespace glint3d;
+using glint3d::PipelineHandle;
+using glint3d::RHI;
+using glint3d::ShaderHandle;
 
-// Forward declarations
+// forward declarations
 struct SceneObject;
 class Shader;
 

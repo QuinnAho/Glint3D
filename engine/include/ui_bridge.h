@@ -1,4 +1,16 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/ui_bridge.h","purpose":"Abstracts UI rendering and command routing for Glint3D's editor","exports":["UIState","UICommand","UICommandData","IUILayer","UIBridge"],"depends_on":["SceneManager","RenderSystem","CameraController","Light","JsonOpsExecutor"],"notes":["Builds engine state snapshots consumable by UI layers","Translates UI commands into scene and renderer actions","Persists MRU file lists and bridges JSON ops"]}
 #pragma once
+
+/**
+ * @file ui_bridge.h
+ * @brief UI abstraction that builds engine state snapshots and executes UI-driven commands.
+ *
+ * UIBridge mediates between core systems and whichever immediate-mode or platform UI is active,
+ * producing a serializable UIState for rendering while translating user commands back into
+ * scene, renderer, and JSON-ops mutations.
+ */
+
 #include <string>
 #include <vector>
 #include <functional>
@@ -6,31 +18,31 @@
 #include "render_system.h"
 #include "camera_controller.h"
 
-// Forward declarations
+// forward declarations
 class SceneManager;
 class RenderSystem; 
 class Light;
 
-// Include needed for unique_ptr
+// include needed for unique_ptr
 #include "json_ops.h"
 
-// UI-independent state snapshot for any UI implementation
+// ui-independent state snapshot for any ui implementation
 struct UIState {
-    // Visibility toggles
+    // visibility toggles
     bool showSettingsPanel = true;
     bool showPerfHUD = false;
     bool showGrid = true;
     bool showAxes = true;
     bool showSkybox = false;
     
-    // Rendering state
+    // rendering state
     RenderMode renderMode = RenderMode::Solid;
     ShadingMode shadingMode = ShadingMode::Gouraud;
     bool framebufferSRGBEnabled = true;
     bool denoiseEnabled = false;
-    int msaaSamples = 1; // UI exposure of MSAA samples
+    int msaaSamples = 1; // ui exposure of msaa samples
     
-    // Environment/lighting state
+    // environment / lighting state
     RenderSystem::BackgroundMode backgroundMode = RenderSystem::BackgroundMode::Solid;
     glm::vec3 backgroundSolid{0.10f,0.11f,0.12f};
     glm::vec3 backgroundTop{0.10f,0.11f,0.12f};
@@ -40,25 +52,25 @@ struct UIState {
     float iblIntensity = 1.0f;
     std::string environmentPath;
     
-    // Camera state
+    // camera state
     CameraState camera;
     float cameraSpeed = 0.5f;
     float sensitivity = 0.1f;
     bool requireRMBToMove = true;
     
-    // Selection
+    // selection
     int selectedObjectIndex = -1;
     std::string selectedObjectName;
     int selectedLightIndex = -1;
     int objectCount = 0;
     int lightCount = 0;
     
-    // Objects list for hierarchy UI
+    // objects list for hierarchy ui
     std::vector<std::string> objectNames;
-    // Optional: parent indices for tree UI (-1 = root). If empty or size mismatch, UI renders flat.
+    // optional: parent indices for tree ui (-1 = root). if empty or size mismatch, ui renders flat.
     std::vector<int> objectParentIndex;
     
-    // Light details for UI editing
+    // light details for ui editing
     struct LightUI {
         int type = 0;              // 0=point, 1=directional
         glm::vec3 position{0.0f};  // point
@@ -71,7 +83,7 @@ struct UIState {
     };
     std::vector<LightUI> lights;   // mirrors lights for editing
     
-    // Gizmo state
+    // gizmo state
     GizmoMode gizmoMode = GizmoMode::Translate;
     GizmoAxis gizmoAxis = GizmoAxis::None;
     bool gizmoLocalSpace = true;
@@ -80,18 +92,18 @@ struct UIState {
     float snapRotateDeg = 15.0f;
     float snapScale = 0.1f;
     
-    // Statistics
+    // statistics
     RenderStats renderStats;
     
-    // Console/log
+    // console / log
     std::vector<std::string> consoleLog;
 
-    // Recent files (MRU)
+    // recent files (mru)
     std::vector<std::string> recentFiles;
 
 };
 
-// Command interface for UI actions
+// command interface for ui actions
 enum class UICommand {
     LoadObject,
     RemoveObject,
@@ -125,33 +137,33 @@ enum class UICommand {
     SetMSAASamples,
     SetRequireRMBToMove,
     
-    // UI visibility toggles
+    // ui visibility toggles
     ToggleSettingsPanel,
     TogglePerfHUD,
     ToggleGrid,
     ToggleAxes,
     ToggleSkybox,
     
-    // IBL/Environment controls
+    // ibl / environment controls
     LoadHDREnvironment,
     SetSkyboxIntensity,
     SetIBLIntensity,
     
-    // Scene operations
+    // scene operations
     CenterCamera,
     SetCameraPreset,
     ResetScene,
     
-    // Application control
+    // application control
     CopyShareLink,
     ExitApplication,
     
-    // File operations
-    ImportAsset,          // Unified import for models and JSON scenes
+    // file operations
+    ImportAsset,          // unified import for models and JSON scenes
     ExportScene,
     OpenFile
     ,
-    // Hierarchy operations
+    // hierarchy operations
     ReparentObject
 };
 
@@ -165,7 +177,7 @@ struct UICommandData {
     bool boolParam = false;
 };
 
-// Abstract UI layer interface
+// abstract ui layer interface
 class IUILayer {
 public:
     virtual ~IUILayer() = default;
@@ -176,7 +188,7 @@ public:
     virtual void handleResize(int width, int height) = 0;
     virtual void handleCommand(const UICommandData& cmd) = 0;
     
-    // Command callback - UI implementations call this to execute actions
+    // command callback - ui implementations call this to execute actions
     std::function<void(const UICommandData&)> onCommand;
 };
 
@@ -187,53 +199,53 @@ public:
              CameraController& camera, Light& lights);
     ~UIBridge() = default;
     
-    // UI lifecycle
+    // ui lifecycle
     void setUILayer(std::unique_ptr<IUILayer> ui) { m_ui = std::move(ui); }
     bool initUI(int windowWidth, int windowHeight);
     void shutdownUI();
     void renderUI();
     void handleResize(int width, int height);
     
-    // State management
+    // state management
     UIState buildUIState() const;
     void handleUICommand(const UICommandData& command);
     
-    // Console/logging
+    // console / logging
     void addConsoleMessage(const std::string& message);
     void clearConsoleLog();
 
-    // Light selection for UI state
+    // light selection for ui state
     void setSelectedLightIndex(int idx) { m_selectedLightIndex = idx; }
     int  getSelectedLightIndex() const { return m_selectedLightIndex; }
 
-    // Settings queried by core
+    // settings queried by core
     bool getRequireRMBToMove() const { return m_requireRMBToMove; }
     
-    // JSON Ops integration
+    // json ops integration
     bool applyJsonOps(const std::string& json, std::string& error);
     std::string buildShareLink() const;
     std::string sceneToJson() const;
     
 private:
-    // System references
+    // system references
     SceneManager& m_scene;
     RenderSystem& m_renderer;
     CameraController& m_camera;
     Light& m_lights;
     
-    // UI layer
+    // ui layer
     std::unique_ptr<IUILayer> m_ui;
     
-    // State
+    // state
     std::vector<std::string> m_consoleLog;
     bool m_previewOnly = false;
     bool m_requireRMBToMove = true;
     int  m_selectedLightIndex = -1;
 
-    // JSON ops executor (modularized from UI)
+    // json ops executor (modularized from ui)
     std::unique_ptr<JsonOpsExecutor> m_ops;
     
-    // MRU recent files
+    // mru recent files
     std::vector<std::string> m_recentFiles;
     size_t m_recentMax = 10;
     void loadRecentFiles();
@@ -241,7 +253,7 @@ private:
     void addRecentFile(const std::string& path);
     bool openFilePath(const std::string& path);
     
-    // Command handlers
+    // command handlers
     void handleLoadObject(const UICommandData& cmd);
     void handleRenderMode(const UICommandData& cmd);
     void handleCameraSettings(const UICommandData& cmd);

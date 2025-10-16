@@ -1,5 +1,5 @@
 #include "managers/pipeline_manager.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>

@@ -1,6 +1,6 @@
 #include "render_pass.h"
 #include "render_system.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "light.h"
 
 #include <glint3d/rhi_types.h>
@@ -566,5 +566,4 @@ void RayIntegratorPass::teardown(const PassContext& ctx) {
         m_outputTex = INVALID_HANDLE;
     }
 }
-
 

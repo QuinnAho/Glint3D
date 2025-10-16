@@ -1,7 +1,7 @@
 #include "application_core.h"
 #include "gl_platform.h"
 #include <GLFW/glfw3.h>
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "render_system.h"
 #include "camera_controller.h"
 #include "light.h"

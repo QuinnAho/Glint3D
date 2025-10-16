@@ -1,5 +1,5 @@
 #include "../engine/include/camera_controller.h"
-#include "../engine/include/scene_manager.h"
+#include "../engine/include/managers/scene_manager.h"
 #include "../engine/include/config_defaults.h"
 #include <iostream>
 #include <cmath>

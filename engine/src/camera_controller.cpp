@@ -1,5 +1,5 @@
 #include "camera_controller.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 #include <algorithm>

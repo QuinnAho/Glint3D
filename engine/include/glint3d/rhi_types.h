@@ -1,3 +1,16 @@
+// machine summary block
+// {"file":"engine/include/glint3d/rhi_types.h","purpose":"defines rhi type system with resource handles, descriptors, and enums","exports":["TextureHandle","BufferHandle","ShaderHandle","PipelineHandle","RenderTargetHandle","BindGroupHandle","RhiInit","TextureDesc","BufferDesc","PipelineDesc","DrawDesc","RenderPassDesc","UniformAllocation","ShaderReflection"],"depends_on":["glm"],"notes":["provides webgpu-shaped api types for cross-platform rendering","includes uniform buffer ring allocator types","all resource handles are opaque uint32_t for type safety"]}
+
+/**
+ * @file rhi_types.h
+ * @brief type definitions for the render hardware interface abstraction layer.
+ *
+ * defines all handles, enums, and descriptor structures used by the rhi system. includes
+ * resource handles (textures, buffers, shaders, pipelines), initialization and draw descriptors,
+ * render pass configuration, and uniform buffer reflection types. designed to be backend-agnostic
+ * and compatible with both opengl and future backends (vulkan, metal, webgpu).
+ */
+
 #pragma once
 
 #include <string>
@@ -7,7 +20,7 @@
 
 namespace glint3d {
 
-// Resource handle types - opaque handles for type safety
+// resource handle types (opaque for type safety)
 using TextureHandle = uint32_t;
 using BufferHandle = uint32_t;
 using ShaderHandle = uint32_t;
@@ -20,7 +33,7 @@ using SamplerHandle = uint32_t;
 
 constexpr uint32_t INVALID_HANDLE = 0;
 
-// RHI Initialization descriptor
+// initialization and configuration
 struct RhiInit {
     int windowWidth = 800;
     int windowHeight = 600;
@@ -30,7 +43,7 @@ struct RhiInit {
     const char* applicationName = "Glint3D";
 };
 
-// Resource states (WebGPU-shaped)
+// resource states and formats
 enum class ResourceState : uint32_t {
     Undefined = 0,
     RenderTarget,
@@ -42,7 +55,6 @@ enum class ResourceState : uint32_t {
     Present
 };
 
-// Texture formats - keep compatible with existing engine usage
 enum class TextureFormat {
     RGBA8,
     RGBA16F,
@@ -60,7 +72,6 @@ enum class TextureFormat {
     Depth32F
 };
 
-// Texture types
 enum class TextureType {
     Texture2D,
     TextureCube,
@@ -68,7 +79,7 @@ enum class TextureType {
     Texture3D
 };
 
-// Buffer types
+// buffer and rendering configuration
 enum class BufferType {
     Vertex,
     Index,
@@ -76,14 +87,12 @@ enum class BufferType {
     Storage
 };
 
-// Buffer usage patterns
 enum class BufferUsage {
-    Static,   // Rarely modified
-    Dynamic,  // Frequently modified  
-    Stream    // Modified every frame
+    Static,   // rarely modified
+    Dynamic,  // frequently modified  
+    Stream    // modified every frame
 };
 
-// Primitive topology
 enum class PrimitiveTopology {
     Triangles,
     TriangleStrip,
@@ -92,14 +101,12 @@ enum class PrimitiveTopology {
     Points
 };
 
-// Polygon rasterization mode
 enum class PolygonMode {
-    Fill,      // Solid polygons (default)
-    Line,      // Wireframe
-    Point      // Vertices only
+    Fill,      // solid polygons (default)
+    Line,      // wireframe
+    Point      // vertices only
 };
 
-// Blend factors for source and destination
 enum class BlendFactor {
     Zero,
     One,
@@ -115,7 +122,7 @@ enum class BlendFactor {
     OneMinusConstantColor
 };
 
-// Shader stages - bitfield for multi-stage shaders
+// shader configuration
 enum class ShaderStage : uint32_t {
     Vertex = 1 << 0,
     Fragment = 1 << 1,
@@ -125,7 +132,7 @@ enum class ShaderStage : uint32_t {
     Compute = 1 << 5
 };
 
-// Enable bitwise operations for ShaderStage
+// bitwise operations for shader stage flags
 inline ShaderStage operator|(ShaderStage a, ShaderStage b) {
     return static_cast<ShaderStage>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
 }
@@ -134,10 +141,9 @@ inline ShaderStage operator&(ShaderStage a, ShaderStage b) {
     return static_cast<ShaderStage>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
 }
 
-// Visibility bitset helpers
 inline uint32_t shaderStageBits(ShaderStage s) { return static_cast<uint32_t>(s); }
 
-// Texture descriptor
+// resource descriptors
 struct TextureDesc {
     TextureType type = TextureType::Texture2D;
     TextureFormat format = TextureFormat::RGBA8;
@@ -152,7 +158,6 @@ struct TextureDesc {
     std::string debugName;
 };
 
-// Buffer descriptor
 struct BufferDesc {
     BufferType type = BufferType::Vertex;
     BufferUsage usage = BufferUsage::Static;
@@ -161,7 +166,7 @@ struct BufferDesc {
     std::string debugName;
 };
 
-// Bind group layout (WebGPU-shaped)
+// bind group layout (webgpu-shaped)
 enum class BindingType : uint32_t {
     UniformBuffer,
     StorageBuffer,
@@ -181,11 +186,12 @@ struct BindGroupLayoutDesc {
     std::string debugName;
 };
 
-// Bind group (resource set) description
+// bind group (resource set) description
+
 struct BufferBinding {
     BufferHandle buffer = INVALID_HANDLE;
     size_t offset = 0;
-    size_t size = 0; // 0 means whole buffer from offset
+    size_t size = 0; // 0 = whole buffer from offset
 };
 
 struct TextureBinding {
@@ -195,9 +201,8 @@ struct TextureBinding {
 
 struct BindGroupEntry {
     uint32_t binding = 0;
-    // One of the below will be used depending on layout type
-    BufferBinding buffer;
-    TextureBinding texture;
+    BufferBinding buffer;   // used for uniform/storage buffers
+    TextureBinding texture; // used for sampled textures
 };
 
 struct BindGroupDesc {
@@ -206,7 +211,6 @@ struct BindGroupDesc {
     std::string debugName;
 };
 
-// Shader descriptor
 struct ShaderDesc {
     uint32_t stages = 0; // Bitfield of ShaderStage
     std::string vertexSource;
@@ -218,7 +222,7 @@ struct ShaderDesc {
     std::string debugName;
 };
 
-// Vertex attribute description
+// vertex input configuration
 struct VertexAttribute {
     uint32_t location = 0;
     uint32_t binding = 0;
@@ -226,7 +230,6 @@ struct VertexAttribute {
     uint32_t offset = 0;
 };
 
-// Vertex binding description
 struct VertexBinding {
     uint32_t binding = 0;
     uint32_t stride = 0;
@@ -234,7 +237,7 @@ struct VertexBinding {
     BufferHandle buffer = INVALID_HANDLE;
 };
 
-// Pipeline descriptor
+// pipeline configuration
 struct PipelineDesc {
     ShaderHandle shader = INVALID_HANDLE;
     std::vector<VertexAttribute> vertexAttributes;
@@ -256,7 +259,7 @@ struct PipelineDesc {
     std::string debugName;
 };
 
-// Draw command descriptor
+// draw and readback commands
 struct DrawDesc {
     PipelineHandle pipeline = INVALID_HANDLE;
     BufferHandle vertexBuffer = INVALID_HANDLE;
@@ -269,7 +272,6 @@ struct DrawDesc {
     uint32_t firstInstance = 0;
 };
 
-// Readback descriptor for CPU access to GPU resources
 struct ReadbackDesc {
     TextureHandle sourceTexture = INVALID_HANDLE;
     TextureFormat format = TextureFormat::RGBA8;
@@ -279,7 +281,7 @@ struct ReadbackDesc {
     size_t destinationSize = 0;
 };
 
-// Cubemap face enumeration (matches OpenGL/WebGL convention)
+// render target configuration
 enum class CubemapFace : uint32_t {
     PositiveX = 0,
     NegativeX = 1,
@@ -289,7 +291,6 @@ enum class CubemapFace : uint32_t {
     NegativeZ = 5
 };
 
-// Render target attachment types
 enum class AttachmentType {
     Color0,
     Color1,
@@ -303,37 +304,35 @@ enum class AttachmentType {
     DepthStencil
 };
 
-// Render target attachment descriptor
 struct RenderTargetAttachment {
     AttachmentType type = AttachmentType::Color0;
     TextureHandle texture = INVALID_HANDLE;
     int mipLevel = 0;
-    int arrayLayer = 0; // For texture arrays/cubemaps
+    int arrayLayer = 0; // for texture arrays/cubemaps
 };
 
-// Render target descriptor
 struct RenderTargetDesc {
     std::vector<RenderTargetAttachment> colorAttachments;
     RenderTargetAttachment depthAttachment;
     int width = 0;
     int height = 0;
-    int samples = 1; // MSAA samples
+    int samples = 1; // msaa samples
     std::string debugName;
 };
 
-// Render pass description (WebGPU-shaped)
+// render pass description (webgpu-shaped)
 enum class LoadOp { Load, Clear };
 enum class StoreOp { Store, Discard };
 
 struct ColorAttachmentDesc {
-    TextureHandle texture = INVALID_HANDLE; // bound as color attachment view
+    TextureHandle texture = INVALID_HANDLE;
     glm::vec4 clearColor = glm::vec4(0, 0, 0, 1);
     LoadOp loadOp = LoadOp::Clear;
     StoreOp storeOp = StoreOp::Store;
 };
 
 struct DepthStencilAttachmentDesc {
-    TextureHandle texture = INVALID_HANDLE; // bound as depth/stencil view
+    TextureHandle texture = INVALID_HANDLE;
     float depthClear = 1.0f;
     uint32_t stencilClear = 0;
     LoadOp depthLoadOp = LoadOp::Clear;
@@ -341,7 +340,6 @@ struct DepthStencilAttachmentDesc {
 };
 
 struct RenderPassDesc {
-    // Either specify a prebuilt render target handle, or direct attachments
     RenderTargetHandle target = INVALID_HANDLE; // if set, overrides attachments below
     std::vector<ColorAttachmentDesc> colorAttachments;
     DepthStencilAttachmentDesc depthStencil;
@@ -350,17 +348,9 @@ struct RenderPassDesc {
     std::string debugName;
 };
 
-// Uniform Buffer Ring Allocator Types (FEAT-0249)
-// ================================================
-
-/**
- * @brief Handle to a uniform buffer allocation from the ring allocator
- */
+// uniform buffer ring allocator types
 using UniformAllocationHandle = uint32_t;
 
-/**
- * @brief Uniform data type enumeration for validation
- */
 enum class UniformType {
     Float,
     Vec2,
@@ -372,47 +362,32 @@ enum class UniformType {
     Bool
 };
 
-/**
- * @brief Uniform variable reflection information
- */
 struct UniformVariableInfo {
     std::string name;
     UniformType type;
-    uint32_t offset;        // Byte offset in uniform buffer
-    uint32_t size;          // Size in bytes
+    uint32_t offset;        // byte offset in uniform buffer
+    uint32_t size;          // size in bytes
     uint32_t arraySize;     // 1 for non-arrays
 };
 
-/**
- * @brief Uniform buffer reflection information
- */
 struct UniformBlockReflection {
     std::string blockName;
-    uint32_t blockSize;     // Total size in bytes
-    uint32_t binding;       // Binding point
+    uint32_t blockSize;     // total size in bytes
+    uint32_t binding;       // binding point
     std::vector<UniformVariableInfo> variables;
 };
 
-/**
- * @brief Shader reflection data containing all uniform blocks
- */
 struct ShaderReflection {
     std::vector<UniformBlockReflection> uniformBlocks;
     bool isValid = false;
 };
 
-/**
- * @brief Parameters for uniform buffer allocation
- */
 struct UniformAllocationDesc {
-    uint32_t size;          // Size in bytes
-    uint32_t alignment = 16; // Required alignment (UBO std140 is 16 bytes)
+    uint32_t size;          // size in bytes
+    uint32_t alignment = 16; // required alignment (ubo std140 is 16 bytes)
     const char* debugName = nullptr;
 };
 
-/**
- * @brief Result of uniform buffer allocation
- */
 struct UniformAllocation {
     UniformAllocationHandle handle = INVALID_HANDLE;
     BufferHandle buffer = INVALID_HANDLE;

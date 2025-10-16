@@ -2597,7 +2597,7 @@ float computePBR(MaterialCore mat, Light light, vec3 normal) {
 |------|-----------|
 | **Model import** | `engine/src/importers/` (OBJ, Assimp plugins) |
 | **Texture loading** | `engine/src/texture_cache.cpp` |
-| **Scene management** | `engine/include/scene_manager.h` |
+| **Scene management** | `engine/include/managers/scene_manager.h` |
 | **Material system** | `engine/include/glint3d/material_core.h` |
 
 #### Platform-Specific Code

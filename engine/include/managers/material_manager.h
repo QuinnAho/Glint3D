@@ -1,11 +1,21 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/managers/material_manager.h","purpose":"Caches material parameters and updates material uniform buffers","exports":["MaterialManager"],"depends_on":["SceneManager","glint3d::uniform blocks"],"notes":["Synchronizes material data per object","Supports PBR parameter sampling"]}
 #pragma once
+
+/**
+ * @file material_manager.h
+ * @brief Collects material properties and manages the material UBO slots.
+ */
+
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
 
-using namespace glint3d;
+using glint3d::MaterialBlock;
+using glint3d::RHI;
+using glint3d::UniformAllocation;
 
-// Forward declarations
+// forward declarations
 struct SceneObject;
 struct MaterialCore;
 

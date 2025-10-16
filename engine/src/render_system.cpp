@@ -1,6 +1,6 @@
 #include "render_system.h"
 #include <glint3d/uniform_blocks.h>
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "light.h"
 #include "axisrenderer.h"
 #include "grid.h"

@@ -1,4 +1,4 @@
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "mesh_loader.h"
 #include "texture_cache.h"
 #include <iostream>
@@ -677,4 +677,3 @@ glm::mat4 SceneManager::getLocalMatrix(int objectIndex) const
     }
     return m_objects[objectIndex].localMatrix;
 }
-

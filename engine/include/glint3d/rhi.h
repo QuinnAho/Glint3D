@@ -7,7 +7,7 @@
 
 namespace glint3d {
 
-// Forward declarations for WebGPU-shaped frontend
+// forward declarations for WebGPU-shaped frontend
 class CommandEncoder;
 class RenderPassEncoder;
 class Queue;
@@ -15,15 +15,15 @@ class Queue;
 /**
  * @brief Render Hardware Interface (RHI) - Thin abstraction for GPU operations
  * 
- * The RHI provides a clean abstraction layer over graphics APIs (OpenGL, WebGL2,
+ * the RHI provides a clean abstraction layer over graphics APIs (OpenGL, WebGL2,
  * future Vulkan/WebGPU) with minimal performance overhead. It follows RAII patterns
  * for resource management and supports both desktop and web platforms.
  * 
  * Design principles:
- * - Minimal overhead: Thin wrapper with <5% performance cost
- * - Type safety: Opaque handles prevent resource mix-ups
- * - Cross-platform: Consistent API across OpenGL/WebGL2/Vulkan
- * - Future-proof: Designed for modern graphics API patterns
+ * - minimal overhead: Thin wrapper with <5% performance cost
+ * - type safety: Opaque handles prevent resource mix-ups
+ * - cross-platform: Consistent API across OpenGL/WebGL2/Vulkan
+ * - future-proof: Designed for modern graphics API patterns
  */
 class RHI {
 public:
@@ -31,11 +31,11 @@ public:
 
     // Backend identification
     enum class Backend { 
-        OpenGL,   // Desktop OpenGL 3.3+
-        WebGL2,   // Web WebGL 2.0
-        Vulkan,   // Future: Desktop/mobile Vulkan
-        WebGPU,   // Future: Next-gen web graphics
-        Null      // Testing/headless backend
+        OpenGL,   // desktop OpenGL 3.3+
+        WebGL2,   // web WebGL 2.0
+        Vulkan,   // future: Desktop/mobile Vulkan
+        WebGPU,   // future: Next-gen web graphics
+        Null      // testing/headless backend
     };
     
     /**

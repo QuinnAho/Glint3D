@@ -1,5 +1,5 @@
 #include "ui_bridge.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "render_system.h"
 #include "camera_controller.h"
 #include "light.h"

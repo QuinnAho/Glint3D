@@ -4,7 +4,7 @@
 #include "cli_parser.h"
 #include "render_mode_selector.h"
 #include "material_core.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "path_security.h"
 #include <string>
 #include <vector>

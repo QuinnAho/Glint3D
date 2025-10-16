@@ -1,3 +1,17 @@
+// machine summary block
+// {"file":"engine/src/rhi/rhi_gl.cpp","purpose":"implements RhiGL methods for opengl resource management and rendering","exports":[],"depends_on":["rhi/rhi_gl.h","glint3d::rhi_types","glad","path_utils"],"notes":["translates rhi calls to opengl 3.3+ api","manages gl texture/buffer/shader/pipeline/fbo lifecycle","implements uniform buffer ring allocator with persistent mapping","provides simple command encoder/queue for immediate mode execution"]}
+
+/**
+ * @file rhi_gl.cpp
+ * @brief implementation of the opengl rhi backend.
+ *
+ * implements all rhi interface methods by translating to opengl calls. handles resource
+ * creation/destruction, state management, draw calls, and framebuffer operations. includes
+ * webgpu-shaped command encoder/queue adapters that execute immediately in opengl's stateful
+ * api. the uniform buffer ring allocator provides efficient ubo memory management with
+ * persistent mapping support when available.
+ */
+
 #include "rhi/rhi_gl.h"
 #include "path_utils.h"
 #include <iostream>

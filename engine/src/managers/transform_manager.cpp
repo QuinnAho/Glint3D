@@ -1,3 +1,14 @@
+// machine summary block
+// {"file":"engine/src/managers/transform_manager.cpp","purpose":"implements TransformManager methods for rhi-based transform ubo management","exports":[],"depends_on":["managers/transform_manager.h","glint3d::RHI","glint3d::uniform_blocks"],"notes":["allocates persistent mapped ubo for TransformBlock","updates via memcpy to mappedPtr on each matrix change","binds to binding point 0 per uniform_blocks.h convention"]}
+
+/**
+ * @file transform_manager.cpp
+ * @brief implementation of TransformManager for managing model/view/projection transform ubos.
+ *
+ * handles lifecycle (init/shutdown), ubo allocation with persistent mapping, and efficient
+ * updates via direct memory copy. all matrix updates trigger immediate ubo synchronization.
+ */
+
 #include "managers/transform_manager.h"
 #include <cstring>
 #include <iostream>

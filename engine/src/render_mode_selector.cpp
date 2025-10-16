@@ -1,5 +1,5 @@
 #include "render_mode_selector.h"
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "render_pass.h"
 #include <glint3d/rhi.h>
 #include <algorithm>

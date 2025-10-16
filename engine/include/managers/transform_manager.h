@@ -1,10 +1,19 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/managers/transform_manager.h","purpose":"Maintains transform UBO data for objects and global matrices","exports":["TransformManager"],"depends_on":["glm","SceneManager","glint3d::uniform blocks"],"notes":["Uploads model/view/projection data","Supports object picking and gizmo helpers"]}
 #pragma once
+
+/**
+ * @file transform_manager.h
+ * @brief Assembles model/view/projection transforms and writes transform UBOs.
+ */
 
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
 
-using namespace glint3d;
+using glint3d::RHI;
+using glint3d::TransformBlock;
+using glint3d::UniformAllocation;
 
 class TransformManager {
 public:

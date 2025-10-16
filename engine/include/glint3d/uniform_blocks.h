@@ -8,11 +8,11 @@ namespace glint3d {
 /**
  * @brief Standard uniform block structures for UBO ring allocator system
  *
- * These structures match the layout(std140) uniform blocks in shaders.
- * All blocks are padded to 16-byte alignment as required by std140.
+ * these structures match the layout(std140) uniform blocks in shaders.
+ * all blocks are padded to 16-byte alignment as required by std140.
  */
 
-// Transform matrices (used by all vertex shaders)
+// transform matrices (used by all vertex shaders)
 struct TransformBlock {
     glm::mat4 model;
     glm::mat4 view;
@@ -23,7 +23,7 @@ struct TransformBlock {
     static constexpr uint32_t BINDING_POINT = 0;
 };
 
-// Light data structure (matches shader Light struct)
+// light data structure (matches shader Light struct)
 struct LightData {
     int type;
     glm::vec3 position;
@@ -35,7 +35,7 @@ struct LightData {
     float _padding;     // std140 alignment
 };
 
-// Lighting uniform block (used by fragment shaders)
+// lighting uniform block (used by fragment shaders)
 struct LightingBlock {
     int numLights;
     float _padding1[3];  // vec3 alignment
@@ -48,12 +48,12 @@ struct LightingBlock {
     static constexpr uint32_t BINDING_POINT = 1;
 };
 
-// Material properties (used by PBR fragment shader)
+// material properties (used by PBR fragment shader)
 struct MaterialBlock {
     glm::vec4 baseColorFactor;  // rgba
     float metallicFactor;
     float roughnessFactor;
-    float ior;              // Index of refraction
+    float ior;              // index of refraction
     float transmission;     // [0,1]
     float thickness;        // meters
     float attenuationDistance; // meters (Beer-Lambert)
@@ -74,7 +74,7 @@ struct MaterialBlock {
     static constexpr uint32_t BINDING_POINT = 2;
 };
 
-// Rendering state and post-processing parameters
+// rendering state and post-processing parameters
 struct RenderingBlock {
     float exposure;
     float gamma;

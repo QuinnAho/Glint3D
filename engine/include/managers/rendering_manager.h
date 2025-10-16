@@ -1,12 +1,21 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/managers/rendering_manager.h","purpose":"Tracks frame-level rendering parameters and writes the rendering UBO","exports":["RenderingManager"],"depends_on":["glint3d::uniform blocks"],"notes":["Maintains exposure, gamma, temporal state","Handles frame delta timing for shaders"]}
 #pragma once
+
+/**
+ * @file rendering_manager.h
+ * @brief Stores frame-level rendering settings and updates the rendering UBO.
+ */
 
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
 
-using namespace glint3d;
+using glint3d::RenderingBlock;
+using glint3d::RHI;
+using glint3d::UniformAllocation;
 
-// Forward declarations
+// forward declarations
 class IBLSystem;
 
 enum class RenderToneMapMode;

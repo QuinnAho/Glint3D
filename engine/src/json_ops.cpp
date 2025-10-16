@@ -1,6 +1,6 @@
-#include "json_ops.h"
+﻿#include "json_ops.h"
 
-#include "scene_manager.h"
+#include "managers/scene_manager.h"
 #include "render_system.h"
 #include "camera_controller.h"
 #include "config_defaults.h"

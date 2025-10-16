@@ -1,5 +1,5 @@
-#include "managers/material_manager.h"
-#include "scene_manager.h"
+﻿#include "managers/material_manager.h"
+#include "managers/scene_manager.h"
 #include "material_core.h"
 #include <cstring>
 #include <iostream>

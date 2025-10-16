@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <glm/glm.hpp>
 #include <string>
@@ -9,7 +9,7 @@ namespace glint3d {
 /**
  * @brief MaterialCore - Unified BSDF material representation
  * 
- * This single struct is used by BOTH rasterization and raytracing pipelines,
+ * this single struct is used by BOTH rasterization and raytracing pipelines,
  * eliminating the need for dual material storage and conversion between systems.
  * 
  * May change for the raster and ray unfication process

@@ -1,11 +1,21 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/include/managers/lighting_manager.h","purpose":"Manages light data and uploads lighting uniform buffers","exports":["LightingManager"],"depends_on":["glm","glint3d::uniform blocks","SceneManager"],"notes":["Builds light arrays for the GPU","Tracks active light selection state"]}
 #pragma once
+
+/**
+ * @file lighting_manager.h
+ * @brief Aggregates scene lights and pushes them into the lighting UBO.
+ */
+
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 #include <glint3d/uniform_blocks.h>
 
-using namespace glint3d;
+using glint3d::LightingBlock;
+using glint3d::RHI;
+using glint3d::UniformAllocation;
 
-// Forward declarations
+// forward declarations
 class Light;
 
 /**
@@ -17,20 +27,20 @@ public:
     LightingManager();
     ~LightingManager();
 
-    // Initialize/shutdown
+    // initialize/shutdown
     bool init(RHI* rhi);
     void shutdown();
 
-    // Update lighting data from Light system
+    // update lighting data from light system
     void updateLighting(const Light& lights, const glm::vec3& viewPos);
 
-    // Bind lighting UBO to the current shader pipeline
+    // bind lighting UBO to the current shader pipeline
     void bindLightingUniforms();
 
-    // Access to lighting block data (read-only)
+    // access to lighting block data (read-only)
     const LightingBlock& getLightingData() const { return m_lightingData; }
 
-    // Configuration
+    // configuration
     void setGlobalAmbient(const glm::vec4& ambient) { m_lightingData.globalAmbient = ambient; }
     glm::vec4 getGlobalAmbient() const { return m_lightingData.globalAmbient; }
 
@@ -41,7 +51,7 @@ private:
     UniformAllocation m_lightingBlock = {};
     LightingBlock m_lightingData = {};
 
-    // Helper methods
+    // helper methods
     void allocateUBO();
     void updateUBO();
 };
