@@ -1,3 +1,5 @@
+﻿// Machine Summary Block (ndjson)
+// {"file":"engine/include/application_core.h","purpose":"Coordinates Glint3D's window lifecycle, scene state, rendering, and user interaction","exports":["ApplicationCore"],"depends_on":["SceneManager","RenderSystem","CameraController","UIBridge","JsonOpsExecutor"],"notes":["Bootstraps GLFW windowing and callbacks","Bridges CLI/JSON operations to renderer","Owns deterministic clock and seeded RNG for reproducibility"]}
 #pragma once
 #include <string>
 #include <memory>
@@ -7,17 +9,26 @@
 #include "clock.h"
 #include "seeded_rng.h"
 
-// Forward declarations
+/**
+ * @file application_core.h
+ * @brief Central application driver that ties together windowing, scene management, and rendering.
+ *
+ * ApplicationCore bootstraps platform dependencies, advances the main loop, and exposes a compact
+ * API for loading assets, dispatching renders, and routing input/state updates to the renderer,
+ * camera controller, and UI bridge layers.
+ */
+
+// forward declarations
 struct GLFWwindow;
 class SceneManager;
 class RenderSystem;
 class CameraController;
 class Light;
 class UIBridge;
-class UserInput;
+class user input;
 class JsonOpsExecutor;
 
-// Streamlined Application class focused on coordination
+// streamlined application class focused on coordination
 class ApplicationCore 
 {
 public:
@@ -26,10 +37,10 @@ public:
 
     bool init(const std::string& windowTitle, int width, int height, bool headless = false);
     void run();
-    void frame(); // Single frame for Emscripten
+    void frame(); // single frame for emscripten
     void shutdown();
 
-    // Public API for external usage (main.cpp, JSON Ops, etc.)
+    // public api for external usage (main.cpp, json ops, etc.)
     bool loadObject(const std::string& name, const std::string& path, 
                    const glm::vec3& position, const glm::vec3& scale = glm::vec3(1.0f));
     bool renderToPNG(const std::string& path, int width, int height);
@@ -37,34 +48,34 @@ public:
     std::string buildShareLink() const;
     std::string sceneToJson() const;
     
-    // Denoiser support
+    // denoiser support
     void setDenoiseEnabled(bool enabled);
     bool isDenoiseEnabled() const;
     
-    // Raytracing mode support
+    // raytracing mode support
     void setRaytraceMode(bool enabled);
     bool isRaytraceMode() const;
     
-    // Reflection samples per pixel support
+    // reflection samples per pixel support
     void setReflectionSpp(int spp);
     int getReflectionSpp() const;
     
-    // Schema validation support
+    // schema validation support
     void setStrictSchema(bool enabled, const std::string& version = "v1.3");
     bool isStrictSchemaEnabled() const;
     
-    // Render settings support
+    // render settings support
     void setRenderSettings(const RenderSettings& settings);
     const RenderSettings& getRenderSettings() const;
     
-    // Input callbacks (called by GLFW)
+    // input callbacks (called by glfw)
     void handleMouseMove(double xpos, double ypos);
     void handleMouseButton(int button, int action, int mods);
     void handleFramebufferResize(int width, int height);
     void handleKey(int key, int scancode, int action, int mods);
     void handleFileDrop(int count, const char** paths);
 
-    // Getters for external access (UserInput, etc.)
+    // getters for external access (user input, etc.)
     int getWindowWidth() const { return m_windowWidth; }
     int getWindowHeight() const { return m_windowHeight; }
     GLFWwindow* getWindow() const { return m_window; }
@@ -76,7 +87,7 @@ public:
     const SceneManager& getSceneManager() const { return *m_scene; }
 
 private:
-    // Core systems
+    // core systems
     std::unique_ptr<SceneManager> m_scene;
     std::unique_ptr<RenderSystem> m_renderer;
     std::unique_ptr<CameraController> m_camera; 
@@ -84,13 +95,13 @@ private:
     std::unique_ptr<UIBridge> m_uiBridge;
     std::unique_ptr<JsonOpsExecutor> m_ops;
     
-    // Platform/window management
+    // platform / window management
     GLFWwindow* m_window = nullptr;
     int m_windowWidth = 800;
     int m_windowHeight = 600;
     bool m_headless = false;
     
-    // Input state
+    // input state
     bool m_leftMousePressed = false;
     bool m_rightMousePressed = false;
     double m_lastMouseX = 0.0;
@@ -99,16 +110,16 @@ private:
     double m_lastFrameTime = 0.0;
     bool   m_requireRMBToMove = true;
 
-    // Selection
+    // selection
     int m_selectedLightIndex = -1;
     
-    // Render settings
+    // render settings
     RenderSettings m_renderSettings;
 
     std::unique_ptr<IClock> m_clock;
     SeededRng m_rng;
 
-    // Gizmo state
+    // gizmo state
     GizmoMode m_gizmoMode = GizmoMode::Translate;
     GizmoAxis m_gizmoAxis = GizmoAxis::None;
     bool m_gizmoLocal = true;
@@ -120,20 +131,20 @@ private:
     int   m_dragLightIndex = -1;
     glm::mat4 m_modelStart{1.0f};
     
-    // Initialization
+    // initialization
     bool initGLFW(const std::string& windowTitle, int width, int height);
     bool initGLAD();
     void initCallbacks();
     void createDefaultScene();
     void setWindowIcon();
     
-    // GLFW callback wrappers
+    // glfw callback wrappers
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void dropCallback(GLFWwindow* window, int count, const char** paths);
     
-    // Cleanup
+    // cleanup
     void cleanupGL();
 };

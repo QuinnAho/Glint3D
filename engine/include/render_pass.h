@@ -1,125 +1,32 @@
+﻿// Machine Summary Block (ndjson)
+// {"file":"engine/include/render_pass.h","purpose":"Defines render graph contracts and pass context utilities","exports":["PassTiming","ReadbackRequest","PassContext","RenderPass","RenderGraph","RenderGraph-derived passes"],"depends_on":["glint3d::RHI","SceneManager","RenderSystem","Light"],"notes":["PassContext textures map governs inter-pass resources","RenderGraph sequences passes with optional timing","Legacy offscreen rendering still bypasses the graph"]}
 #pragma once
 
 /**
  * @file render_pass.h
- * @brief Render Graph System - Modern pass-based rendering architecture
+ * @brief Render graph interfaces for Glint3D's modular frame pipeline.
  *
- * OVERVIEW
- * This file defines Glint3D's render graph system, a declarative framework for organizing
- * rendering work into modular, reusable passes. Unlike traditional monolithic render loops,
- * the render graph allows passes to declare their inputs/outputs and execute sequentially
- * while the GPU processes commands in parallel.
+ * A RenderGraph owns an ordered list of passes, manages shared render targets, and tracks timing so passes
+ * can be toggled or profiled without touching their code. Each RenderPass implements setup/execute/teardown,
+ * advertises its texture dependencies, and delegates draw work to RenderSystem helpers via PassContext.
  *
- * ARCHITECTURE
+ * PassContext carries the per-frame state shared by passes: scene data, camera and viewport parameters, the
+ * RHI pointer, the shared texture map, timing buffers, and the RenderSystem callbacks (passFrameSetup,
+ * passDeferredLighting, etc.).
  *
- * RenderGraph:
- *   - Container that owns and orchestrates render passes
- *   - Manages shared texture resources between passes
- *   - Executes passes in defined order with automatic timing
- *   - Supports enabling/disabling passes at runtime
+ * Default graphs:
+ *   Raster: FrameSetup -> GBuffer -> DeferredLighting -> Overlay -> Resolve -> Present -> Readback
+ *   Ray:    FrameSetup -> RayIntegrator -> RayDenoise -> Overlay -> Present -> Readback
  *
- * RenderPass (abstract base):
- *   - setup()    - Allocate GPU resources (render targets, textures, pipelines)
- *   - execute()  - Record rendering commands to GPU command queue
- *   - teardown() - Free GPU resources
- *   - getInputs()/getOutputs() - Declare data dependencies
+ * Key points:
+ * - Passes run sequentially on the CPU while the GPU consumes their recorded command buffers.
+ * - Shared textures live in ctx.textures so resource flow stays explicit.
+ * - Manager subsystems update UBOs up front, letting passes stay stateless.
+ * - Legacy offscreen rendering still bypasses the graph (see RenderSystem::renderToPNG()).
  *
- * PassContext:
- *   - Shared state passed to all passes in a frame
- *   - Contains: scene, lights, camera matrices, viewport size, timing data
- *   - ctx.textures map - Named texture pool for inter-pass communication
- *   - ctx.renderer - Callback to RenderSystem for actual draw calls
- *
- * AVAILABLE PASSES
- * ================
- *
- * Raster Pipeline (used for interactive viewport):
- *   FrameSetupPass        → Update managers, bind UBOs, clear screen
- *   GBufferPass           → Geometry pass: write baseColor/normal/position/material
- *   DeferredLightingPass  → Lighting pass: read G-buffer, compute lighting, output litColor
- *   OverlayPass           → Render grid, axes, gizmos
- *   ResolvePass           → MSAA resolve, tonemapping (stub)
- *   PresentPass           → Swap buffers (stub)
- *   ReadbackPass          → GPU→CPU texture readback for PNG export
- *
- * Ray Pipeline (used for physically accurate rendering):
- *   FrameSetupPass        → Update managers, bind UBOs
- *   RayIntegratorPass     → CPU raytracer: cast rays, output rayTraceResult texture
- *   RayDenoisePass        → AI denoising (OIDN): rayTraceResult → denoisedResult
- *   OverlayPass           → Render overlays (usually disabled for ray)
- *   PresentPass           → Swap buffers
- *   ReadbackPass          → GPU→CPU readback for export
- *
- * DATA FLOW EXAMPLE
- * =================
- *
- * Raster Pipeline Frame:
- *
- *   GBufferPass::execute()
- *     └─> ctx.textures["gBaseColor"] = m_baseColorTex      (writes)
- *         ctx.textures["gNormal"] = m_normalTex            (writes)
- *         ctx.textures["gPosition"] = m_positionTex        (writes)
- *         ctx.textures["gMaterial"] = m_materialTex        (writes)
- *
- *   DeferredLightingPass::execute()
- *     └─> auto gBaseColor = ctx.textures.find("gBaseColor") (reads)
- *         auto gNormal = ctx.textures.find("gNormal")       (reads)
- *         // ... compute lighting ...
- *         ctx.textures["litColor"] = m_outputTex             (writes)
- *
- *   ReadbackPass::execute()
- *     └─> auto litColor = ctx.textures.find("litColor")     (reads)
- *         // ... readback to CPU for PNG export ...
- *
- * USAGE
- * =====
- *
- * Creating a render graph (see RenderSystem::initRenderGraphs):
- *
- *   m_rasterGraph = std::make_unique<RenderGraph>(m_rhi.get());
- *   m_rasterGraph->addPass(std::make_unique<FrameSetupPass>());
- *   m_rasterGraph->addPass(std::make_unique<GBufferPass>());
- *   m_rasterGraph->addPass(std::make_unique<DeferredLightingPass>());
- *
- * Executing a frame (see RenderSystem::renderUnified):
- *
- *   PassContext ctx;
- *   ctx.rhi = m_rhi.get();
- *   ctx.scene = &scene;
- *   ctx.lights = &lights;
- *   ctx.renderer = this;
- *   ctx.viewMatrix = viewMatrix;
- *   ctx.projMatrix = projMatrix;
- *   ctx.viewportWidth = width;
- *   ctx.viewportHeight = height;
- *
- *   m_rhi->beginFrame();
- *   m_rasterGraph->setup(ctx);    // Allocate resources once
- *   m_rasterGraph->execute(ctx);  // Execute all passes
- *   m_rhi->endFrame();
- *
- * KEY INSIGHTS
- * ============
- *
- * - Passes execute SEQUENTIALLY on CPU (one after another in order)
- * - GPU executes commands ASYNCHRONOUSLY (CPU queues work, GPU processes in parallel)
- * - Passes communicate via named textures in ctx.textures map
- * - Passes delegate actual rendering to RenderSystem via ctx.renderer->passXXX()
- * - Each pass is timed automatically for performance profiling
- * - Manager layer (TransformManager, LightingManager, etc.) handles UBO state
- *
- * RELATION TO LEGACY CODE
- * =======================
- *
- * This render graph system is used ONLY for interactive rendering (desktop/web viewport).
- * Offscreen rendering (renderToPNG, renderToTextureRHI) currently bypasses the graph
- * and uses legacy direct rendering paths (renderRasterized/renderRaytraced).
- *
- * See CLAUDE.md Phase B for migration status.
- *
- * @see RenderSystem::renderUnified() - Main entry point for graph-based rendering
- * @see RenderSystem::initRenderGraphs() - Graph construction and pass registration
- * @see render_mode_selector.h - Automatic pipeline selection (raster vs ray)
+ * @see RenderSystem::renderUnified()
+ * @see RenderSystem::initRenderGraphs()
+ * @see render_mode_selector.h
  */
 
 #include <memory>
@@ -130,7 +37,11 @@
 #include <glm/glm.hpp>
 #include <glint3d/rhi.h>
 
-using namespace glint3d;
+using glint3d::RHI;
+using glint3d::RenderTargetHandle;
+using glint3d::TextureDesc;
+using glint3d::TextureFormat;
+using glint3d::TextureHandle;
 
 struct PassTiming {
     std::string passName;
@@ -153,7 +64,7 @@ struct ReadbackRequest {
     TextureFormat format = TextureFormat::RGBA8;
 };
 
-// Pass execution context containing all resources and state
+// pass execution context containing shared frame state
 struct PassContext {
     RHI* rhi = nullptr;
     const SceneManager* scene = nullptr;
@@ -169,24 +80,24 @@ struct PassContext {
     RenderTargetHandle renderTarget = INVALID_HANDLE;
     TextureHandle outputTexture = INVALID_HANDLE;
 
-    // Render targets and textures
+    // render targets and textures handed between passes
     std::unordered_map<std::string, TextureHandle> textures;
 
-    // Camera and viewport
+    // camera and viewport
     glm::mat4 viewMatrix{1.0f};
     glm::mat4 projMatrix{1.0f};
     int viewportWidth = 0;
     int viewportHeight = 0;
 
-    // Frame state
+    // frame state
     uint32_t frameIndex = 0;
     float deltaTime = 0.0f;
 
-    // Timing support
+    // timing support
     bool enableTiming = true;
-    std::vector<PassTiming>* passTimings = nullptr; // Pointer to stats collection
+    std::vector<PassTiming>* passTimings = nullptr; // pointer to stats collection
 
-    // Pass-specific data (can be extended by derived passes)
+    // per-pass scratch data (extendable by derived passes)
     std::unordered_map<std::string, void*> customData;
 };
 
@@ -205,7 +116,7 @@ public:
     virtual std::vector<std::string> getInputs() const { return {}; }
     virtual std::vector<std::string> getOutputs() const { return {}; }
 
-    // Execute with timing support
+    // run the pass and capture optional timing
     void executeWithTiming(const PassContext& ctx);
 
 protected:
@@ -323,18 +234,18 @@ public:
     void teardown(const PassContext& ctx) override;
     const char* getName() const override { return "ReadbackPass"; }
 
-    // Allow specifying which texture to read back
+    // allow specifying which texture to read back
     void setSourceTexture(const std::string& textureName) { m_sourceTexture = textureName; }
 
     std::vector<std::string> getInputs() const override {
         if (!m_sourceTexture.empty()) {
             return {m_sourceTexture};
         }
-        return {"litColor", "rayTraceResult", "denoisedResult"}; // Accept any of these
+        return {"litColor", "rayTraceResult", "denoisedResult"}; // accept any of these
     }
 
 private:
-    std::string m_sourceTexture; // Optional specific source texture
+    std::string m_sourceTexture; // optional specific source texture
 };
 
 class GBufferPass : public RenderPass {
@@ -396,6 +307,8 @@ private:
     int m_sampleCount = 64;
     int m_maxDepth = 8;
 };
+
+
 
 
 

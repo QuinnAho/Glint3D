@@ -28,6 +28,44 @@ AI_MUST_NOT:
 - Proceed after any failed step.
 - Ignore or silence any errors.
 
+## 0A. MACHINE SUMMARY BLOCK PROTOCOL
+
+AI_SHALL:
+- Before reading or modifying any source file, locate the **Machine Summary Block** at the very top of the file (immediately preceding code or directives) and parse it for authoritative context.
+- If the Machine Summary Block is missing, create one **before proceeding further**. The block must start with a comment line containing `Machine Summary Block` and be followed by one or more newline-delimited JSON entries (NDJSON) optimized for machine parsing.
+- Keep the block concise (<= 3 JSON lines unless justified) and update it whenever file responsibilities, exports, or key dependencies change.
+
+Recommended JSON fields:
+- `file`: canonical path or filename.
+- `purpose`: single-sentence description of what the file declares or implements.
+- `exports`: array of primary types, functions, or resources defined.
+- `depends_on`: array of critical dependencies or forward declarations.
+- `notes`: short array highlighting behavioral nuances, invariants, or special protocols.
+
+AI_MUST:
+- Ensure the JSON is valid UTF-8 ASCII, double-quoted, and free of trailing commas.
+- Preserve existing Machine Summary Blocks when present, editing fields in place to keep them accurate.
+- Prefer lower_snake_case field names for consistency.
+
+ AI_MUST_NOT:
+ - Place the block after code, include verbose prose, or omit it when creating new files.
+
+## 0B. HUMAN SUMMARY GUIDELINES
+
+AI_SHALL:
+- Maintain a concise human-readable summary comment directly beneath the Machine Summary Block.
+- Keep the summary scoped to the file's purpose, key responsibilities, or architecture context; avoid duplicating the NDJSON content verbatim.
+- Update the summary whenever behavior, exports, or design intent materially changes.
+
+AI_MUST:
+- Prefer brief paragraphs or short bullet fragments over exhaustive walkthroughs.
+- Remove stale sections if they no longer reflect the file.
+- Keep formatting consistent with surrounding codebase conventions (e.g., Doxygen `@file` blocks for headers).
+
+AI_MUST_NOT:
+- Allow the human summary to contradict the Machine Summary Block.
+- Expand the summary with tutorial-level detail or changelog notes.
+
 ## 1. NO HALLUCINATION POLICY
 
 - IF information is not found in:
