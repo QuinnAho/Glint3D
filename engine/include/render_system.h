@@ -1,4 +1,243 @@
 #pragma once
+
+/**
+ * @file render_system.h
+ * @brief Central Rendering Coordinator - Manages all rendering operations and subsystems
+ *
+ * OVERVIEW
+ * ========
+ * RenderSystem is the top-level orchestrator for all rendering in Glint3D. It owns and coordinates:
+ *   - Render Hardware Interface (RHI) for cross-platform GPU abstraction
+ *   - Manager system (Transform, Lighting, Material, Rendering, Pipeline, Camera)
+ *   - RenderGraph system for modular pass-based rendering
+ *   - Mode selection (Raster vs Ray pipeline selection)
+ *   - Utility renderers (Grid, Axes, Gizmo, Skybox, IBL)
+ *   - CPU Raytracer with BVH acceleration
+ *
+ * ARCHITECTURE: DUAL RENDERING PATHS
+ * ==================================
+ *
+ * Glint3D currently has TWO separate rendering architectures:
+ *
+ * Path 1: Modern RenderGraph (Interactive Rendering)
+ * ---------------------------------------------------
+ * Used by: Desktop/Web viewports, real-time rendering
+ *
+ *   Application::mainLoop()
+ *       ↓
+ *   RenderSystem::renderUnified()
+ *       ↓
+ *   Update Managers (TransformManager, LightingManager, MaterialManager, RenderingManager)
+ *       ↓
+ *   Select Pipeline Mode (RenderPipelineModeSelector analyzes materials)
+ *       ↓
+ *   Execute RenderGraph (m_rasterGraph or m_rayGraph)
+ *       ↓
+ *   Graph executes passes sequentially:
+ *     - FrameSetupPass → GBufferPass → DeferredLightingPass → OverlayPass → ResolvePass → PresentPass
+ *
+ * Features:
+ *   Pass-based modular architecture
+ *   Manager-driven UBO system
+ *   Automatic mode selection
+ *   Per-pass timing statistics
+ *   Deferred shading for raster
+ *   Integrated denoising for ray
+ *
+ * Path 2: Legacy Direct Rendering (Offscreen/Headless)
+ * -----------------------------------------------------
+ * Used by: PNG export (--render), JSON Ops render command, headless rendering
+ *
+ *   CLI --render flag / JSON Ops
+ *       ↓
+ *   RenderSystem::renderToPNG()
+ *       ↓
+ *   RenderSystem::renderToTextureRHI()
+ *       ↓
+ *   Check m_renderMode (RenderMode::Raytrace vs Solid/Wireframe/Points)
+ *       ↓
+ *   renderRaytraced() OR renderRasterized()
+ *       ↓
+ *   Direct function calls (bypasses RenderGraph entirely)
+ *
+ * Features:
+ *   Monolithic function-based rendering
+ *   Forward rendering only (no deferred shading)
+ *   Manual mode selection via --mode flag
+ *   No pass timing
+ *   No overlays/grid/axes
+ *
+ * MIGRATION STATUS: The dual-path architecture is temporary technical debt.
+ * Goal: Migrate offscreen paths to use RenderGraph (CLAUDE.md Phase B).
+ *
+ * MANAGER SYSTEM
+ * ==============
+ *
+ * RenderSystem owns 6 managers that handle GPU state via Uniform Buffer Objects (UBOs):
+ *
+ *   Manager              | UBO Binding | Contains                    | Updated
+ *   ---------------------|-------------|-----------------------------|-----------
+ *   TransformManager     | 0           | model/view/projection       | Per-object
+ *   LightingManager      | 1           | Light data, view position   | Per-frame
+ *   MaterialManager      | 2           | PBR properties              | Per-object
+ *   RenderingManager     | 3           | Exposure/gamma/tonemap      | Per-frame
+ *   PipelineManager      | N/A         | Pipeline creation/caching   | On-demand
+ *   CameraManager        | N/A         | Camera state/matrices       | Per-frame
+ *
+ * All managers are updated before rendering begins, then bound via bindUniformBlocks().
+ * Shaders access these as:
+ *
+ *   layout(std140, binding=0) uniform TransformBlock { mat4 model; mat4 view; ... };
+ *   layout(std140, binding=1) uniform LightingBlock { int numLights; Light lights[10]; ... };
+ *   layout(std140, binding=2) uniform MaterialBlock { vec4 baseColorFactor; float metallic; ... };
+ *   layout(std140, binding=3) uniform RenderingBlock { float exposure; float gamma; ... };
+ *
+ * KEY WORKFLOWS
+ * =============
+ *
+ * Interactive Frame (RenderGraph Path):
+ * --------------------------------------
+ *   1. Application::mainLoop() calls renderUnified(scene, lights)
+ *   2. Update all managers with current frame data:
+ *        m_transformManager.updateTransforms(identity, view, proj);
+ *        m_lightingManager.updateLighting(lights, cameraPos);
+ *        m_renderingManager.updateRenderingState(exposure, gamma, ...);
+ *        bindUniformBlocks(); // Bind all UBOs to shader binding points
+ *   3. Analyze scene materials and select pipeline mode:
+ *        RenderPipelineMode mode = m_pipelineSelector->selectMode(materials, config);
+ *   4. Get appropriate render graph:
+ *        RenderGraph* graph = (mode == Raster) ? m_rasterGraph : m_rayGraph;
+ *   5. Build PassContext with scene/lights/camera/viewport:
+ *        PassContext ctx;
+ *        ctx.rhi = m_rhi.get();
+ *        ctx.scene = &scene;
+ *        ctx.renderer = this;  // Passes call back to RenderSystem::passXXX()
+ *   6. Execute graph:
+ *        m_rhi->beginFrame();
+ *        graph->execute(ctx);  // Executes all passes sequentially
+ *        m_rhi->endFrame();
+ *
+ * Offscreen PNG Export (Legacy Path):
+ * ------------------------------------
+ *   1. CLI: glint --ops scene.json --render output.png --w 1920 --h 1080
+ *   2. renderToPNG(scene, lights, "output.png", 1920, 1080)
+ *   3. Create offscreen RHI texture
+ *   4. renderToTextureRHI(scene, lights, texture, width, height)
+ *   5. Check m_renderMode:
+ *        if (m_renderMode == RenderMode::Raytrace) {
+ *            renderRaytraced(scene, lights);  // CPU raytracer
+ *        } else {
+ *            renderRasterized(scene, lights); // Forward rendering
+ *        }
+ *   6. Readback texture to CPU memory
+ *   7. Write PNG using stb_image_write
+ *
+ * PASS IMPLEMENTATION CALLBACKS
+ * =============================
+ *
+ * RenderGraph passes call back to RenderSystem for actual rendering work:
+ *
+ *   Pass                    | RenderSystem Callback              | What It Does
+ *   ------------------------|------------------------------------|----------------------------------
+ *   FrameSetupPass          | passFrameSetup()                   | Clear screen, update/bind UBOs
+ *   GBufferPass             | passGBuffer()                      | Render geometry to MRT
+ *   DeferredLightingPass    | passDeferredLighting()             | Full-screen lighting pass
+ *   RayIntegratorPass       | passRayIntegrator()                | CPU raytracer → texture
+ *   RayDenoisePass          | passRayDenoise()                   | AI denoising (OIDN)
+ *   OverlayPass             | passOverlays()                     | Grid, axes, gizmos, lights
+ *   ResolvePass             | passResolve()                      | MSAA resolve (stub)
+ *   PresentPass             | passPresent()                      | Swap buffers (stub)
+ *   ReadbackPass            | passReadback()                     | GPU→CPU texture copy
+ *
+ * PUBLIC API OVERVIEW
+ * ===================
+ *
+ * Initialization:
+ *   init(width, height)          - Initialize RHI, managers, render graphs
+ *   shutdown()                   - Cleanup all resources
+ *
+ * Rendering:
+ *   render(scene, lights)        - Alias for renderUnified()
+ *   renderUnified(scene, lights) - Modern RenderGraph path (interactive)
+ *   renderToPNG(scene, path, w, h) - Legacy path (offscreen export)
+ *   renderToTextureRHI(scene, tex, w, h) - Legacy path (offscreen texture)
+ *
+ * Configuration:
+ *   setRenderMode(mode)          - Legacy: Points/Wireframe/Solid/Raytrace
+ *   setSampleCount(samples)      - MSAA sample count
+ *   setExposure(exposure)        - HDR exposure adjustment
+ *   setGamma(gamma)              - Gamma correction
+ *   setToneMapping(mode)         - Tonemap: Linear/Reinhard/Filmic/ACES
+ *   setSeed(seed)                - Deterministic rendering seed
+ *   setDenoiseEnabled(enabled)   - OIDN denoising for raytracing
+ *
+ * Camera:
+ *   setCamera(cameraState)       - Update camera state
+ *   updateViewMatrix()           - Recalculate view from camera
+ *   updateProjectionMatrix(w, h) - Recalculate projection
+ *
+ * Debugging:
+ *   setShowGrid(show)            - Toggle grid rendering
+ *   setShowAxes(show)            - Toggle axis gizmo
+ *   setShowSkybox(show)          - Toggle skybox
+ *   getLastFrameStats()          - Get draw calls, triangles, timing
+ *
+ * STATISTICS AND PROFILING
+ * ========================
+ *
+ * RenderStats (available via getLastFrameStats()):
+ *   - drawCalls: Total draw commands issued
+ *   - totalTriangles: Geometry complexity
+ *   - uniqueMaterialKeys: Material batching efficiency
+ *   - uniqueTextures: Texture count
+ *   - texturesMB, geometryMB, vramMB: Memory usage estimates
+ *   - passTimings: Per-pass timing (only for RenderGraph path)
+ *
+ * Performance Monitoring:
+ *   std::vector<PassTiming>& timings = m_stats.passTimings;
+ *   for (const auto& t : timings) {
+ *       std::cout << t.passName << ": " << t.timeMs << "ms\n";
+ *   }
+ *
+ * COMMON PITFALLS
+ * ===============
+ *
+ * 1. **Dual Path Confusion**: Interactive uses RenderGraph, offscreen uses legacy direct calls.
+ *    Same scene may render differently depending on entry point.
+ *
+ * 2. **Manager Update Order**: Managers must be updated BEFORE rendering begins.
+ *    Per-frame updates (lighting, rendering) happen once; per-object updates (material, transform)
+ *    happen inside draw loops.
+ *
+ * 3. **Legacy m_renderMode vs RenderPipelineMode**: Two different enums!
+ *    - RenderMode: Legacy (Points/Wireframe/Solid/Raytrace) - used by offscreen paths
+ *    - RenderPipelineMode: Modern (Raster/Ray/Auto) - used by RenderGraph
+ *
+ * 4. **RHI Initialization**: Many methods require m_rhi to be initialized. Always call init() first.
+ *
+ * 5. **Pipeline Caching**: Pipelines are created lazily and cached. First frame may be slower.
+ *
+ * FUTURE WORK
+ * ===========
+ *
+ * Phase B Migration (in progress):
+ *   - Replace renderToTextureRHI() legacy path with RenderGraph
+ *   - Unify deferred shading for both interactive and offscreen
+ *   - Add ReadbackPass to enable PNG export via graph
+ *
+ * Planned Features:
+ *   - Explicit MSAA resolve pass (currently handled by OpenGL default FB)
+ *   - Custom present pass for render-to-texture workflows
+ *   - Shadow mapping (currently disabled - dummy shadow texture used)
+ *   - Screen-space reflections (SSR) pass for raster pipeline
+ *   - Temporal anti-aliasing (TAA)
+ *
+ * @see render_pass.h - RenderGraph and pass definitions
+ * @see render_mode_selector.h - Automatic pipeline mode selection
+ * @see glint3d/rhi.h - Render Hardware Interface abstraction
+ * @see glint3d/uniform_blocks.h - UBO struct definitions
+ */
+
 #include <string>
 #include <vector>
 #include <memory>
