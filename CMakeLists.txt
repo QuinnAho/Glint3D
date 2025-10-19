@@ -35,7 +35,6 @@ set(APP_SOURCES
     ${SRC_DIR}/schema_validator.cpp
     ${SRC_DIR}/path_security.cpp
     ${SRC_DIR}/path_utils.cpp
-    # ${SRC_DIR}/render_offscreen.cpp  # legacy (Application-based); excluded from build
     ${SRC_DIR}/shader.cpp
     ${SRC_DIR}/texture.cpp
     ${SRC_DIR}/texture_cache.cpp
