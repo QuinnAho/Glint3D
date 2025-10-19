@@ -92,6 +92,14 @@
       "status": "pending",
       "blocked_by": "resource_model",
       "preparation_work": ["minimal_schema_definition", "cli_architecture"]
+    },
+    "header_documentation": {
+      "status": "pending",
+      "blocked_by": [],
+      "priority": "medium",
+      "estimated_effort": "8-12 hours",
+      "description": "Add Machine Summary Blocks and Doxygen documentation to all 64 header files in engine/include/",
+      "notes": "Foundational documentation work - can be done in parallel with other tasks"
     }
   },
   "critical_path": [
@@ -107,8 +115,8 @@
     "immediate": ["Grid shader handle not created", "RenderSystem uses legacy Shader wrappers", "Uniform bridge calls GL"],
     "upcoming": ["setUniform* bridge removal across 60+ call sites"]
   },
-  "last_updated": "2025-10-11T00:00:00Z",
-  "updated_by": "claude_code_assistant",
+  "last_updated": "2025-10-19T17:14:36Z",
+  "updated_by": "claude",
   "notes": "OpenGL migration 94% complete (426/454 GL calls eliminated) BUT critical integration issues discovered. Phase 1-5 work complete but Grid shader handle never created before pipeline build (engine/src/grid.cpp:55-101), RenderSystem still instantiates legacy Shader wrappers (engine/src/render_system.cpp:175-199, 1374-1407), and RHIGL uniform helpers still call glGetUniformLocation/glUniform* (engine/src/rhi/rhi_gl.cpp:1143-1166). Current state won't run cleanly with RHIGL. Phase 6 NOW REQUIRED: 1) Replace Shader usage with RHI equivalents, 2) Move uniform updates to RHI path exclusively (manager APIs or bind groups), 3) Fix Grid shader handle creation, 4) Remove setUniform* bridge (60+ call sites), 5) Delete shader.{h,cpp} (24 GL calls). Priority elevated to CRITICAL - must complete before pass_bridging can proceed."
 }
 }

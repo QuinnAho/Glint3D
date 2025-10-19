@@ -1,0 +1,43 @@
+{
+  "id": "header_documentation",
+  "title": "Add Machine Summary Blocks and Doxygen Documentation to All Headers",
+  "owner": "documentation_team",
+  "status": "pending",
+  "inputs": {
+    "files": [
+      "engine/include/**/*.h"
+    ],
+    "schema_version": "1.0"
+  },
+  "outputs": {
+    "artifacts": [
+      "artifacts/documentation/header_audit.md",
+      "artifacts/documentation/documentation_coverage_report.md",
+      "artifacts/validation/documentation_validation.json"
+    ],
+    "events": [
+      "task_created",
+      "task_started",
+      "step_completed",
+      "phase_completed",
+      "task_completed"
+    ]
+  },
+  "acceptance": [
+    "All header files in engine/include/ have Machine Summary Block at the top",
+    "All Machine Summary Blocks follow NDJSON format with file, purpose, exports, depends_on fields",
+    "All header files have human-readable summary beneath Machine Summary Block",
+    "All header files have Doxygen @file directive with brief description",
+    "All public classes, structs, and functions have @brief documentation",
+    "All function parameters documented with @param",
+    "All function return values documented with @return",
+    "Documentation verification checklist (FOR_MACHINES.md §0C) passes for all headers",
+    "Documentation regenerates without errors using docs/generate-docs.sh"
+  ],
+  "safety": {
+    "rate_limits": ["max_file_edit_time_5min"],
+    "sandbox": false
+  },
+  "dependencies": [],
+  "seed_policy": "non_deterministic"
+}
