@@ -66,6 +66,43 @@ AI_MUST_NOT:
 - Allow the human summary to contradict the Machine Summary Block.
 - Expand the summary with tutorial-level detail or changelog notes.
 
+## 0C. DOXYGEN DOCUMENTATION PROTOCOL
+
+AI_SHALL:
+- Ensure all public header files (in `engine/include/`) use Doxygen-compliant documentation format.
+- After completing any task that modifies or creates header files, verify that all comments are up to date and properly formatted for Doxygen.
+- Check documentation completeness as part of task validation before marking any step complete.
+
+Required Doxygen Elements for Headers:
+- `@file` directive at the top of each header file with brief description
+- `@brief` for all public classes, structs, functions, and enums
+- `@param` for all function parameters
+- `@return` for all functions with return values
+- `@note` for important behavioral notes or invariants
+- `@warning` for critical usage warnings
+- `@see` for related functions or classes when appropriate
+
+AI_MUST:
+- Use `///` or `/** */` style comments for Doxygen blocks
+- Place brief descriptions on the same line as `@brief` or immediately after
+- Document all public APIs before marking a step complete
+- Verify documentation matches actual implementation
+- Update existing documentation when modifying function signatures or behavior
+
+AI_MUST_NOT:
+- Leave public APIs undocumented
+- Use generic placeholder comments (e.g., "TODO: document this")
+- Mark a task complete if header documentation is missing or outdated
+- Skip documentation updates when modifying existing code
+
+Documentation Verification Checklist:
+1. All public classes/structs have `@brief` and purpose description
+2. All public functions have `@brief`, `@param`, and `@return` (if applicable)
+3. Complex algorithms or behaviors have `@note` explaining approach
+4. Edge cases or limitations documented with `@warning`
+5. All parameters and return values accurately described
+6. Cross-references added with `@see` where helpful
+
 ## 1. NO HALLUCINATION POLICY
 
 - IF information is not found in:
@@ -169,6 +206,11 @@ Validate:
 - No compilation errors
 - Tests pass
 - Expected outputs exist and match spec
+- **Verify Doxygen Documentation** (if headers modified):
+  - Check all modified header files for Doxygen compliance
+  - Ensure all new/modified public APIs are documented
+  - Verify documentation matches implementation
+  - Run documentation verification checklist from §0C
 
 If success:
 - Mark step [x] in checklist.md
@@ -182,6 +224,12 @@ If failure:
 For each acceptance criterion:
 - If fails → append acceptance_failed event → RETURN to execution
 - If passes → continue
+
+Documentation Validation:
+- **Verify all modified header files have up-to-date Doxygen documentation**
+- Run through documentation verification checklist from §0C
+- If any header lacks proper documentation → append acceptance_failed event → RETURN to execution
+- If documentation is incomplete or outdated → HALT and update before proceeding
 
 ### STEP 6: MARK TASK COMPLETE
 
@@ -261,10 +309,12 @@ A task is only DONE if:
 - All checklist steps are [x]
 - All acceptance criteria are met
 - All artifacts exist and validated
+- **All modified header files have complete, up-to-date Doxygen documentation**
+- **Documentation verification checklist (§0C) passed for all headers**
 - task.json marked completed
 - current_index.json updated
 - task_completed event logged
 
 NO EXCEPTIONS.
 
-# END OF SPEC v2.1
+# END OF SPEC v2.2

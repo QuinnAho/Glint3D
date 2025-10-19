@@ -1,3 +1,16 @@
+// machine summary block
+// {"file":"engine/include/glint3d/rhi.h","purpose":"render hardware interface providing thin abstraction over graphics apis","exports":["RHI","CommandEncoder","RenderPassEncoder","Queue","createRHI","createDefaultRHI"],"depends_on":["rhi_types","glm"],"notes":["webgpu-shaped api for cross-platform rendering","supports opengl, webgl2, future vulkan/webgpu backends","minimal overhead with raii resource management","includes uniform buffer ring allocator system"]}
+
+/**
+ * @file rhi.h
+ * @brief render hardware interface abstraction layer for cross-platform gpu operations.
+ *
+ * defines the RHI class providing a thin, backend-agnostic abstraction over graphics APIs
+ * including opengl, webgl2, and future vulkan/webgpu backends. includes webgpu-shaped command
+ * recording with encoders and render passes, uniform buffer ring allocator system, and resource
+ * management with opaque typed handles for safety.
+ */
+
 #pragma once
 
 #include <glint3d/rhi_types.h>
@@ -13,12 +26,12 @@ class RenderPassEncoder;
 class Queue;
 
 /**
- * @brief Render Hardware Interface (RHI) - Thin abstraction for GPU operations
- * 
+ * @brief thin abstraction layer for gpu operations across multiple backends
+ *
  * the RHI provides a clean abstraction layer over graphics APIs (OpenGL, WebGL2,
  * future Vulkan/WebGPU) with minimal performance overhead. It follows RAII patterns
  * for resource management and supports both desktop and web platforms.
- * 
+ *
  * Design principles:
  * - minimal overhead: Thin wrapper with <5% performance cost
  * - type safety: Opaque handles prevent resource mix-ups

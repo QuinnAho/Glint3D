@@ -414,7 +414,27 @@ Each finding includes:
 Please perform a QA pass following the ai/prompts/QA_PASS_PROMPT.md specification.
 ```
 
+## Documentation Standards
+
+### Doxygen API Documentation
+
+The project uses **Doxygen** to generate API documentation. All public headers in `engine/include/` must use Doxygen-compliant comments with `@file`, `@brief`, `@param`, `@return`, etc.
+
+**Generate documentation:**
+```bash
+# Windows
+docs\generate-docs.bat
+
+# Linux/macOS
+./docs/generate-docs.sh
+```
+
+Output: `docs/api/html/index.html`
+
+**Important:** Per FOR_MACHINES.md §0C, tasks cannot be marked complete if header documentation is missing or outdated. AI agents must verify documentation after modifying any header files.
+
 ## Next Steps
 
 - Read `ai/FOR_MACHINES.md` for the AI execution protocol
 - Review existing task modules in `ai/tasks/` for examples
+- Generate API documentation with the scripts in `docs/`

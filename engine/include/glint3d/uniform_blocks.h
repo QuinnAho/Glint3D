@@ -1,3 +1,16 @@
+// machine summary block
+// {"file":"engine/include/glint3d/uniform_blocks.h","purpose":"standard uniform block structures for shader uniform buffer objects","exports":["TransformBlock","LightingBlock","MaterialBlock","RenderingBlock","UniformBlocks"],"depends_on":["glm","rhi_types"],"notes":["std140 layout compatible structures","16-byte alignment padding for ubo requirements","includes binding points and block names","provides helper functions for block allocation"]}
+
+/**
+ * @file uniform_blocks.h
+ * @brief standard uniform block structures for shader uniform buffer objects (ubos).
+ *
+ * defines std140-compatible uniform block structures used across all shaders including
+ * transform matrices, lighting data, material properties, and rendering state. all blocks
+ * include proper padding for 16-byte alignment requirements and provide static binding
+ * points for consistent shader interface.
+ */
+
 #pragma once
 
 #include <glm/glm.hpp>
@@ -6,7 +19,7 @@
 namespace glint3d {
 
 /**
- * @brief Standard uniform block structures for UBO ring allocator system
+ * @brief std140-compatible uniform block structures with proper alignment
  *
  * these structures match the layout(std140) uniform blocks in shaders.
  * all blocks are padded to 16-byte alignment as required by std140.

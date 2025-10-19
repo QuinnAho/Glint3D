@@ -1,4 +1,17 @@
-﻿#pragma once
+﻿// machine summary block
+// {"file":"engine/include/glint3d/material_core.h","purpose":"unified material system for pbr workflows across raster and ray pipelines","exports":["MaterialCore"],"depends_on":["glm"],"notes":["single source of truth for material properties","supports pbr workflow with metallic-roughness model","includes factory methods for common material types","compatible with both realtime and offline rendering"]}
+
+/**
+ * @file material_core.h
+ * @brief unified material representation for physically-based rendering workflows.
+ *
+ * defines MaterialCore, a single unified BSDF material struct used by both rasterization
+ * and raytracing pipelines. eliminates dual material storage and conversion overhead between
+ * rendering systems. supports full pbr workflow with metallic-roughness model, transmission,
+ * clearcoat, and future extensions for subsurface scattering and anisotropy.
+ */
+
+#pragma once
 
 #include <glm/glm.hpp>
 #include <string>
@@ -7,16 +20,16 @@
 namespace glint3d {
 
 /**
- * @brief MaterialCore - Unified BSDF material representation
- * 
+ * @brief unified material representation for raster and ray pipelines
+ *
  * this single struct is used by BOTH rasterization and raytracing pipelines,
  * eliminating the need for dual material storage and conversion between systems.
- * 
+ *
  * May change for the raster and ray unfication process
- * 
+ *
  * Design Goals:
  * - Single source of truth for all material properties
- * - Compatible with both real-time raster and offline ray pipelines  
+ * - Compatible with both real-time raster and offline ray pipelines
  * - Physically-based parameters with sensible ranges
  * - Forward compatibility for advanced features
  * - Cache-friendly memory layout
