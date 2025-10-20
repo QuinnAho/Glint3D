@@ -40,7 +40,6 @@
       <tab type="filelist" visible="yes" title="" intro=""/>
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
-    <tab type="user" url="@ref tasks" title="Task Modules" intro=""/>
     <tab type="examples" visible="yes" title="" intro=""/>
   </navindex>
 
