@@ -67,8 +67,6 @@ enum class RenderPipelineMode;
 struct PassContext;
 struct SceneObject;
 
-class Shader;
-
 enum class RenderToneMapMode {
     Linear = 0,
     Reinhard,

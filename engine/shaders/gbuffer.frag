@@ -31,10 +31,10 @@ layout(std140) uniform MaterialBlock {
     bool useTexture;
 };
 
-// Texture samplers
-uniform sampler2D baseColorTex;
-uniform sampler2D normalTex;
-uniform sampler2D mrTex; // Metallic-Roughness texture
+// Texture samplers (match TextureSlots constants)
+layout(binding = 0) uniform sampler2D baseColorTex;
+layout(binding = 1) uniform sampler2D normalTex;
+layout(binding = 2) uniform sampler2D mrTex; // Metallic-Roughness texture
 
 void main()
 {

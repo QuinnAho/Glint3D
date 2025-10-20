@@ -184,13 +184,13 @@
 - [x] **Replace m_screenQuadShader** - Migrated to m_screenQuadShaderRhi + m_screenQuadPipeline in RenderSystem (Phase 2) ✅
 - [x] **Replace m_pbrShader** - Removed from RenderSystem, primary rendering uses RHI pipelines (Phase 3) ✅
 - [x] **Replace m_basicShader** - Removed from RenderSystem, comparison logic eliminated (Phase 3) ✅
-- [ ] **Migrate PipelineManager** - Still instantiates legacy Shader at pipeline_manager.cpp:80
-- [ ] **Remove Shader::setRHI** - Still called at render_system.cpp:184
+- [x] **Migrate PipelineManager** - `pipeline_manager.cpp` now relies solely on RHI shader handles (2025-10-19)
+- [x] **Remove Shader::setRHI** - Legacy helper removed from `render_system.cpp` (2025-10-19)
 - [ ] **Remove Shader class** - Still exists with 24 GL calls in shader.cpp
 
 ### Critical Issue: RHIGL Uniform Bridge Calls GL
-- [ ] **Audit setUniform* calls** - Find all RHI::setUniform* call sites (60+ locations)
-- [ ] **Design manager API** - Define TransformManager/MaterialManager/LightingManager interfaces
+- [x] **Audit setUniform* calls** - Documented 45 active RHI::setUniform* call sites (see artifacts/set_uniform_call_audit.md)
+- [x] **Design manager API** - Documented manager + uniform block responsibilities (see artifacts/uniform_bridge_replacement_plan.md)
 - [ ] **Implement UBO-backed managers** - Replace direct uniform setting with manager updates
 - [ ] **Migrate call sites** - Convert all setUniform* calls to manager API (render_system, helpers)
 - [ ] **Remove GL bridge** - Delete RhiGL::setUniform* methods (rhi_gl.cpp:1143-1166)
@@ -274,17 +274,16 @@
 - ✅ renderObjectFast() no longer takes Shader* parameter
 
 **Remaining Critical Work**:
-1. 🔴 **PipelineManager migration** - Still instantiates legacy Shader at pipeline_manager.cpp:80
-   - Remove loadShaders() method
-   - Remove m_pbrShader/m_basicShader unique_ptr members
-   - Use m_pbrShaderRhi/m_basicShaderRhi exclusively
-2. 🔴 **Remove Shader::setRHI call** - render_system.cpp:184 still calls this
-3. 🔴 **Delete Shader class** - shader.cpp still exists with 24 GL calls
-4. 🔴 **Migrate setUniform* bridge** - 60+ call sites still use RHI::setUniform*, which calls GL
-   - Move to manager APIs or bind groups
-   - Remove setUniform* methods from RhiGL (rhi_gl.cpp:1146+)
-5. 🔴 **Remove forward declaration** - render_system.h:40 still has `class Shader;`
-
+- [x] **PipelineManager migration** - `pipeline_manager.cpp` now relies solely on RHI shader handles (2025-10-19)
+  - [x] Removed `loadShaders()` method
+  - [x] Removed `m_pbrShader`/`m_basicShader` unique_ptr members
+  - [x] Confirmed `m_pbrShaderRhi`/`m_basicShaderRhi` used exclusively
+- [x] **Remove Shader::setRHI call** - `render_system.cpp:188` no longer invokes the legacy helper (2025-10-19)
+- [ ] **Delete Shader class** - `shader.cpp` still exists with 24 GL calls
+- [ ] **Migrate setUniform* bridge** - 60+ call sites still use `RHI::setUniform*`, which calls GL
+  - [ ] Move to manager APIs or bind groups
+  - [ ] Remove `setUniform*` methods from `rhi_gl.cpp` (1146+)
+- [x] **Remove forward declaration** - `render_system.h` no longer declares `class Shader;`
 **Priority**: CRITICAL - Must complete before pass_bridging
 
 **Estimated Remaining**: 3-5 hours for full Phase 6 completion

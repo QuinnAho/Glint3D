@@ -1,12 +1,17 @@
 #version 330 core
 in  vec2 vUV;
 out vec4 FragColor;
-uniform sampler2D rayTex;
+layout(binding = 7) uniform sampler2D rayTex;
 
-// Post-processing uniforms
-uniform float exposure;
-uniform float gamma;
-uniform int toneMappingMode; // 0=Linear, 1=Reinhard, 2=Filmic, 3=ACES
+// Post-processing uniforms via RenderingBlock UBO
+layout(std140) uniform RenderingBlock {
+    float exposure;
+    float gamma;
+    int toneMappingMode; // 0=Linear, 1=Reinhard, 2=Filmic, 3=ACES
+    int shadingMode;
+    float iblIntensity;
+    vec3 objectColor;
+};
 
 // Tone mapping functions
 vec3 reinhardToneMapping(vec3 color) {

@@ -1,3 +1,7 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/src/managers/pipeline_manager.cpp","purpose":"Implements PipelineManager lifecycle, shader creation, and cached pipeline retrieval for the RHI layer","depends_on":["engine/include/managers/pipeline_manager.h","glint3d::RHI"],"notes":["Destroys cached pipelines on shutdown","Creates default RHI shader handles before pipelines","Legacy Shader objects removed"]}
+// PipelineManager implementation for creating, caching, and destroying RHI pipelines. Handles shader handle creation and object pipeline queries.
+
 #include "managers/pipeline_manager.h"
 #include "managers/scene_manager.h"
 #include <iostream>
@@ -21,12 +25,6 @@ bool PipelineManager::init(RHI* rhi)
     }
 
     m_rhi = rhi;
-
-    // Load legacy shader objects first
-    if (!loadShaders()) {
-        std::cerr << "PipelineManager: Failed to load legacy shaders" << std::endl;
-        return false;
-    }
 
     // Create RHI shader objects
     if (!createRhiShaders()) {
@@ -67,33 +65,7 @@ void PipelineManager::shutdown()
         }
     }
 
-    // Reset legacy shaders
-    m_basicShader.reset();
-    m_pbrShader.reset();
-
     m_rhi = nullptr;
-}
-
-bool PipelineManager::loadShaders()
-{
-    // Load PBR shader (required)
-    m_pbrShader = std::make_unique<Shader>();
-    if (!m_pbrShader->load(m_pbrVertPath, m_pbrFragPath)) {
-        std::cerr << "PipelineManager: Failed to load PBR shader from "
-                  << m_pbrVertPath << ", " << m_pbrFragPath << std::endl;
-        return false;
-    }
-
-    // Try to load basic shader (optional - fallback to PBR if missing)
-    m_basicShader = std::make_unique<Shader>();
-    if (!m_basicShader->load(m_basicVertPath, m_basicFragPath)) {
-        std::cerr << "PipelineManager: Basic shaders not found, using PBR shaders for all rendering" << std::endl;
-        // Use PBR shader as fallback for basic shader
-        m_basicShader.reset();
-    }
-
-    std::cerr << "PipelineManager: Successfully loaded legacy shaders" << std::endl;
-    return true;
 }
 
 bool PipelineManager::createRhiShaders()

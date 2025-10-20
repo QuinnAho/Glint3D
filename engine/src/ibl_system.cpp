@@ -1,10 +1,16 @@
+// Machine Summary Block
+// {"file":"engine/src/ibl_system.cpp","purpose":"Implements image-based lighting asset preparation and GPU pipeline bindings","exports":["IblSystem"],"depends_on":["glint3d::RHI","glint3d::TextureSlots","glm"],"notes":["Generates cubemaps, irradiance, prefilter, and BRDF LUT using the runtime RHI"]}
+// Human Summary: Handles loading HDR environments and generating the derived cubemaps plus LUTs, managing GPU state via the RHI.
+
 #include "ibl_system.h"
 #include "image_io.h"
 #include "path_utils.h"
 #include <iostream>
 #include <cmath>
+#include <glint3d/texture_slots.h>
 
 using namespace glint3d;
+namespace Slots = glint3d::TextureSlots;
 
 namespace {
     // Cube vertices for environment mapping
@@ -766,9 +772,9 @@ void IBLSystem::generateBRDFLUT()
 void IBLSystem::bindIBLTextures() const
 {
     // Bind IBL textures to standard slots
-    m_rhi->bindTexture(m_irradianceMap, 3);
-    m_rhi->bindTexture(m_prefilterMap, 4);
-    m_rhi->bindTexture(m_brdfLUT, 5);
+    m_rhi->bindTexture(m_irradianceMap, Slots::IrradianceMap);
+    m_rhi->bindTexture(m_prefilterMap, Slots::PrefilterMap);
+    m_rhi->bindTexture(m_brdfLUT, Slots::BrdfLut);
 }
 
 void IBLSystem::setupCube()

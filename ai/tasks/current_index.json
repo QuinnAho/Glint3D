@@ -119,4 +119,3 @@
   "updated_by": "claude",
   "notes": "OpenGL migration 94% complete (426/454 GL calls eliminated) BUT critical integration issues discovered. Phase 1-5 work complete but Grid shader handle never created before pipeline build (engine/src/grid.cpp:55-101), RenderSystem still instantiates legacy Shader wrappers (engine/src/render_system.cpp:175-199, 1374-1407), and RHIGL uniform helpers still call glGetUniformLocation/glUniform* (engine/src/rhi/rhi_gl.cpp:1143-1166). Current state won't run cleanly with RHIGL. Phase 6 NOW REQUIRED: 1) Replace Shader usage with RHI equivalents, 2) Move uniform updates to RHI path exclusively (manager APIs or bind groups), 3) Fix Grid shader handle creation, 4) Remove setUniform* bridge (60+ call sites), 5) Delete shader.{h,cpp} (24 GL calls). Priority elevated to CRITICAL - must complete before pass_bridging can proceed."
 }
-}

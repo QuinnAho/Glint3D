@@ -64,17 +64,17 @@ layout(std140) uniform RenderingBlock {
     vec3 objectColor;  // for wireframe/debug modes
 };
 
-// Texture samplers (not in UBOs)
-uniform sampler2D baseColorTex;
-uniform sampler2D normalTex;
-uniform sampler2D mrTex; // glTF convention: G=roughness, B=metallic
+// Texture samplers (match TextureSlots constants)
+layout(binding = 0) uniform sampler2D baseColorTex;
+layout(binding = 1) uniform sampler2D normalTex;
+layout(binding = 2) uniform sampler2D mrTex; // glTF convention: G=roughness, B=metallic
 
-uniform sampler2D shadowMap;
+layout(binding = 3) uniform sampler2D shadowMap;
 
 // IBL textures
-uniform samplerCube irradianceMap;
-uniform samplerCube prefilterMap;
-uniform sampler2D brdfLUT;
+layout(binding = 4) uniform samplerCube irradianceMap;
+layout(binding = 5) uniform samplerCube prefilterMap;
+layout(binding = 6) uniform sampler2D brdfLUT;
 
 // Shadow
 float calculateShadow(vec4 fragPosLightSpace) {

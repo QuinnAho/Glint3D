@@ -25,6 +25,20 @@ if not exist "Doxyfile" (
     exit /b 1
 )
 
+REM Generate task module documentation (optional - requires Python)
+echo [INFO] Generating task module documentation...
+where python >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    python tools\generate-task-docs.py
+    if %ERRORLEVEL% NEQ 0 (
+        echo [WARNING] Task documentation generation failed, continuing with Doxygen...
+    )
+) else (
+    echo [INFO] Python not found, skipping task documentation generation
+    echo [INFO] Install Python to enable automatic task docs: https://www.python.org/
+)
+echo.
+
 REM Generate documentation
 echo [INFO] Generating API documentation...
 echo.

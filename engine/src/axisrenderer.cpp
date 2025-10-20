@@ -1,4 +1,9 @@
+// Machine Summary Block
+// {"file":"engine/src/axisrenderer.cpp","purpose":"Implements the axis gizmo renderer using the RHI primitives","exports":["AxisRenderer"],"depends_on":["glint3d::RHI","glint3d::BufferDesc","glint3d::PipelineDesc"],"notes":["Initializes vertex buffer and pipeline once then renders axes each frame"]}
+// Human Summary: Builds colored axis lines, initializes their RHI resources, and renders them through the shared RHI interface.
+
 #include "axisrenderer.h"
+#include "managers/transform_manager.h"
 #include <glint3d/rhi.h>
 
 AxisRenderer::AxisRenderer()
@@ -66,18 +71,17 @@ void AxisRenderer::init(glint3d::RHI* rhi) {
     m_pipeline = m_rhi->createPipeline(pipelineDesc);
 }
 
-void AxisRenderer::render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix) {
+void AxisRenderer::render(const glm::mat4& modelMatrix,
+                          const glm::mat4& viewMatrix,
+                          const glm::mat4& projectionMatrix,
+                          TransformManager& transforms) {
     if (!m_rhi) return;
 
-    // Bind pipeline
-    m_rhi->bindPipeline(m_pipeline);
-
-    // Set uniforms via RHI
-    m_rhi->setUniformMat4("model", modelMatrix);
-    m_rhi->setUniformMat4("view", viewMatrix);
-    m_rhi->setUniformMat4("projection", projectionMatrix);
+    transforms.updateTransforms(modelMatrix, viewMatrix, projectionMatrix);
+    transforms.bindTransformUniforms();
 
     // Draw via RHI
+    m_rhi->bindPipeline(m_pipeline);
     glint3d::DrawDesc drawDesc;
     drawDesc.pipeline = m_pipeline;
     drawDesc.vertexBuffer = m_vertexBuffer;

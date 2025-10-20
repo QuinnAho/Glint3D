@@ -5,10 +5,10 @@ out vec4 FragColor;
 in vec2 vUV;
 
 // G-Buffer textures
-uniform sampler2D gBaseColor;  // RGB: base color, A: metallic
-uniform sampler2D gNormal;     // RGB: world normal, A: roughness
-uniform sampler2D gPosition;   // RGB: world position, A: depth
-uniform sampler2D gMaterial;   // R: transmission, G: ior, B: thickness, A: unused
+layout(binding = 0) uniform sampler2D gBaseColor;  // RGB: base color, A: metallic
+layout(binding = 1) uniform sampler2D gNormal;     // RGB: world normal, A: roughness
+layout(binding = 2) uniform sampler2D gPosition;   // RGB: world position, A: depth
+layout(binding = 3) uniform sampler2D gMaterial;   // R: transmission, G: ior, B: thickness, A: unused
 
 // Light types
 #define LIGHT_POINT 0
@@ -46,9 +46,9 @@ layout(std140) uniform RenderingBlock {
 };
 
 // IBL textures
-uniform samplerCube irradianceMap;
-uniform samplerCube prefilterMap;
-uniform sampler2D brdfLUT;
+layout(binding = 4) uniform samplerCube irradianceMap;
+layout(binding = 5) uniform samplerCube prefilterMap;
+layout(binding = 6) uniform sampler2D brdfLUT;
 
 // PBR Functions (copied from pbr.frag)
 vec3 getNormalFromMap(vec2 uv, vec3 worldPos, vec3 normal)

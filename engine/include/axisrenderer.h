@@ -4,8 +4,9 @@
 #include <glm/glm.hpp>
 #include <glint3d/rhi_types.h>
 
-// Forward declaration
+// Forward declarations
 namespace glint3d { class RHI; }
+class TransformManager;
 
 class AxisRenderer {
 private:
@@ -19,9 +20,12 @@ private:
     layout (location = 0) in vec3 aPos;
     layout (location = 1) in vec3 aColor;
     out vec3 ourColor;
-    uniform mat4 model;
-    uniform mat4 view;
-    uniform mat4 projection;
+    layout(std140, binding = 0) uniform TransformBlock {
+        mat4 model;
+        mat4 view;
+        mat4 projection;
+        mat4 lightSpaceMatrix;
+    };
     void main() {
         gl_Position = projection * view * model * vec4(aPos, 1.0);
         ourColor = aColor;
@@ -38,7 +42,10 @@ private:
 public:
     AxisRenderer();
     void init(glint3d::RHI* rhi);
-    void render(glm::mat4& modelMatrix, glm::mat4& viewMatrix, glm::mat4& projectionMatrix);
+    void render(const glm::mat4& modelMatrix,
+                const glm::mat4& viewMatrix,
+                const glm::mat4& projectionMatrix,
+                TransformManager& transforms);
     void cleanup();
 };
 

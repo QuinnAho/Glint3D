@@ -1,3 +1,7 @@
+// Machine Summary Block
+// {"file":"engine/src/light.cpp","purpose":"Manages scene light data and renders light indicators using the RHI","exports":["Light","LightSource"],"depends_on":["glint3d::RHI","glm"],"notes":["Maintains dynamic light list and draws debug indicators"]}
+// Human Summary: Stores lights, updates GPU buffers, and draws indicator meshes through the shared RHI for editor visualization.
+
 #include "light.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>

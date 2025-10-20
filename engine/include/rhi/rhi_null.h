@@ -1,3 +1,7 @@
+// Machine Summary Block
+// {"file":"engine/include/rhi/rhi_null.h","purpose":"Defines a no-op RHI backend for testing and headless runs","exports":["RhiNull"],"depends_on":["glint3d::RHI"],"notes":["Counts draw calls but skips GPU work"]}
+// Human Summary: Provides a stub implementation of the RHI interface that tracks resource handles without issuing GPU commands.
+
 #pragma once
 #include <glint3d/rhi.h>
 #include <cstdint>

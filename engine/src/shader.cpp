@@ -1,4 +1,8 @@
-﻿#include "shader.h"
+﻿// Machine Summary Block
+// {"file":"engine/src/shader.cpp","purpose":"Legacy OpenGL shader wrapper retained for transitional uniform bridging","exports":["Shader"],"depends_on":["glad","glint3d::RHI","glm"],"notes":["Maintains static RHI pointer for setUniform* proxy until migration completes"]}
+// Human Summary: Compiles GLSL programs, exposes use/setUniform helpers, and proxies uniforms through the RHI during the deprecation period.
+
+#include "shader.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>

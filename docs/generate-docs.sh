@@ -27,6 +27,14 @@ if [ ! -f "Doxyfile" ]; then
     exit 1
 fi
 
+# Generate task module documentation
+echo "[INFO] Generating task module documentation..."
+python3 tools/generate-task-docs.py
+if [ $? -ne 0 ]; then
+    echo "[WARNING] Task documentation generation failed, continuing with Doxygen..."
+fi
+echo
+
 # Generate documentation
 echo "[INFO] Generating API documentation..."
 echo

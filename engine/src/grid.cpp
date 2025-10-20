@@ -1,4 +1,9 @@
+// Machine Summary Block
+// {"file":"engine/src/grid.cpp","purpose":"Draws the ground grid visualization using RHI-managed buffers and shaders","exports":["Grid"],"depends_on":["glint3d::RHI","glm"],"notes":["Initializes line vertex data and stores pipeline plus shader handles"]}
+// Human Summary: Sets up vertex data for the editor grid and renders it via the RHI with configurable spacing and line count.
+
 #include "grid.h"
+#include "managers/transform_manager.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>

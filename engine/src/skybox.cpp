@@ -1,3 +1,7 @@
+// Machine Summary Block
+// {"file":"engine/src/skybox.cpp","purpose":"Loads cubemap textures and renders the skybox via the RHI","exports":["Skybox"],"depends_on":["glint3d::RHI","stb_image"],"notes":["Manages gradient parameters and cubemap handles for background rendering"]}
+// Human Summary: Handles cubemap loading, gradient fallback, and issuing RHI draw calls to render the surrounding skybox cube.
+
 #include "skybox.h"
 #include "stb_image.h"
 #include <iostream>

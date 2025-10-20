@@ -1,5 +1,5 @@
 // Machine Summary Block (ndjson)
-// {"file":"engine/include/managers/pipeline_manager.h","purpose":"Creates and caches GPU pipeline objects for render passes","exports":["PipelineManager"],"depends_on":["glint3d::RHI","ShaderHandle"],"notes":["Provides reuse of shader/pipeline combos","Handles rebuilds on shader or config changes"]}
+// {"file":"engine/include/managers/pipeline_manager.h","purpose":"Creates and caches GPU pipeline objects for render passes","exports":["PipelineManager"],"depends_on":["glint3d::RHI","ShaderHandle"],"notes":["Caches RHI pipelines keyed by geometry layout","Owns reusable shader handles for default materials"]}
 #pragma once
 
 /**
@@ -7,9 +7,7 @@
  * @brief Factory/cache for render pipelines built through the RHI.
  */
 
-#include <glm/glm.hpp>
 #include <glint3d/rhi.h>
-#include <memory>
 #include <unordered_map>
 #include <string>
 
@@ -19,12 +17,10 @@ using glint3d::ShaderHandle;
 
 // forward declarations
 struct SceneObject;
-class Shader;
 
 /**
- * PipelineManager centralizes shader and pipeline creation/management.
- * This handles the complex logic around ensuring objects have appropriate pipelines
- * and manages shader resources.
+ * PipelineManager centralizes shader and pipeline creation/management for the RHI.
+ * It ensures objects acquire appropriate pipelines and manages shared shader handles.
  */
 class PipelineManager {
 public:
@@ -40,11 +36,8 @@ public:
     PipelineHandle getOrCreatePipeline(const std::string& pipelineName, bool usePbr = true);
 
     // Shader management
-    bool loadShaders();
     ShaderHandle getBasicShader() const { return m_basicShaderRhi; }
     ShaderHandle getPbrShader() const { return m_pbrShaderRhi; }
-    Shader* getBasicShaderLegacy() const { return m_basicShader ? m_basicShader.get() : m_pbrShader.get(); }
-    Shader* getPbrShaderLegacy() const { return m_pbrShader.get(); }
 
     // Pipeline querying
     bool hasValidPipeline(const SceneObject& obj) const;
@@ -62,10 +55,6 @@ private:
     ShaderHandle m_pbrShaderRhi = INVALID_HANDLE;
     PipelineHandle m_basicPipeline = INVALID_HANDLE;
     PipelineHandle m_pbrPipeline = INVALID_HANDLE;
-
-    // Legacy shader objects (for compatibility)
-    std::unique_ptr<Shader> m_basicShader;
-    std::unique_ptr<Shader> m_pbrShader;
 
     // Pipeline cache
     std::unordered_map<std::string, PipelineHandle> m_pipelineCache;

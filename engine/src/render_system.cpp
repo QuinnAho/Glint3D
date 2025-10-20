@@ -1,3 +1,7 @@
+// Machine Summary Block (ndjson)
+// {"file":"engine/src/render_system.cpp","purpose":"Implements RenderSystem orchestration for RHI-based scene and debug rendering","depends_on":["engine/include/render_system.h","glint3d::RHI","managers/pipeline_manager.h"],"notes":["Coordinates scene rendering passes and debug systems","Manages RHI pipeline selection and draw submissions"]}
+// RenderSystem implementation driving RHI-centric rendering across primary and debug passes.
+
 #include "render_system.h"
 #include <glint3d/uniform_blocks.h>
 #include "managers/scene_manager.h"
@@ -14,6 +18,7 @@
 #include "render_pass.h"
 #include <glint3d/rhi.h>
 #include <glint3d/rhi_types.h>
+#include <glint3d/texture_slots.h>
 #include "rhi/rhi_gl.h"
 #include "gl_platform.h"
 #include <iostream>
@@ -28,6 +33,7 @@
 #include <sstream>
 
 using namespace glint3d;
+namespace Slots = glint3d::TextureSlots;
 
 // FEAT-0249: Legacy uniform helpers REMOVED
 // All transform, lighting, and material data now uses UBO system
@@ -181,7 +187,6 @@ bool RenderSystem::init(int windowWidth, int windowHeight)
     // Register RHI with Texture so cache can create matching RHI textures
     if (m_rhi) {
         Texture::setRHI(m_rhi.get());
-        Shader::setRHI(m_rhi.get()); // Route shader uniforms through RHI
     }
 
     // Init helpers
@@ -966,18 +971,13 @@ void RenderSystem::renderRaytraced(const SceneManager& scene, const Light& light
     }
     // Note: Depth testing state managed by pipeline
     
-    // Render the raytraced result using screen quad with RHI pipeline
-    // Set post-processing uniforms via RHI
-    if (m_rhi) {
-        m_rhi->setUniformFloat("exposure", m_exposure);
-        m_rhi->setUniformFloat("gamma", m_gamma);
-        m_rhi->setUniformInt("toneMappingMode", static_cast<int>(m_tonemap));
-    }
+    // Ensure UBO state is current for tone mapping
+    m_renderingManager.updateRenderingState(m_exposure, m_gamma, m_tonemap, m_shadingMode, m_iblSystem.get());
 
-    // Bind the raytraced texture (RHI required)
+    // Bind the raytraced texture (RHI required) and draw the screen quad
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE) {
-        m_rhi->bindTexture(m_raytraceTextureRhi, 0);
-        m_rhi->setUniformInt("rayTex", 0);
+        bindUniformBlocks();
+        m_rhi->bindTexture(m_raytraceTextureRhi, Slots::RaytracedOutput);
 
         // Draw the screen quad using RHI with rayscreen pipeline
         BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
@@ -1019,26 +1019,19 @@ void RenderSystem::renderObject(const SceneObject& obj, const Light& lights)
     // Note: shadingMode now in RenderingBlock UBO
 
     // Bind PBR textures - RHI texture binding
-    int unit = 0;
     if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
-        m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("baseColorTex", unit);
-        unit++;
+        m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), Slots::BaseColor);
     }
     if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
-        m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("normalTex", unit);
-        unit++;
+        m_rhi->bindTexture(obj.normalTex->rhiHandle(), Slots::Normal);
     }
     if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
-        m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("mrTex", unit);
+        m_rhi->bindTexture(obj.mrTex->rhiHandle(), Slots::MetallicRoughness);
     }
 
     // Bind dummy shadow map - RHI texture binding
     if (s_dummyShadowTexRhi != INVALID_HANDLE) {
-        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-        m_rhi->setUniformInt("shadowMap", 7);
+        m_rhi->bindTexture(s_dummyShadowTexRhi, Slots::ShadowMap);
     }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
 
@@ -1231,8 +1224,7 @@ void RenderSystem::renderSelectionOutline(const SceneManager& scene)
             // Material UBO now handled by MaterialManager
             // Force bright ambient and no direct lights
             if (s_dummyShadowTexRhi != INVALID_HANDLE) {
-                m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-                m_rhi->setUniformInt("shadowMap", 7);
+                m_rhi->bindTexture(s_dummyShadowTexRhi, Slots::ShadowMap);
             }
             // Note: lightSpaceMatrix now in TransformBlock UBO
             // Note: numLights, globalAmbient now in LightingBlock UBO
@@ -1364,17 +1356,13 @@ void RenderSystem::setupCommonUniforms()
 
     // Bind dummy shadow map - RHI texture binding
     if (s_dummyShadowTexRhi != INVALID_HANDLE) {
-        m_rhi->bindTexture(s_dummyShadowTexRhi, 7);
-        m_rhi->setUniformInt("shadowMap", 7);
+        m_rhi->bindTexture(s_dummyShadowTexRhi, Slots::ShadowMap);
     }
     // FEAT-0249: lightSpaceMatrix now part of TransformBlock UBO
 
     // Bind IBL textures if available - RHI texture binding
     if (m_iblSystem) {
         m_iblSystem->bindIBLTextures();
-        m_rhi->setUniformInt("irradianceMap", 3);
-        m_rhi->setUniformInt("prefilterMap", 4);
-        m_rhi->setUniformInt("brdfLUT", 5);
         // Note: iblIntensity now in RenderingBlock UBO
     }
 }
@@ -1391,23 +1379,17 @@ void RenderSystem::renderObjectFast(const SceneObject& obj, const Light& lights)
     // Material data set via updateMaterialUniformsForObject() -> MaterialBlock UBO
     // Texture flags in MaterialBlock UBO (set by updateMaterialUniformsForObject)
 
-    int unit = 0;
     if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
-        m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("baseColorTex", unit);
-        unit++;
+        m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), Slots::BaseColor);
     }
     if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
-        m_rhi->bindTexture(obj.normalTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("normalTex", unit);
-        unit++;
+        m_rhi->bindTexture(obj.normalTex->rhiHandle(), Slots::Normal);
     }
     if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
         // RHI-only texture binding
-        m_rhi->bindTexture(obj.mrTex->rhiHandle(), unit);
-        m_rhi->setUniformInt("mrTex", unit);
+        m_rhi->bindTexture(obj.mrTex->rhiHandle(), Slots::MetallicRoughness);
     }
     // Draw call using RHI
     DrawDesc dd{};
@@ -1665,8 +1647,7 @@ void RenderSystem::passRaytrace(const PassContext& ctx, int sampleCount, int max
 
     // Render full-screen quad with raytraced texture using RHI pipeline
     if (m_rhi && m_raytraceTextureRhi != INVALID_HANDLE && m_screenQuadPipeline != INVALID_HANDLE) {
-        m_rhi->setUniformInt("screenTexture", 0);
-        m_rhi->bindTexture(m_raytraceTextureRhi, 0);
+        m_rhi->bindTexture(m_raytraceTextureRhi, Slots::RaytracedOutput);
 
         // Use RHI screen quad buffer with rayscreen pipeline
         BufferHandle screenQuadBuffer = m_rhi->getScreenQuadBuffer();
@@ -1794,6 +1775,7 @@ void RenderSystem::passGBuffer(const PassContext& ctx, RenderTargetHandle gBuffe
 
     // Bind the G-buffer pipeline
     m_rhi->bindPipeline(gBufferPipeline);
+    bindUniformBlocks();
 
     // Render all objects to G-buffer using the managers for uniform data
     const auto& objects = ctx.scene->getObjects();
@@ -1805,26 +1787,19 @@ void RenderSystem::passGBuffer(const PassContext& ctx, RenderTargetHandle gBuffe
 
         // Update per-object transform (model matrix)
         glm::mat4 model = obj.modelMatrix;
-        m_rhi->setUniformMat4("model", model);
+        m_transformManager.updateTransforms(model, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
 
         // Bind textures if available
-        int textureUnit = 0;
         if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("baseColorTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), Slots::BaseColor);
         }
 
         if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.normalTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("normalTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.normalTex->rhiHandle(), Slots::Normal);
         }
 
         if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.mrTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("mrTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.mrTex->rhiHandle(), Slots::MetallicRoughness);
         }
 
         // Draw the object
@@ -1879,62 +1854,39 @@ void RenderSystem::passDeferredLighting(const PassContext& ctx, RenderTargetHand
     m_rhi->bindPipeline(deferredPipeline);
 
     // Bind G-buffer textures to texture units
-    int textureUnit = 0;
     if (gBaseColor != INVALID_HANDLE) {
-        m_rhi->bindTexture(gBaseColor, textureUnit);
-        m_rhi->setUniformInt("gBaseColor", textureUnit);
-        textureUnit++;
+        m_rhi->bindTexture(gBaseColor, Slots::GBufferBaseColor);
     }
 
     if (gNormal != INVALID_HANDLE) {
-        m_rhi->bindTexture(gNormal, textureUnit);
-        m_rhi->setUniformInt("gNormal", textureUnit);
-        textureUnit++;
+        m_rhi->bindTexture(gNormal, Slots::GBufferNormal);
     }
 
     if (gPosition != INVALID_HANDLE) {
-        m_rhi->bindTexture(gPosition, textureUnit);
-        m_rhi->setUniformInt("gPosition", textureUnit);
-        textureUnit++;
+        m_rhi->bindTexture(gPosition, Slots::GBufferPosition);
     }
 
     if (gMaterial != INVALID_HANDLE) {
-        m_rhi->bindTexture(gMaterial, textureUnit);
-        m_rhi->setUniformInt("gMaterial", textureUnit);
-        textureUnit++;
+        m_rhi->bindTexture(gMaterial, Slots::GBufferMaterial);
     }
 
     // Bind IBL textures if available and loaded (now that IBL system is RHI-based)
-    // Note: IBL textures are only created after loadHDREnvironment() is called
     if (m_iblSystem) {
         auto irradianceMap = m_iblSystem->getIrradianceMap();
         auto prefilterMap = m_iblSystem->getPrefilterMap();
         auto brdfLUT = m_iblSystem->getBRDFLUT();
 
-        // Only bind if textures are actually loaded (not just initialized to INVALID_HANDLE)
         if (irradianceMap != INVALID_HANDLE) {
-            m_rhi->bindTexture(irradianceMap, textureUnit);
-            m_rhi->setUniformInt("irradianceMap", textureUnit);
-            m_rhi->setUniformInt("useIBL", 1);  // Enable IBL in shader
-            textureUnit++;
-        } else {
-            m_rhi->setUniformInt("useIBL", 0);  // Disable IBL in shader if not loaded
+            m_rhi->bindTexture(irradianceMap, Slots::IrradianceMap);
         }
 
         if (prefilterMap != INVALID_HANDLE) {
-            m_rhi->bindTexture(prefilterMap, textureUnit);
-            m_rhi->setUniformInt("prefilterMap", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(prefilterMap, Slots::PrefilterMap);
         }
 
         if (brdfLUT != INVALID_HANDLE) {
-            m_rhi->bindTexture(brdfLUT, textureUnit);
-            m_rhi->setUniformInt("brdfLUT", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(brdfLUT, Slots::BrdfLut);
         }
-    } else {
-        // No IBL system available
-        m_rhi->setUniformInt("useIBL", 0);
     }
 
     // Draw screen quad (6 vertices, no index buffer)
@@ -2198,29 +2150,22 @@ void RenderSystem::renderObjectsBatchedWithManagers(const SceneManager& scene, c
 
         // Bind pipeline and render
         m_rhi->bindPipeline(pipeline);
+        bindUniformBlocks();
 
-        // Set per-object transform uniform (model matrix)
-        // TODO: This should also be managed by a TransformManager
-        m_rhi->setUniformMat4("model", obj.modelMatrix);
+        // Set per-object transform via TransformManager
+        m_transformManager.updateTransforms(obj.modelMatrix, m_cameraManager.viewMatrix(), m_cameraManager.projectionMatrix());
 
         // Bind textures if available
-        int textureUnit = 0;
         if (obj.baseColorTex && obj.baseColorTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("baseColorTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.baseColorTex->rhiHandle(), Slots::BaseColor);
         }
 
         if (obj.normalTex && obj.normalTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.normalTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("normalTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.normalTex->rhiHandle(), Slots::Normal);
         }
 
         if (obj.mrTex && obj.mrTex->rhiHandle() != INVALID_HANDLE) {
-            m_rhi->bindTexture(obj.mrTex->rhiHandle(), textureUnit);
-            m_rhi->setUniformInt("metallicRoughnessTex", textureUnit);
-            textureUnit++;
+            m_rhi->bindTexture(obj.mrTex->rhiHandle(), Slots::MetallicRoughness);
         }
 
         // Draw the object using RHI draw command

@@ -1,3 +1,7 @@
+// Machine Summary Block
+// {"file":"engine/src/gizmo.cpp","purpose":"Implements the transform gizmo visualization using RHI buffers and shaders","exports":["Gizmo"],"depends_on":["glint3d::RHI","glm"],"notes":["Provides tri-axis lines for orientation debugging"]}
+// Human Summary: Builds the axis gizmo geometry and issues draw calls through the RHI to visualize transform axes.
+
 #include "gizmo.h"
 
 #include <glm/gtc/matrix_transform.hpp>

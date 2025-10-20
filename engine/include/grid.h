@@ -6,6 +6,7 @@
 #include "colors.h"
 
 namespace glint3d { class RHI; }
+class TransformManager;
 
 class Grid {
 public:
@@ -15,8 +16,8 @@ public:
     // Initialize with RHI, number of lines in each direction, and spacing between lines
     bool init(glint3d::RHI* rhi, int lineCount = 50, float spacing = 1.0f);
 
-    // Render the grid using view/projection matrices
-    void render(const glm::mat4& view, const glm::mat4& projection);
+    // Render the grid using the supplied camera transforms
+    void render(const glm::mat4& view, const glm::mat4& projection, TransformManager& transforms);
 
     // Cleanup RHI resources
     void cleanup();
