@@ -40,15 +40,7 @@
       <tab type="filelist" visible="yes" title="" intro=""/>
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
-    <tab type="user" url="@ref tasks" title="Task Modules" intro="">
-      <tab type="user" url="@ref tasks_current_focus" title="Current Focus" intro=""/>
-      <tab type="user" url="@ref tasks_critical_path" title="Critical Path" intro=""/>
-      <tab type="user" url="@ref tasks_in_progress" title="In Progress" intro=""/>
-      <tab type="user" url="@ref tasks_blocked" title="Blocked Tasks" intro=""/>
-      <tab type="user" url="@ref tasks_pending" title="Pending Tasks" intro=""/>
-      <tab type="user" url="@ref tasks_completed" title="Completed Tasks" intro=""/>
-      <tab type="user" url="@ref tasks_protocol" title="Protocol" intro=""/>
-    </tab>
+    <tab type="user" url="@ref tasks" title="Task Modules" intro=""/>
     <tab type="examples" visible="yes" title="" intro=""/>
   </navindex>
 
