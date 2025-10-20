@@ -6,7 +6,7 @@
     <tab type="mainpage" visible="yes" title=""/>
     <tab type="pages" visible="yes" title="" intro=""/>
     <tab type="topics" visible="yes" title="" intro=""/>
-    <tab type="modules" visible="yes" title="" intro="">
+    <tab type="modules" visible="no" title="" intro="">
       <tab type="modulelist" visible="yes" title="" intro=""/>
       <tab type="modulemembers" visible="yes" title="" intro=""/>
     </tab>
@@ -40,6 +40,7 @@
       <tab type="filelist" visible="yes" title="" intro=""/>
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
+    <tab type="user" url="@ref tasks" title="Task Modules" intro=""/>
     <tab type="examples" visible="yes" title="" intro=""/>
   </navindex>
 
