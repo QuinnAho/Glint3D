@@ -38,7 +38,7 @@ Documentation automatically deploys to GitHub Pages when you push to `main`.
 2. Set **Source** to: `GitHub Actions`
 3. Push changes to trigger deployment
 
-**Live URL:** https://ahoqp1.github.io/Glint3D/
+**Live URL:** https://quinnaho.github.io/Glint3D/index.html
 
 **Manual trigger:**
 - Go to **Actions** → **Deploy Documentation** → **Run workflow**

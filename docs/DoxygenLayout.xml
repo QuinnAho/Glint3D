@@ -41,7 +41,6 @@
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
     <tab type="user" url="@ref tasks" title="Task Modules" intro="">
-      <tab type="user" url="@ref tasks_overview" title="Overview" intro=""/>
       <tab type="user" url="@ref tasks_current_focus" title="Current Focus" intro=""/>
       <tab type="user" url="@ref tasks_critical_path" title="Critical Path" intro=""/>
       <tab type="user" url="@ref tasks_in_progress" title="In Progress" intro=""/>
